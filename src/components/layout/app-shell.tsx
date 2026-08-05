@@ -1,10 +1,13 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ClipboardList,
   LayoutDashboard,
   Settings,
   Users,
 } from "lucide-react";
+
+import { createClient } from "@/lib/supabase/server";
 
 const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
@@ -13,11 +16,31 @@ const navigationItems = [
   { title: "הגדרות", href: "/settings", icon: Settings },
 ];
 
-export function AppShell({
+export async function AppShell({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, is_active")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_active) {
+    redirect("/login?error=not-authorized");
+  }
+
   return (
     <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-950">
       <aside className="fixed right-0 top-0 z-20 flex h-screen w-[260px] flex-col border-l border-slate-200 bg-white">
@@ -49,7 +72,7 @@ export function AppShell({
 
         <div className="border-t border-slate-200 px-6 py-5">
           <p className="text-[15px] font-semibold text-slate-500">
-            מחלקת איכות
+            {profile.full_name}
           </p>
         </div>
       </aside>
@@ -69,7 +92,7 @@ export function AppShell({
             </div>
 
             <p className="text-left text-[16px] font-bold text-slate-600">
-              מחובר למערכת
+              {profile.full_name}
             </p>
           </div>
         </header>
