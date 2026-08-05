@@ -126,7 +126,7 @@ export default function NewTaskPage() {
                     defaultChecked
                     className="h-5 w-5"
                   />
-                  <span>סרגאיי</span>
+                  <span>סרגיי</span>
                 </label>
 
                 <label className="flex items-center gap-3 text-base">
@@ -185,3 +185,4 @@ export default function NewTaskPage() {
     </AppShell>
   );
 }
+
