@@ -161,6 +161,10 @@ export default async function TasksPage() {
                 <TableHead className="text-right text-base font-bold">
                   עדכון אחרון
                 </TableHead>
+
+                <TableHead className="w-24 text-center text-base font-bold">
+                  עריכה
+                </TableHead>
               </TableRow>
             </TableHeader>
 
@@ -195,11 +199,20 @@ export default async function TasksPage() {
                     <TableCell>
                       {formatDateTime(task.updated_at)}
                     </TableCell>
+
+                    <TableCell className="text-center">
+                      <Link
+                        href={`/tasks/${task.id}/edit`}
+                        className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-bold transition hover:bg-slate-50"
+                      >
+                        עריכה
+                      </Link>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-64 text-center">
+                  <TableCell colSpan={8} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <Badge variant="secondary" className="px-4 py-1 text-sm">
                         אין משימות פעילות
@@ -219,3 +232,4 @@ export default async function TasksPage() {
     </AppShell>
   );
 }
+
