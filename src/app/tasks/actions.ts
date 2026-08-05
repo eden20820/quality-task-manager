@@ -16,13 +16,13 @@ async function getAuthorizedClient() {
     throw new Error("Unauthorized");
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("profiles")
     .select("is_active")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_active) {
+  if (error || !profile?.is_active) {
     throw new Error("User is not active");
   }
 
@@ -92,4 +92,22 @@ export async function updateTask(formData: FormData) {
   revalidatePath("/tasks/completed");
 
   redirect("/tasks");
+}
+
+export async function clearDashboardTasks() {
+  const { supabase, user } = await getAuthorizedClient();
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      dashboard_cleared_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    console.error("Clear dashboard error:", error);
+    throw new Error("Failed to clear dashboard");
+  }
+
+  revalidatePath("/");
 }
