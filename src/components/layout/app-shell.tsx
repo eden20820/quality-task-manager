@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  CheckCircle2,
   ClipboardList,
   LayoutDashboard,
   Settings,
@@ -12,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
   { title: "משימות", href: "/tasks", icon: ClipboardList },
+  { title: "משימות שהושלמו", href: "/tasks/completed", icon: CheckCircle2 },
   { title: "עובדים", href: "/users", icon: Users },
   { title: "הגדרות", href: "/settings", icon: Settings },
 ];
@@ -106,3 +108,5 @@ export async function AppShell({
     </div>
   );
 }
+
+

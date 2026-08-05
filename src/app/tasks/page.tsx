@@ -1,6 +1,7 @@
 ﻿import Link from "next/link";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { TaskCompleteCheckbox } from "@/components/task-complete-checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,6 +69,7 @@ export default async function TasksPage() {
       due_date,
       updated_at
     `)
+    .neq("status", "completed")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -80,8 +82,9 @@ export default async function TasksPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-4xl font-extrabold">משימות</h2>
+
             <p className="mt-2 text-lg text-slate-500">
-              ניהול, סינון ומעקב אחר כל משימות המחלקה
+              ניהול, סינון ומעקב אחר כל המשימות הפעילות
             </p>
           </div>
 
@@ -109,7 +112,6 @@ export default async function TasksPage() {
               <SelectItem value="new">חדשה</SelectItem>
               <SelectItem value="in_progress">בטיפול</SelectItem>
               <SelectItem value="waiting">ממתינה</SelectItem>
-              <SelectItem value="completed">הושלמה</SelectItem>
               <SelectItem value="cancelled">בוטלה</SelectItem>
             </SelectContent>
           </Select>
@@ -132,21 +134,30 @@ export default async function TasksPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50">
+                <TableHead className="w-24 text-center text-base font-bold">
+                  בוצעה
+                </TableHead>
+
                 <TableHead className="text-right text-base font-bold">
                   מספר
                 </TableHead>
+
                 <TableHead className="text-right text-base font-bold">
                   כותרת
                 </TableHead>
+
                 <TableHead className="text-right text-base font-bold">
                   סטטוס
                 </TableHead>
+
                 <TableHead className="text-right text-base font-bold">
                   עדיפות
                 </TableHead>
+
                 <TableHead className="text-right text-base font-bold">
                   תאריך יעד
                 </TableHead>
+
                 <TableHead className="text-right text-base font-bold">
                   עדכון אחרון
                 </TableHead>
@@ -157,6 +168,10 @@ export default async function TasksPage() {
               {tasks && tasks.length > 0 ? (
                 tasks.map((task) => (
                   <TableRow key={task.id}>
+                    <TableCell>
+                      <TaskCompleteCheckbox taskId={task.id} />
+                    </TableCell>
+
                     <TableCell className="font-bold">
                       #{task.task_number}
                     </TableCell>
@@ -177,19 +192,21 @@ export default async function TasksPage() {
 
                     <TableCell>{formatDate(task.due_date)}</TableCell>
 
-                    <TableCell>{formatDateTime(task.updated_at)}</TableCell>
+                    <TableCell>
+                      {formatDateTime(task.updated_at)}
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <Badge variant="secondary" className="px-4 py-1 text-sm">
-                        אין משימות להצגה
+                        אין משימות פעילות
                       </Badge>
 
                       <p className="text-base text-slate-500">
-                        צור משימה חדשה כדי להתחיל לעבוד
+                        כל המשימות הושלמו או שעדיין לא נוצרו משימות
                       </p>
                     </div>
                   </TableCell>
