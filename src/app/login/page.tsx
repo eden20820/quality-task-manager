@@ -1,4 +1,4 @@
-﻿
+
 import Link from "next/link";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -168,3 +168,4 @@ export default async function HomePage() {
     </AppShell>
   );
 }
+'@ | Set-Content -Encoding utf8 .\src\app\page.tsx
