@@ -17,7 +17,6 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
@@ -67,12 +66,13 @@ export function AppSidebar() {
 
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild tooltip={item.title}>
-                      <Link href={item.href}>
-                        <Icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
+                    <Link
+                      href={item.href}
+                      className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span>{item.title}</span>
+                    </Link>
                   </SidebarMenuItem>
                 );
               })}
