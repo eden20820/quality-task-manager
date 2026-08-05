@@ -138,8 +138,8 @@ export default async function TasksPage() {
                   בוצעה
                 </TableHead>
 
-                <TableHead className="text-right text-base font-bold">
-                  מספר
+                <TableHead className="w-20 text-center text-base font-bold">
+                  מצב
                 </TableHead>
 
                 <TableHead className="text-right text-base font-bold">
@@ -176,8 +176,22 @@ export default async function TasksPage() {
                       <TaskCompleteCheckbox taskId={task.id} />
                     </TableCell>
 
-                    <TableCell className="font-bold">
-                      #{task.task_number}
+                    <TableCell className="text-center">
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full ${
+                          task.status === "new"
+                            ? "bg-emerald-500"
+                            : task.status === "in_progress"
+                              ? "bg-amber-400"
+                              : task.status === "waiting"
+                                ? "bg-orange-500"
+                                : task.status === "cancelled"
+                                  ? "bg-slate-400"
+                                  : "bg-blue-500"
+                        }`}
+                        aria-label={statusLabels[task.status] ?? task.status}
+                        title={statusLabels[task.status] ?? task.status}
+                      />
                     </TableCell>
 
                     <TableCell className="font-semibold">
@@ -232,4 +246,5 @@ export default async function TasksPage() {
     </AppShell>
   );
 }
+
 

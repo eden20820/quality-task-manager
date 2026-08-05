@@ -93,8 +93,8 @@ export default async function CompletedTasksPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50">
-                <TableHead className="text-right text-base font-bold">
-                  מספר
+                <TableHead className="w-20 text-center text-base font-bold">
+                  מצב
                 </TableHead>
 
                 <TableHead className="text-right text-base font-bold">
@@ -126,8 +126,12 @@ export default async function CompletedTasksPage() {
 
                   return (
                     <TableRow key={task.id}>
-                      <TableCell className="font-bold">
-                        #{task.task_number}
+                      <TableCell className="text-center">
+                        <span
+                          className="inline-block h-3.5 w-3.5 rounded-full bg-blue-500"
+                          aria-label="הושלמה"
+                          title="הושלמה"
+                        />
                       </TableCell>
 
                       <TableCell className="font-semibold">
@@ -174,3 +178,4 @@ export default async function CompletedTasksPage() {
     </AppShell>
   );
 }
+
