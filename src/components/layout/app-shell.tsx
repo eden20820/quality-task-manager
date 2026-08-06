@@ -5,7 +5,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Settings,
-  Users,
+  CalendarClock,
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
@@ -14,7 +14,7 @@ const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
   { title: "משימות", href: "/tasks", icon: ClipboardList },
   { title: "משימות שהושלמו", href: "/tasks/completed", icon: CheckCircle2 },
-  { title: "עובדים", href: "/users", icon: Users },
+  { title: "ניהול חומרים", href: "/expiry", icon: CalendarClock },
   { title: "הגדרות", href: "/settings", icon: Settings },
 ];
 
@@ -108,5 +108,7 @@ export async function AppShell({
     </div>
   );
 }
+
+
 
 
