@@ -10,19 +10,20 @@ async function getAuthorizedClient() {
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (userError || !user) {
     throw new Error("Unauthorized");
   }
 
-  const { data: profile, error } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("is_active")
     .eq("id", user.id)
     .single();
 
-  if (error || !profile?.is_active) {
+  if (profileError || !profile?.is_active) {
     throw new Error("User is not active");
   }
 
@@ -51,18 +52,24 @@ export async function completeTask(formData: FormData) {
     throw new Error("Failed to complete task");
   }
 
-  revalidatePath("/");
   revalidatePath("/tasks");
   revalidatePath("/tasks/completed");
+  revalidatePath("/");
 }
 
 export async function updateTask(formData: FormData) {
   const taskId = String(formData.get("task_id") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
+  const description = String(
+    formData.get("description") ?? ""
+  ).trim();
   const status = String(formData.get("status") ?? "new");
-  const priority = String(formData.get("priority") ?? "normal");
-  const dueDate = String(formData.get("due_date") ?? "").trim();
+  const priority = String(
+    formData.get("priority") ?? "normal"
+  );
+  const dueDate = String(
+    formData.get("due_date") ?? ""
+  ).trim();
 
   if (!taskId || !title) {
     throw new Error("Missing required task details");
@@ -86,10 +93,13 @@ export async function updateTask(formData: FormData) {
     throw new Error("Failed to update task");
   }
 
-  revalidatePath("/");
+  /*
+   * אין צורך לרענן את עמוד העריכה עצמו,
+   * מפני שמיד לאחר השמירה המשתמש מועבר לעמוד המשימות.
+   */
   revalidatePath("/tasks");
-  revalidatePath(`/tasks/${taskId}/edit`);
   revalidatePath("/tasks/completed");
+  revalidatePath("/");
 
   redirect("/tasks");
 }

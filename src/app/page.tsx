@@ -1,7 +1,8 @@
-﻿import Link from "next/link";
+﻿
+import Link from "next/link";
 
-import { AppShell } from "@/components/layout/app-shell";
 import { clearDashboardTasks } from "@/app/tasks/actions";
+import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -35,6 +36,14 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
+function formatDateForDatabase(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
 
@@ -45,16 +54,25 @@ export default async function HomePage() {
   let dashboardClearedAt: string | null = null;
 
   if (user) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("dashboard_cleared_at")
       .eq("id", user.id)
       .single();
 
+    if (profileError) {
+      console.error("Load dashboard profile error:", profileError);
+    }
+
     dashboardClearedAt = profile?.dashboard_cleared_at ?? null;
   }
 
-  const { data: tasks, error } = await supabase
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayString = formatDateForDatabase(today);
+
+  let recentTasksQuery = supabase
     .from("tasks")
     .select(`
       id,
@@ -65,55 +83,65 @@ export default async function HomePage() {
       due_date,
       created_at
     `)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(5);
 
-  if (error) {
-    console.error("Load dashboard tasks error:", error);
+  if (dashboardClearedAt) {
+    recentTasksQuery = recentTasksQuery.gt(
+      "created_at",
+      dashboardClearedAt
+    );
   }
 
-  const allTasks = tasks ?? [];
+  const [
+    newTasksResult,
+    inProgressTasksResult,
+    waitingTasksResult,
+    overdueTasksResult,
+    recentTasksResult,
+  ] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "new"),
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "in_progress"),
 
-  const newTasks = allTasks.filter(
-    (task) => task.status === "new"
-  ).length;
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "waiting"),
 
-  const inProgressTasks = allTasks.filter(
-    (task) => task.status === "in_progress"
-  ).length;
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .lt("due_date", todayString)
+      .neq("status", "completed")
+      .neq("status", "cancelled"),
 
-  const waitingTasks = allTasks.filter(
-    (task) => task.status === "waiting"
-  ).length;
+    recentTasksQuery,
+  ]);
 
-  const overdueTasks = allTasks.filter((task) => {
-    if (!task.due_date) return false;
+  const errors = [
+    newTasksResult.error,
+    inProgressTasksResult.error,
+    waitingTasksResult.error,
+    overdueTasksResult.error,
+    recentTasksResult.error,
+  ].filter(Boolean);
 
-    if (
-      task.status === "completed" ||
-      task.status === "cancelled"
-    ) {
-      return false;
-    }
+  if (errors.length > 0) {
+    console.error("Load dashboard error:", errors);
+  }
 
-    const dueDate = new Date(task.due_date);
-    dueDate.setHours(0, 0, 0, 0);
-
-    return dueDate < today;
-  }).length;
-
-  const visibleRecentTasks = allTasks
-    .filter((task) => {
-      if (!dashboardClearedAt) return true;
-
-      return (
-        new Date(task.created_at).getTime() >
-        new Date(dashboardClearedAt).getTime()
-      );
-    })
-    .slice(0, 5);
+  const newTasks = newTasksResult.count ?? 0;
+  const inProgressTasks = inProgressTasksResult.count ?? 0;
+  const waitingTasks = waitingTasksResult.count ?? 0;
+  const overdueTasks = overdueTasksResult.count ?? 0;
+  const visibleRecentTasks = recentTasksResult.data ?? [];
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks },
@@ -233,3 +261,4 @@ export default async function HomePage() {
     </AppShell>
   );
 }
+
