@@ -1,5 +1,6 @@
 ﻿import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -167,9 +168,10 @@ export default function NewTaskPage() {
           </div>
 
           <div className="flex justify-start gap-3 border-t border-slate-200 pt-6">
-            <Button type="submit" size="lg" className="px-8 text-base font-bold">
-              שמור משימה
-            </Button>
+            <SubmitButton
+              idleText="שמור משימה"
+              pendingText="שומר משימה..."
+            />
 
             <Button
               type="button"
@@ -185,4 +187,5 @@ export default function NewTaskPage() {
     </AppShell>
   );
 }
+
 

@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -141,13 +142,10 @@ export default async function EditTaskPage({
           </div>
 
           <div className="flex gap-3 border-t border-slate-200 pt-6">
-            <Button
-              type="submit"
-              size="lg"
-              className="px-8 text-base font-bold"
-            >
-              שמור שינויים
-            </Button>
+            <SubmitButton
+              idleText="שמור שינויים"
+              pendingText="שומר שינויים..."
+            />
 
             <a
               href="/tasks"
@@ -161,3 +159,4 @@ export default async function EditTaskPage({
     </AppShell>
   );
 }
+

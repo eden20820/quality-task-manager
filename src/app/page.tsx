@@ -2,6 +2,7 @@
 import Link from "next/link";
 
 import { clearDashboardTasks } from "@/app/tasks/actions";
+import { ClearDashboardButton } from "@/components/clear-dashboard-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -191,12 +192,7 @@ export default async function HomePage() {
               <div className="flex items-center gap-4">
                 {visibleRecentTasks.length > 0 && (
                   <form action={clearDashboardTasks}>
-                    <button
-                      type="submit"
-                      className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-                    >
-                      ניקוי
-                    </button>
+                    <ClearDashboardButton />
                   </form>
                 )}
 
@@ -275,5 +271,6 @@ export default async function HomePage() {
     </AppShell>
   );
 }
+
 
 
