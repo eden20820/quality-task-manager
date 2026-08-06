@@ -218,8 +218,22 @@ export default async function HomePage() {
                     key={task.id}
                     className="grid grid-cols-[90px_1fr_130px_110px_130px] items-center gap-4 px-5 py-4"
                   >
-                    <div className="font-bold">
-                      #{task.task_number}
+                    <div className="flex justify-center">
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full ${
+                          task.status === "new"
+                            ? "bg-emerald-500"
+                            : task.status === "in_progress"
+                              ? "bg-amber-400"
+                              : task.status === "waiting"
+                                ? "bg-orange-500"
+                                : task.status === "cancelled"
+                                  ? "bg-slate-400"
+                                  : "bg-blue-500"
+                        }`}
+                        aria-label={statusLabels[task.status] ?? task.status}
+                        title={statusLabels[task.status] ?? task.status}
+                      />
                     </div>
 
                     <div className="font-semibold">
@@ -261,4 +275,5 @@ export default async function HomePage() {
     </AppShell>
   );
 }
+
 
