@@ -1,9 +1,4 @@
 "use client";
-import {
-  createExpiryItem,
-  deleteExpiryItem,
-  updateExpiryItem,
-} from "@/app/expiry/actions";
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -19,6 +14,7 @@ import {
 
 import {
   createExpiryItem,
+  deleteExpiryItem,
   updateExpiryItem,
 } from "@/app/expiry/actions";
 import { Button } from "@/components/ui/button";
@@ -50,11 +46,7 @@ export type ExpiryRow = {
   isRejected?: boolean;
 };
 
-type Tab =
-  | "all"
-  | "expired"
-  | "upcoming"
-  | "valid";
+type Tab = "all" | "expired" | "upcoming" | "valid";
 
 type Props = {
   rows: ExpiryRow[];
@@ -146,6 +138,9 @@ export function ExpiryTable({ rows }: Props) {
     useState<MaterialFormValues>(emptyForm);
 
   const [message, setMessage] = useState("");
+  const [deletingItemId, setDeletingItemId] =
+    useState<string | null>(null);
+
   const [isPending, startTransition] =
     useTransition();
 
@@ -262,6 +257,34 @@ export function ExpiryTable({ rows }: Props) {
 
       setDialogOpen(false);
       setFormValues(emptyForm);
+      router.refresh();
+    });
+  }
+
+  function handleDelete(row: ExpiryRow) {
+    const confirmed = window.confirm(
+      `האם למחוק את החומר "${row.material}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingItemId(row.id);
+    setMessage("");
+
+    startTransition(async () => {
+      const result = await deleteExpiryItem(
+        row.id
+      );
+
+      if (!result.success) {
+        window.alert(result.message);
+        setDeletingItemId(null);
+        return;
+      }
+
+      setDeletingItemId(null);
       router.refresh();
     });
   }
@@ -385,7 +408,9 @@ export function ExpiryTable({ rows }: Props) {
                 type="button"
                 variant="outline"
                 onClick={exportToCsv}
-                disabled={filteredRows.length === 0}
+                disabled={
+                  filteredRows.length === 0
+                }
               >
                 <Download className="ml-2 h-4 w-4" />
                 ייצוא
@@ -453,7 +478,7 @@ export function ExpiryTable({ rows }: Props) {
                   מיקום
                 </TableHead>
 
-                <TableHead className="w-28 text-center font-bold">
+                <TableHead className="w-44 text-center font-bold">
                   פעולות
                 </TableHead>
               </TableRow>
@@ -494,18 +519,45 @@ export function ExpiryTable({ rows }: Props) {
                       {row.location || "—"}
                     </TableCell>
 
-                    <TableCell className="text-center">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          openEditDialog(row)
-                        }
-                      >
-                        <Pencil className="ml-2 h-4 w-4" />
-                        עריכה
-                      </Button>
+                    <TableCell>
+                      <div className="flex justify-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            deletingItemId === row.id
+                          }
+                          onClick={() =>
+                            openEditDialog(row)
+                          }
+                        >
+                          <Pencil className="ml-2 h-4 w-4" />
+                          עריכה
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          disabled={
+                            deletingItemId === row.id
+                          }
+                          onClick={() =>
+                            handleDelete(row)
+                          }
+                        >
+                          {deletingItemId ===
+                          row.id ? (
+                            <>
+                              <LoaderCircle className="ml-2 h-4 w-4 animate-spin" />
+                              מוחק...
+                            </>
+                          ) : (
+                            "מחק"
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -572,7 +624,8 @@ export function ExpiryTable({ rows }: Props) {
                   onChange={(event) =>
                     setFormValues((current) => ({
                       ...current,
-                      material: event.target.value,
+                      material:
+                        event.target.value,
                     }))
                   }
                 />
@@ -648,7 +701,8 @@ export function ExpiryTable({ rows }: Props) {
                   onChange={(event) =>
                     setFormValues((current) => ({
                       ...current,
-                      location: event.target.value,
+                      location:
+                        event.target.value,
                     }))
                   }
                 />
@@ -657,7 +711,9 @@ export function ExpiryTable({ rows }: Props) {
               <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4">
                 <input
                   type="checkbox"
-                  checked={formValues.isRejected}
+                  checked={
+                    formValues.isRejected
+                  }
                   onChange={(event) =>
                     setFormValues((current) => ({
                       ...current,
