@@ -1,4 +1,9 @@
 "use client";
+import {
+  createExpiryItem,
+  deleteExpiryItem,
+  updateExpiryItem,
+} from "@/app/expiry/actions";
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -45,7 +50,11 @@ export type ExpiryRow = {
   isRejected?: boolean;
 };
 
-type Filter = "all" | "expired" | "30" | "90";
+type Tab =
+  | "all"
+  | "expired"
+  | "upcoming"
+  | "valid";
 
 type Props = {
   rows: ExpiryRow[];
@@ -125,8 +134,7 @@ export function ExpiryTable({ rows }: Props) {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
-  const [filter, setFilter] =
-    useState<Filter>("all");
+  const [tab, setTab] = useState<Tab>("expired");
 
   const [dialogOpen, setDialogOpen] =
     useState(false);
@@ -140,6 +148,23 @@ export function ExpiryTable({ rows }: Props) {
   const [message, setMessage] = useState("");
   const [isPending, startTransition] =
     useTransition();
+
+  const counts = useMemo(() => {
+    return {
+      all: rows.length,
+      expired: rows.filter(
+        (row) => row.daysLeft < 0
+      ).length,
+      upcoming: rows.filter(
+        (row) =>
+          row.daysLeft >= 0 &&
+          row.daysLeft <= 90
+      ).length,
+      valid: rows.filter(
+        (row) => row.daysLeft > 90
+      ).length,
+    };
+  }, [rows]);
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = search
@@ -159,31 +184,24 @@ export function ExpiryTable({ rows }: Props) {
         return false;
       }
 
-      switch (filter) {
+      switch (tab) {
         case "expired":
           return row.daysLeft < 0;
 
-        case "30":
+        case "upcoming":
           return (
             row.daysLeft >= 0 &&
-            row.daysLeft <= 30
-          );
-
-        case "90":
-          return (
-            row.daysLeft > 30 &&
             row.daysLeft <= 90
           );
+
+        case "valid":
+          return row.daysLeft > 90;
 
         default:
           return true;
       }
     });
-  }, [rows, search, filter]);
-
-  const expiredCount = rows.filter(
-    (row) => row.daysLeft < 0
-  ).length;
+  }, [rows, search, tab]);
 
   function openCreateDialog() {
     setFormMode("create");
@@ -297,113 +315,117 @@ export function ExpiryTable({ rows }: Props) {
     URL.revokeObjectURL(url);
   }
 
+  const tabs: {
+    key: Tab;
+    label: string;
+    count: number;
+  }[] = [
+    {
+      key: "expired",
+      label: "פגי תוקף",
+      count: counts.expired,
+    },
+    {
+      key: "upcoming",
+      label: "עד 90 יום",
+      count: counts.upcoming,
+    },
+    {
+      key: "valid",
+      label: "מעל 90 יום",
+      count: counts.valid,
+    },
+    {
+      key: "all",
+      label: "הכול",
+      count: counts.all,
+    },
+  ];
+
   return (
     <>
       <div className="space-y-5">
-        {expiredCount > 0 && (
+        {counts.expired > 0 && (
           <div className="flex items-center gap-3 rounded-xl border border-red-300 bg-red-50 p-4">
             <AlertTriangle className="h-5 w-5 text-red-600" />
 
             <span className="font-semibold text-red-700">
-              קיימים {expiredCount} חומרים שפג
+              קיימים {counts.expired} חומרים שפג
               תוקפם
             </span>
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
-            <Input
-              className="pr-10"
-              placeholder="חיפוש לפי חומר או מיקום..."
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-            />
+              <Input
+                className="pr-10"
+                placeholder="חיפוש לפי חומר או מיקום..."
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.refresh()}
+              >
+                <RefreshCcw className="ml-2 h-4 w-4" />
+                רענון
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={exportToCsv}
+                disabled={filteredRows.length === 0}
+              >
+                <Download className="ml-2 h-4 w-4" />
+                ייצוא
+              </Button>
+
+              <Button
+                type="button"
+                onClick={openCreateDialog}
+              >
+                <Plus className="ml-2 h-4 w-4" />
+                הוסף חומר
+              </Button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant={
-                filter === "all"
-                  ? "default"
-                  : "outline"
-              }
-              onClick={() => setFilter("all")}
-            >
-              הכל
-            </Button>
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+            {tabs.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setTab(item.key)}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition ${
+                  tab === item.key
+                    ? "bg-slate-950 text-white shadow-sm"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <span>{item.label}</span>
 
-            <Button
-              type="button"
-              variant={
-                filter === "expired"
-                  ? "default"
-                  : "outline"
-              }
-              onClick={() =>
-                setFilter("expired")
-              }
-            >
-              פגי תוקף
-            </Button>
-
-            <Button
-              type="button"
-              variant={
-                filter === "30"
-                  ? "default"
-                  : "outline"
-              }
-              onClick={() => setFilter("30")}
-            >
-              עד 30 יום
-            </Button>
-
-            <Button
-              type="button"
-              variant={
-                filter === "90"
-                  ? "default"
-                  : "outline"
-              }
-              onClick={() => setFilter("90")}
-            >
-              עד 90 יום
-            </Button>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.refresh()}
-            >
-              <RefreshCcw className="ml-2 h-4 w-4" />
-              רענון
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={exportToCsv}
-              disabled={filteredRows.length === 0}
-            >
-              <Download className="ml-2 h-4 w-4" />
-              ייצוא
-            </Button>
-
-            <Button
-              type="button"
-              onClick={openCreateDialog}
-            >
-              <Plus className="ml-2 h-4 w-4" />
-              הוסף חומר
-            </Button>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    tab === item.key
+                      ? "bg-white/20 text-white"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {item.count}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -493,7 +515,7 @@ export function ExpiryTable({ rows }: Props) {
                     colSpan={6}
                     className="h-48 text-center text-slate-500"
                   >
-                    לא נמצאו חומרים התואמים לחיפוש
+                    אין חומרים בכרטיסייה הזו
                   </TableCell>
                 </TableRow>
               )}

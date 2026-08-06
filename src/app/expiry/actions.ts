@@ -627,3 +627,39 @@ export async function updateExpiryItem(
     };
   }
 }
+
+export async function deleteExpiryItem(
+  id: string
+): Promise<ManualExpiryActionResult> {
+  try {
+    const { supabase } = await getAuthorizedClient();
+
+    const { error } = await supabase
+      .from("expiry_items")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Delete expiry item error:", error);
+
+      return {
+        success: false,
+        message: "מחיקת החומר נכשלה",
+      };
+    }
+
+    revalidatePath("/expiry");
+
+    return {
+      success: true,
+      message: "החומר נמחק בהצלחה",
+    };
+  } catch (error) {
+    console.error("Delete expiry item action error:", error);
+
+    return {
+      success: false,
+      message: "מחיקת החומר נכשלה",
+    };
+  }
+}
