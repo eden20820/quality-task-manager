@@ -32,7 +32,10 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  // getClaims מרענן את הסשן בעת הצורך בדיוק כמו getUser(),
+  // אבל מאמת מקומית מול JWKS מקוישד כשאפשר במקום לפנות
+  // לשרת ה-Auth בכל בקשה.
+  await supabase.auth.getClaims();
 
   return response;
 }

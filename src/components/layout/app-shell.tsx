@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import {
   CheckCircle2,
   ClipboardList,
@@ -18,20 +19,17 @@ const navigationItems = [
   { title: "הגדרות", href: "/settings", icon: Settings },
 ];
 
-export async function AppShell({
+/*
+ * AppShell עצמו הוא סינכרוני ולא ממתין לשום דבר —
+ * הסיידבר וה-header מצטיירים מיידית בכל ניווט, בלי "הבהוב" של המסך כולו.
+ * רק החלקים שתלויים בנתוני המשתמש (השם, ובדיקת ההרשאה שמגינה על children)
+ * עטופים ב-Suspense נפרד, כך שהם "משלימים" ברקע בלי לחסום את השלד.
+ */
+export function AppShell({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const portalUser = await getPortalUser();
-  if (!portalUser) {
-    redirect("/login");
-  }
-  const { profile } = portalUser;
-  if (!profile.is_active) {
-    redirect("/login?error=not-authorized");
-  }
-
   return (
     <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-950">
       <aside className="fixed right-0 top-0 z-20 flex h-screen w-[260px] flex-col border-l border-slate-200 bg-white">
@@ -62,9 +60,9 @@ export async function AppShell({
         </nav>
 
         <div className="border-t border-slate-200 px-6 py-5">
-          <p className="text-[15px] font-semibold text-slate-500">
-            {profile.full_name}
-          </p>
+          <Suspense fallback={<span className="block h-[18px] w-24 animate-pulse rounded bg-slate-200" />}>
+            <UserName />
+          </Suspense>
         </div>
       </aside>
 
@@ -83,17 +81,49 @@ export async function AppShell({
             </div>
 
             <p className="text-left text-[16px] font-bold text-slate-600">
-              {profile.full_name}
+              <Suspense fallback={<span className="block h-[16px] w-20 animate-pulse rounded bg-slate-200" />}>
+                <UserName />
+              </Suspense>
             </p>
           </div>
         </header>
 
         <main className="px-10 py-12">
           <div className="mx-auto w-full max-w-[1250px]">
-            {children}
+            <Suspense fallback={<ContentSkeleton />}>
+              <AuthGate>{children}</AuthGate>
+            </Suspense>
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+async function UserName() {
+  // getPortalUser עטופה ב-React cache(), אז הקריאה כאן משתפת
+  // את אותה תוצאה עם AuthGate בלי לשלוף פעמיים באותה בקשה.
+  const portalUser = await getPortalUser();
+  return <>{portalUser?.profile.full_name ?? ""}</>;
+}
+
+async function AuthGate({ children }: { children: React.ReactNode }) {
+  const portalUser = await getPortalUser();
+  if (!portalUser) {
+    redirect("/login");
+  }
+  if (!portalUser.profile.is_active) {
+    redirect("/login?error=not-authorized");
+  }
+
+  return <>{children}</>;
+}
+
+function ContentSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="h-10 w-64 animate-pulse rounded bg-slate-200" />
+      <div className="h-40 animate-pulse rounded-xl bg-slate-200" />
     </div>
   );
 }
