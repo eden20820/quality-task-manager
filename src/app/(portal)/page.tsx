@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { getPortalUser } from "@/lib/auth/portal-user";
 
 const statusLabels: Record<string, string> = {
   new: "חדשה",
@@ -47,32 +48,15 @@ function formatDateForDatabase(date: Date) {
 export default async function HomePage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let dashboardClearedAt: string | null = null;
-
-  if (user) {
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("dashboard_cleared_at")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError) {
-      console.error("Load dashboard profile error:", profileError);
-    }
-
-    dashboardClearedAt = profile?.dashboard_cleared_at ?? null;
-  }
+  const portalUser = await getPortalUser();
+  const dashboardClearedAt = portalUser?.profile.dashboard_cleared_at ?? null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const todayString = formatDateForDatabase(today);
 
-  let recentTasksQuery = supabase
+  let tasksQuery = supabase
     .from("tasks")
     .select(`
       id,
@@ -83,65 +67,27 @@ export default async function HomePage() {
       due_date,
       created_at
     `)
-    .order("created_at", { ascending: false })
-    .limit(5);
+    .order("created_at", { ascending: false });
 
   if (dashboardClearedAt) {
-    recentTasksQuery = recentTasksQuery.gt(
+    tasksQuery = tasksQuery.gt(
       "created_at",
       dashboardClearedAt
     );
   }
 
-  const [
-    newTasksResult,
-    inProgressTasksResult,
-    waitingTasksResult,
-    overdueTasksResult,
-    recentTasksResult,
-  ] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "new"),
+  const { data: dashboardTasks, error: tasksError } = await tasksQuery;
+  if (tasksError) console.error("Load dashboard error:", tasksError);
 
-    supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "in_progress"),
-
-    supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "waiting"),
-
-    supabase
-      .from("tasks")
-      .select("id", { count: "exact", head: true })
-      .lt("due_date", todayString)
-      .neq("status", "completed")
-      .neq("status", "cancelled"),
-
-    recentTasksQuery,
-  ]);
-
-  const errors = [
-    newTasksResult.error,
-    inProgressTasksResult.error,
-    waitingTasksResult.error,
-    overdueTasksResult.error,
-    recentTasksResult.error,
-  ].filter(Boolean);
-
-  if (errors.length > 0) {
-    console.error("Load dashboard error:", errors);
-  }
-
-  const newTasks = newTasksResult.count ?? 0;
-  const inProgressTasks = inProgressTasksResult.count ?? 0;
-  const waitingTasks = waitingTasksResult.count ?? 0;
-  const overdueTasks = overdueTasksResult.count ?? 0;
-  const visibleRecentTasks = recentTasksResult.data ?? [];
+  const allTasks = dashboardTasks ?? [];
+  const newTasks = allTasks.filter((task) => task.status === "new").length;
+  const inProgressTasks = allTasks.filter((task) => task.status === "in_progress").length;
+  const waitingTasks = allTasks.filter((task) => task.status === "waiting").length;
+  const overdueTasks = allTasks.filter((task) =>
+    task.due_date && task.due_date < todayString &&
+    task.status !== "completed" && task.status !== "cancelled"
+  ).length;
+  const visibleRecentTasks = allTasks.slice(0, 5);
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks },
@@ -270,6 +216,4 @@ export default async function HomePage() {
     </>
   );
 }
-
-
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase/client";
 import {
   Table,
   TableBody,
@@ -126,6 +127,8 @@ export function ExpiryTable({ rows }: Props) {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
+  const [localRows, setLocalRows] = useState(rows);
+  const [page, setPage] = useState(1);
   const [tab, setTab] = useState<Tab>("expired");
 
   const [dialogOpen, setDialogOpen] =
@@ -144,29 +147,40 @@ export function ExpiryTable({ rows }: Props) {
   const [isPending, startTransition] =
     useTransition();
 
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase.channel("expiry-items")
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "expiry_items" }, (payload) => {
+        const oldItem = payload.old as { id?: string };
+        if (oldItem.id) setLocalRows((current) => current.filter((row) => row.id !== oldItem.id));
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
+
   const counts = useMemo(() => {
     return {
-      all: rows.length,
-      expired: rows.filter(
+      all: localRows.length,
+      expired: localRows.filter(
         (row) => row.daysLeft < 0
       ).length,
-      upcoming: rows.filter(
+      upcoming: localRows.filter(
         (row) =>
           row.daysLeft >= 0 &&
           row.daysLeft <= 90
       ).length,
-      valid: rows.filter(
+      valid: localRows.filter(
         (row) => row.daysLeft > 90
       ).length,
     };
-  }, [rows]);
+  }, [localRows]);
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = search
       .trim()
       .toLowerCase();
 
-    return rows.filter((row) => {
+    return localRows.filter((row) => {
       const matchesSearch =
         row.material
           .toLowerCase()
@@ -196,7 +210,12 @@ export function ExpiryTable({ rows }: Props) {
           return true;
       }
     });
-  }, [rows, search, tab]);
+  }, [localRows, search, tab]);
+
+  const pageSize = 50;
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   function openCreateDialog() {
     setFormMode("create");
@@ -255,9 +274,28 @@ export function ExpiryTable({ rows }: Props) {
         return;
       }
 
+      if (result.item) {
+        const [year, month, day] = result.item.expiryDate.split("-");
+        const target = new Date(`${result.item.expiryDate}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        target.setHours(0, 0, 0, 0);
+        const nextRow: ExpiryRow = {
+          id: result.item.id,
+          material: result.item.materialName,
+          expiry: `${day}/${month}/${year}`,
+          quantity: result.item.quantity,
+          location: result.item.location,
+          daysLeft: Math.floor((target.getTime() - today.getTime()) / 86_400_000),
+          isRejected: result.item.isRejected,
+        };
+        setLocalRows((current) => formMode === "create"
+          ? [nextRow, ...current]
+          : current.map((row) => row.id === nextRow.id ? nextRow : row));
+      }
+
       setDialogOpen(false);
       setFormValues(emptyForm);
-      router.refresh();
     });
   }
 
@@ -272,6 +310,7 @@ export function ExpiryTable({ rows }: Props) {
 
     setDeletingItemId(row.id);
     setMessage("");
+    setLocalRows((current) => current.filter((item) => item.id !== row.id));
 
     startTransition(async () => {
       const result = await deleteExpiryItem(
@@ -279,13 +318,13 @@ export function ExpiryTable({ rows }: Props) {
       );
 
       if (!result.success) {
+        setLocalRows((current) => [row, ...current]);
         window.alert(result.message);
         setDeletingItemId(null);
         return;
       }
 
       setDeletingItemId(null);
-      router.refresh();
     });
   }
 
@@ -388,9 +427,7 @@ export function ExpiryTable({ rows }: Props) {
                 className="pr-10"
                 placeholder="חיפוש לפי חומר או מיקום..."
                 value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
+                onChange={(event) => { setSearch(event.target.value); setPage(1); }}
               />
             </div>
 
@@ -431,7 +468,7 @@ export function ExpiryTable({ rows }: Props) {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setTab(item.key)}
+                onClick={() => { setTab(item.key); setPage(1); }}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition ${
                   tab === item.key
                     ? "bg-slate-950 text-white shadow-sm"
@@ -485,8 +522,8 @@ export function ExpiryTable({ rows }: Props) {
             </TableHeader>
 
             <TableBody>
-              {filteredRows.length > 0 ? (
-                filteredRows.map((row) => (
+              {pagedRows.length > 0 ? (
+                pagedRows.map((row) => (
                   <TableRow
                     key={row.id}
                     className={`${getRowClass(
@@ -575,10 +612,14 @@ export function ExpiryTable({ rows }: Props) {
           </Table>
         </div>
 
-        <p className="text-sm font-medium text-slate-500">
-          מוצגות {filteredRows.length} מתוך{" "}
-          {rows.length} רשומות
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm font-medium text-slate-500">מוצגות {pagedRows.length} מתוך {filteredRows.length} תוצאות ({localRows.length} רשומות בסך הכול)</p>
+          {totalPages > 1 && <div className="flex items-center gap-3">
+            <Button type="button" variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>הקודם</Button>
+            <span className="text-sm font-bold">עמוד {currentPage} מתוך {totalPages}</span>
+            <Button type="button" variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>הבא</Button>
+          </div>}
+        </div>
       </div>
 
       <Dialog

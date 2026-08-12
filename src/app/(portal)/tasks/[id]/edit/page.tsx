@@ -1,6 +1,5 @@
 ﻿import { notFound } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import {
@@ -158,4 +157,3 @@ export default async function EditTaskPage({
     </>
   );
 }
-

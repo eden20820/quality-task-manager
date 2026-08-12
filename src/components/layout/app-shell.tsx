@@ -8,7 +8,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/server";
+import { getPortalUser } from "@/lib/auth/portal-user";
 
 const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
@@ -23,23 +23,12 @@ export async function AppShell({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const portalUser = await getPortalUser();
+  if (!portalUser) {
     redirect("/login");
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, is_active")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile?.is_active) {
+  const { profile } = portalUser;
+  if (!profile.is_active) {
     redirect("/login?error=not-authorized");
   }
 
@@ -108,7 +97,6 @@ export async function AppShell({
     </div>
   );
 }
-
 
 
 

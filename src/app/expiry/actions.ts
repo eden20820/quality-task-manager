@@ -39,6 +39,14 @@ export type ExpiryImportPreview = {
 export type ManualExpiryActionResult = {
   success: boolean;
   message: string;
+  item?: {
+    id: string;
+    materialName: string;
+    expiryDate: string;
+    quantity: number | null;
+    location: string;
+    isRejected: boolean;
+  };
 };
 
 async function getAuthorizedClient() {
@@ -470,7 +478,7 @@ export async function createExpiryItem(
       };
     }
 
-    const { error } = await supabase
+    const { data: created, error } = await supabase
       .from("expiry_items")
       .insert({
         material_name: item.materialName,
@@ -487,7 +495,9 @@ export async function createExpiryItem(
         created_by: user.id,
         first_imported_at: timestamp,
         last_seen_at: timestamp,
-      });
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error(
@@ -501,11 +511,17 @@ export async function createExpiryItem(
       };
     }
 
-    revalidatePath("/expiry");
-
     return {
       success: true,
       message: "החומר נוסף בהצלחה",
+      item: {
+        id: created.id,
+        materialName: item.materialName,
+        expiryDate: expiryDateValue,
+        quantity: item.quantity,
+        location: item.location,
+        isRejected: item.isRejected,
+      },
     };
   } catch (error) {
     console.error(
@@ -606,11 +622,17 @@ export async function updateExpiryItem(
       };
     }
 
-    revalidatePath("/expiry");
-
     return {
       success: true,
       message: "החומר עודכן בהצלחה",
+      item: {
+        id: itemId,
+        materialName: item.materialName,
+        expiryDate: expiryDateValue,
+        quantity: item.quantity,
+        location: item.location,
+        isRejected: item.isRejected,
+      },
     };
   } catch (error) {
     console.error(
@@ -647,8 +669,6 @@ export async function deleteExpiryItem(
         message: "מחיקת החומר נכשלה",
       };
     }
-
-    revalidatePath("/expiry");
 
     return {
       success: true,

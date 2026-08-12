@@ -30,11 +30,10 @@ async function getAuthorizedClient() {
   return { supabase, user };
 }
 
-export async function completeTask(formData: FormData) {
-  const taskId = String(formData.get("task_id") ?? "").trim();
+export async function completeTask(taskId: string): Promise<{ success: boolean; message: string }> {
 
   if (!taskId) {
-    throw new Error("Missing task ID");
+    return { success: false, message: "מזהה המשימה חסר" };
   }
 
   const { supabase, user } = await getAuthorizedClient();
@@ -49,12 +48,9 @@ export async function completeTask(formData: FormData) {
 
   if (error) {
     console.error("Complete task error:", error);
-    throw new Error("Failed to complete task");
+    return { success: false, message: "השלמת המשימה נכשלה. נסה שוב." };
   }
-
-  revalidatePath("/tasks");
-  revalidatePath("/tasks/completed");
-  revalidatePath("/");
+  return { success: true, message: "המשימה הושלמה" };
 }
 
 export async function updateTask(formData: FormData) {
