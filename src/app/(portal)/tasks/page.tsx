@@ -1,6 +1,5 @@
 ﻿import Link from "next/link";
 
-import { AppShell } from "@/components/layout/app-shell";
 import { TaskCompleteCheckbox } from "@/components/task-complete-checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -77,7 +76,7 @@ export default async function TasksPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <div className="space-y-8">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -243,7 +242,7 @@ export default async function TasksPage() {
           </Table>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
 

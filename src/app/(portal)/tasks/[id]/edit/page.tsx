@@ -1,6 +1,5 @@
 ﻿import { notFound } from "next/navigation";
 
-import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/server";
 
-import { updateTask } from "../../actions";
+import { updateTask } from "@/app/tasks/actions";
 
 type EditTaskPageProps = {
   params: Promise<{
@@ -46,7 +45,7 @@ export default async function EditTaskPage({
   }
 
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-4xl">
         <div className="mb-8">
           <h2 className="text-4xl font-extrabold">
@@ -156,7 +155,7 @@ export default async function EditTaskPage({
           </div>
         </form>
       </div>
-    </AppShell>
+    </>
   );
 }
 

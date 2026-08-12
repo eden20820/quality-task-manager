@@ -1,4 +1,3 @@
-﻿import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +9,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { createTask } from "./actions";
+import { createTask } from "@/app/tasks/new/actions";
 
 export default function NewTaskPage() {
   return (
-    <AppShell>
+    <>
       <div className="mx-auto max-w-4xl">
         <div className="mb-8">
           <h2 className="text-4xl font-extrabold">משימה חדשה</h2>
@@ -184,7 +183,7 @@ export default function NewTaskPage() {
           </div>
         </form>
       </div>
-    </AppShell>
+    </>
   );
 }
 

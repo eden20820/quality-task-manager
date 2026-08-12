@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/layout/app-shell";
 import { ExpiryDashboard } from "@/components/expiry/expiry-dashboard";
 import {
   ExpiryTable,
@@ -94,7 +93,7 @@ export default async function ExpiryPage() {
   ).length;
 
   return (
-    <AppShell>
+    <>
       <div className="space-y-8">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
@@ -120,6 +119,6 @@ export default async function ExpiryPage() {
 
         <ExpiryTable rows={rows} />
       </div>
-    </AppShell>
+    </>
   );
 }

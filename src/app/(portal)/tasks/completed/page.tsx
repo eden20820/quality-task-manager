@@ -1,4 +1,3 @@
-﻿import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -77,7 +76,7 @@ export default async function CompletedTasksPage() {
   );
 
   return (
-    <AppShell>
+    <>
       <div className="space-y-8">
         <div>
           <h2 className="text-4xl font-extrabold">
@@ -175,7 +174,7 @@ export default async function CompletedTasksPage() {
           </Table>
         </div>
       </div>
-    </AppShell>
+    </>
   );
 }
 

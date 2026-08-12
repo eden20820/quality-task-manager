@@ -3,7 +3,6 @@ import Link from "next/link";
 
 import { clearDashboardTasks } from "@/app/tasks/actions";
 import { ClearDashboardButton } from "@/components/clear-dashboard-button";
-import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -152,7 +151,7 @@ export default async function HomePage() {
   ];
 
   return (
-    <AppShell>
+    <>
       <div className="space-y-8">
         <div className="text-center">
           <h2 className="text-4xl font-extrabold">
@@ -268,7 +267,7 @@ export default async function HomePage() {
           </CardContent>
         </Card>
       </div>
-    </AppShell>
+    </>
   );
 }
 
