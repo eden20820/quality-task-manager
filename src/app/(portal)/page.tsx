@@ -87,6 +87,7 @@ export default async function HomePage() {
     { data: dashboardTasks, error: tasksError },
     { data: expiringItems, error: expiryError },
     { data: monthlyReminders, error: remindersError },
+    { data: monthlyDeadlineTasks, error: deadlineTasksError },
   ] = await Promise.all([
     tasksQuery,
     supabase
@@ -94,6 +95,7 @@ export default async function HomePage() {
       .select("id, material_name, expiry_date")
       .eq("is_active", true)
       .not("expiry_date", "is", null)
+      .gte("expiry_date", todayString)
       .lte("expiry_date", inThirtyDaysString)
       .order("expiry_date", { ascending: true }),
     supabase
@@ -102,10 +104,18 @@ export default async function HomePage() {
       .gte("reminder_date", formatDateForDatabase(monthStart))
       .lt("reminder_date", formatDateForDatabase(nextMonthStart))
       .order("reminder_date", { ascending: true }),
+    supabase
+      .from("tasks")
+      .select("id, title, due_date")
+      .not("status", "in", "(completed,cancelled)")
+      .gte("due_date", formatDateForDatabase(monthStart))
+      .lt("due_date", formatDateForDatabase(nextMonthStart))
+      .order("due_date", { ascending: true }),
   ]);
   if (tasksError) console.error("Load dashboard error:", tasksError);
   if (expiryError) console.error("Load dashboard expiry error:", expiryError);
   if (remindersError) console.error("Load dashboard reminders error:", remindersError);
+  if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
 
   const allTasks = dashboardTasks ?? [];
   const newTasks = allTasks.filter((task) => task.status === "new").length;
@@ -117,7 +127,10 @@ export default async function HomePage() {
   ).length;
   const visibleRecentTasks = allTasks.slice(0, 5);
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
-  const reminderTitles = (monthlyReminders ?? []).map((reminder) => reminder.title);
+  const monthEventTitles = [
+    ...(monthlyReminders ?? []).map((reminder) => reminder.title),
+    ...(monthlyDeadlineTasks ?? []).map((task) => task.title),
+  ];
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks },
@@ -128,7 +141,7 @@ export default async function HomePage() {
 
   const detailCards = [
     {
-      title: "פגי תוקף / עד 30 יום",
+      title: "עומדים לפוג / עד 30 יום",
       value: expiringItems?.length ?? 0,
       details: expiringNames,
       emptyText: "אין חומרים שעומדים לפוג",
@@ -136,9 +149,9 @@ export default async function HomePage() {
     },
     {
       title: "תזכורות החודש",
-      value: monthlyReminders?.length ?? 0,
-      details: reminderTitles,
-      emptyText: "אין תזכורות בחודש הנוכחי",
+      value: monthEventTitles.length,
+      details: monthEventTitles,
+      emptyText: "אין תזכורות או דדליינים בחודש הנוכחי",
       href: "/calendar",
     },
   ];
