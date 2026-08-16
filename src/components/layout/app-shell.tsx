@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Settings,
   CalendarClock,
+  CalendarDays,
 } from "lucide-react";
 
 import { getPortalUser } from "@/lib/auth/portal-user";
@@ -15,6 +16,7 @@ const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
   { title: "משימות", href: "/tasks", icon: ClipboardList },
   { title: "משימות שהושלמו", href: "/tasks/completed", icon: CheckCircle2 },
+  { title: "יומן ותזכורות", href: "/calendar", icon: CalendarDays },
   { title: "ניהול חומרים", href: "/expiry", icon: CalendarClock },
   { title: "הגדרות", href: "/settings", icon: Settings },
 ];
@@ -127,6 +129,5 @@ function ContentSkeleton() {
     </div>
   );
 }
-
 
 
