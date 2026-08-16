@@ -56,6 +56,13 @@ export default async function HomePage() {
 
   const todayString = formatDateForDatabase(today);
 
+  const inThirtyDays = new Date(today);
+  inThirtyDays.setDate(inThirtyDays.getDate() + 30);
+  const inThirtyDaysString = formatDateForDatabase(inThirtyDays);
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+
   let tasksQuery = supabase
     .from("tasks")
     .select(`
@@ -76,8 +83,29 @@ export default async function HomePage() {
     );
   }
 
-  const { data: dashboardTasks, error: tasksError } = await tasksQuery;
+  const [
+    { data: dashboardTasks, error: tasksError },
+    { data: expiringItems, error: expiryError },
+    { data: monthlyReminders, error: remindersError },
+  ] = await Promise.all([
+    tasksQuery,
+    supabase
+      .from("expiry_items")
+      .select("id, material_name, expiry_date")
+      .eq("is_active", true)
+      .not("expiry_date", "is", null)
+      .lte("expiry_date", inThirtyDaysString)
+      .order("expiry_date", { ascending: true }),
+    supabase
+      .from("reminders")
+      .select("id, title, reminder_date")
+      .gte("reminder_date", formatDateForDatabase(monthStart))
+      .lt("reminder_date", formatDateForDatabase(nextMonthStart))
+      .order("reminder_date", { ascending: true }),
+  ]);
   if (tasksError) console.error("Load dashboard error:", tasksError);
+  if (expiryError) console.error("Load dashboard expiry error:", expiryError);
+  if (remindersError) console.error("Load dashboard reminders error:", remindersError);
 
   const allTasks = dashboardTasks ?? [];
   const newTasks = allTasks.filter((task) => task.status === "new").length;
@@ -88,12 +116,31 @@ export default async function HomePage() {
     task.status !== "completed" && task.status !== "cancelled"
   ).length;
   const visibleRecentTasks = allTasks.slice(0, 5);
+  const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
+  const reminderTitles = (monthlyReminders ?? []).map((reminder) => reminder.title);
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks },
     { title: "בטיפול", value: inProgressTasks },
     { title: "ממתינות", value: waitingTasks },
     { title: "באיחור", value: overdueTasks },
+  ];
+
+  const detailCards = [
+    {
+      title: "פגי תוקף / עד 30 יום",
+      value: expiringItems?.length ?? 0,
+      details: expiringNames,
+      emptyText: "אין חומרים שעומדים לפוג",
+      href: "/expiry",
+    },
+    {
+      title: "תזכורות החודש",
+      value: monthlyReminders?.length ?? 0,
+      details: reminderTitles,
+      emptyText: "אין תזכורות בחודש הנוכחי",
+      href: "/calendar",
+    },
   ];
 
   return (
@@ -124,6 +171,31 @@ export default async function HomePage() {
                 </p>
               </CardContent>
             </Card>
+          ))}
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {detailCards.map((card) => (
+            <Link key={card.title} href={card.href} className="group block">
+              <Card className="h-full transition group-hover:-translate-y-0.5 group-hover:border-slate-300 group-hover:shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-center text-lg font-bold">
+                    {card.title}
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent>
+                  <p className="text-center text-5xl font-extrabold">
+                    {card.value}
+                  </p>
+                  <p className="mt-3 min-h-5 truncate text-center text-sm font-semibold text-slate-500">
+                    {card.details.length > 0
+                      ? `${card.details.slice(0, 3).join(" • ")}${card.details.length > 3 ? ` • ועוד ${card.details.length - 3}` : ""}`
+                      : card.emptyText}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
 
@@ -216,4 +288,3 @@ export default async function HomePage() {
     </>
   );
 }
-
