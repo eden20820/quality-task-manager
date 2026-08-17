@@ -34,3 +34,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### Task assignment emails (Brevo)
+
+Set these server-side environment variables in Vercel:
+
+```text
+BREVO_API_KEY=xkeysib-...
+BREVO_FROM_EMAIL=your-verified-sender@example.com
+BREVO_FROM_NAME=מערכת ניהול משימות
+APP_URL=https://your-production-domain
+```
+
+Do not use the `NEXT_PUBLIC_` prefix for the Brevo variables. `BREVO_FROM_EMAIL` must exactly match a sender marked as Verified in Brevo. Keep the API key server-side and never commit it to Git.
