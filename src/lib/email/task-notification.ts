@@ -33,24 +33,32 @@ function buildEmailHtml(task: TaskForEmail, assigneeName: string) {
 }
 
 export async function sendTaskAssignmentEmails({ task, assigneeKeys }: { task: TaskForEmail; assigneeKeys: AssigneeKey[] }): Promise<EmailResult[]> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!apiKey || !from) {
-    console.warn("Task email skipped: Resend environment variables are missing");
-    return assigneeKeys.map((assigneeKey) => ({ assigneeKey, email: ASSIGNEES[assigneeKey].email, status: "skipped", error: "Resend environment variables are missing" }));
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.BREVO_FROM_EMAIL;
+  const fromName = process.env.BREVO_FROM_NAME || "מערכת ניהול משימות";
+  if (!apiKey || !fromEmail) {
+    console.warn("Task email skipped: Brevo environment variables are missing");
+    return assigneeKeys.map((assigneeKey) => ({ assigneeKey, email: ASSIGNEES[assigneeKey].email, status: "skipped", error: "Brevo environment variables are missing" }));
   }
 
   return Promise.all(assigneeKeys.map(async (assigneeKey): Promise<EmailResult> => {
     const assignee = ASSIGNEES[assigneeKey];
     try {
-      const response = await fetch("https://api.resend.com/emails", {
+      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `task-${task.id}-${assigneeKey}` },
-        body: JSON.stringify({ from, to: [assignee.email], subject: `משימה חדשה #${task.task_number}: ${task.title}`, html: buildEmailHtml(task, assignee.name), tags: [{ name: "type", value: "task_assignment" }, { name: "assignee", value: assigneeKey }] }),
+        headers: { "api-key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          sender: { name: fromName, email: fromEmail },
+          to: [{ email: assignee.email, name: assignee.name }],
+          subject: `משימה חדשה #${task.task_number}: ${task.title}`,
+          htmlContent: buildEmailHtml(task, assignee.name),
+          tags: ["task_assignment", assigneeKey],
+          headers: { "X-Task-ID": task.id, "X-Assignee-Key": assigneeKey },
+        }),
       });
-      const payload = await response.json().catch(() => ({})) as { id?: string; message?: string; name?: string };
-      if (!response.ok) return { assigneeKey, email: assignee.email, status: "failed", error: payload.message ?? payload.name ?? `Resend returned ${response.status}` };
-      return { assigneeKey, email: assignee.email, status: "sent", messageId: payload.id };
+      const payload = await response.json().catch(() => ({})) as { messageId?: string; message?: string; code?: string };
+      if (!response.ok) return { assigneeKey, email: assignee.email, status: "failed", error: payload.message ?? payload.code ?? `Brevo returned ${response.status}` };
+      return { assigneeKey, email: assignee.email, status: "sent", messageId: payload.messageId };
     } catch (error) {
       return { assigneeKey, email: assignee.email, status: "failed", error: error instanceof Error ? error.message : "Unknown email error" };
     }
