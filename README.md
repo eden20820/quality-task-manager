@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+### Task assignment emails (Resend)
+
+Set these server-side environment variables in Vercel:
+
+```text
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=CAELI Quality <notifications@your-verified-domain>
+APP_URL=https://your-production-domain
+```
+
+Do not use the `NEXT_PUBLIC_` prefix for the Resend variables. The sender domain must be verified in Resend before emails can be sent to assignees.
