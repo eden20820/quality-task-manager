@@ -35,14 +35,15 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
-### Task assignment emails (Resend)
+### Task assignment emails (Brevo)
 
 Set these server-side environment variables in Vercel:
 
 ```text
-RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL=CAELI Quality <notifications@your-verified-domain>
+BREVO_API_KEY=xkeysib-...
+BREVO_FROM_EMAIL=your-verified-sender@example.com
+BREVO_FROM_NAME=מערכת ניהול משימות
 APP_URL=https://your-production-domain
 ```
 
-Do not use the `NEXT_PUBLIC_` prefix for the Resend variables. The sender domain must be verified in Resend before emails can be sent to assignees.
+Do not use the `NEXT_PUBLIC_` prefix for the Brevo variables. `BREVO_FROM_EMAIL` must exactly match a sender marked as Verified in Brevo. Keep the API key server-side and never commit it to Git.
