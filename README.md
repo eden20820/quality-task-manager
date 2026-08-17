@@ -44,6 +44,10 @@ BREVO_API_KEY=xkeysib-...
 BREVO_FROM_EMAIL=your-verified-sender@example.com
 BREVO_FROM_NAME=מערכת ניהול משימות
 APP_URL=https://your-production-domain
+CRON_SECRET=generate-a-long-random-secret
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 ```
 
 Do not use the `NEXT_PUBLIC_` prefix for the Brevo variables. `BREVO_FROM_EMAIL` must exactly match a sender marked as Verified in Brevo. Keep the API key server-side and never commit it to Git.
+
+The daily digest cron runs at 08:00 in `Asia/Jerusalem`. Two daily UTC schedules cover both daylight-saving and standard time; the route sends only when the local hour is 08:00. `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` must be Production-only server secrets.
