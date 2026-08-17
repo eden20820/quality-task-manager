@@ -8,6 +8,7 @@ import {
   Settings,
   CalendarClock,
   CalendarDays,
+  FolderArchive,
 } from "lucide-react";
 
 import { getPortalUser } from "@/lib/auth/portal-user";
@@ -18,6 +19,7 @@ const navigationItems = [
   { title: "משימות שהושלמו", href: "/tasks/completed", icon: CheckCircle2 },
   { title: "יומן ותזכורות", href: "/calendar", icon: CalendarDays },
   { title: "ניהול חומרים", href: "/expiry", icon: CalendarClock },
+  { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
   { title: "הגדרות", href: "/settings", icon: Settings },
 ];
 
@@ -129,5 +131,4 @@ function ContentSkeleton() {
     </div>
   );
 }
-
 
