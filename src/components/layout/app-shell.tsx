@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ClipboardList,
   LayoutDashboard,
-  Settings,
   CalendarClock,
   CalendarDays,
   FolderArchive,
@@ -20,7 +19,6 @@ const navigationItems = [
   { title: "יומן ותזכורות", href: "/calendar", icon: CalendarDays },
   { title: "ניהול חומרים", href: "/expiry", icon: CalendarClock },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
-  { title: "הגדרות", href: "/settings", icon: Settings },
 ];
 
 /*
