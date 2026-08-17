@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   ClipboardList,
   LayoutDashboard,
-  Settings,
   Users,
 } from "lucide-react";
 
@@ -35,11 +34,6 @@ const navigationItems = [
     title: "עובדים",
     href: "/users",
     icon: Users,
-  },
-  {
-    title: "הגדרות",
-    href: "/settings",
-    icon: Settings,
   },
 ];
 
