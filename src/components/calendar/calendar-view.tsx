@@ -43,26 +43,26 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
     </div>
 
     <div className="grid gap-6 xl:grid-cols-[1fr_330px]">
-      <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="min-w-[700px]">
-        <div className="flex items-center justify-between border-b p-5">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b p-3 sm:p-5">
           <button aria-label="החודש הבא" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="rounded-lg p-2 hover:bg-slate-100"><ChevronRight /></button>
-          <h3 className="text-xl font-extrabold">{new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" }).format(month)}</h3>
+          <h3 className="text-base font-extrabold sm:text-xl">{new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" }).format(month)}</h3>
           <button aria-label="החודש הקודם" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="rounded-lg p-2 hover:bg-slate-100"><ChevronLeft /></button>
         </div>
-        <div className="grid grid-cols-7 border-b bg-slate-50">{weekDays.map((day) => <div key={day} className="p-3 text-center text-sm font-bold text-slate-500">{day}</div>)}</div>
+        <div className="grid grid-cols-7 border-b bg-slate-50">{weekDays.map((day) => <div key={day} className="p-1.5 text-center text-xs font-bold text-slate-500 sm:p-3 sm:text-sm">{day}</div>)}</div>
         <div className="grid grid-cols-7">{cells.map((day) => {
           const key = dateKey(day); const events = eventsByDate.get(key); const currentMonth = day.getMonth() === month.getMonth(); const today = key === dateKey(new Date());
-          return <button key={key} onClick={() => setSelectedDate(key)} className={`min-h-28 border-b border-l p-2 text-right align-top transition hover:bg-blue-50 ${selectedDate === key ? "bg-blue-50 ring-2 ring-inset ring-blue-500" : ""} ${currentMonth ? "" : "bg-slate-50 text-slate-400"}`}>
-            <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${today ? "bg-blue-600 text-white" : ""}`}>{day.getDate()}</span>
-            <div className="mt-2 space-y-1">{events?.tasks.slice(0, 2).map((task) => <div key={task.id} className="truncate rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{task.title}</div>)}{events?.reminders.slice(0, 2).map((item) => <div key={item.id} className="truncate rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">{item.title}</div>)}{events && events.tasks.length + events.reminders.length > 4 && <div className="text-xs font-bold text-slate-500">עוד {events.tasks.length + events.reminders.length - 4}</div>}</div>
+          const eventCount = (events?.tasks.length ?? 0) + (events?.reminders.length ?? 0);
+          return <button key={key} aria-label={`${day.getDate()} בחודש, ${eventCount} אירועים`} onClick={() => setSelectedDate(key)} className={`min-h-16 min-w-0 border-b border-l p-1 text-right transition hover:bg-blue-50 sm:min-h-28 sm:p-2 ${selectedDate === key ? "bg-blue-50 ring-2 ring-inset ring-blue-500" : ""} ${currentMonth ? "" : "bg-slate-50 text-slate-400"}`}>
+            <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${today ? "bg-blue-600 text-white" : ""}`}>{day.getDate()}</span>
+            <div className="mt-1 flex flex-wrap justify-center gap-1 sm:hidden">{events?.tasks.length ? <i className="h-2 w-2 rounded-full bg-amber-400" /> : null}{events?.reminders.length ? <i className="h-2 w-2 rounded-full bg-blue-500" /> : null}{eventCount > 2 ? <span className="text-[9px] font-bold text-slate-500">+{eventCount}</span> : null}</div>
+            <div className="mt-2 hidden space-y-1 sm:block">{events?.tasks.slice(0, 2).map((task) => <div key={task.id} className="truncate rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{task.title}</div>)}{events?.reminders.slice(0, 2).map((item) => <div key={item.id} className="truncate rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">{item.title}</div>)}{events && events.tasks.length + events.reminders.length > 4 && <div className="text-xs font-bold text-slate-500">עוד {events.tasks.length + events.reminders.length - 4}</div>}</div>
           </button>;
         })}</div>
-        </div>
       </section>
 
-      <aside className="space-y-5">
-        <section className="rounded-2xl border bg-white p-5 shadow-sm">
+      <aside className="flex flex-col gap-5">
+        <section className="order-2 rounded-2xl border bg-white p-5 shadow-sm xl:order-1">
           <h3 className="flex items-center gap-2 text-xl font-extrabold"><Plus className="h-5 w-5" /> תזכורת חדשה</h3>
           <form action={formAction} className="mt-4 space-y-3">
             <input name="title" required placeholder="מה להזכיר?" className="h-11 w-full rounded-lg border px-3" />
@@ -72,7 +72,7 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
             {state.message && <p className={`text-sm font-bold ${state.success ? "text-emerald-600" : "text-red-600"}`}>{state.message}</p>}
           </form>
         </section>
-        <section className="rounded-2xl border bg-white p-5 shadow-sm">
+        <section className="order-1 rounded-2xl border bg-white p-5 shadow-sm xl:order-2">
           <h3 className="mb-4 flex items-center gap-2 text-lg font-extrabold"><CalendarDays className="h-5 w-5" /> {new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${selectedDate}T12:00:00`))}</h3>
           <div className="space-y-3">
             {selectedEvents.tasks.map((task) => <Link key={task.id} href={`/tasks/${task.id}/edit`} className="block rounded-xl border-r-4 border-amber-400 bg-amber-50 p-3 hover:bg-amber-100"><span className="flex items-center gap-2 font-bold"><ClipboardList className="h-4 w-4" />{task.title}</span><span className="mt-1 block text-xs text-slate-500">דדליין של משימה</span></Link>)}
