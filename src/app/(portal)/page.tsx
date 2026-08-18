@@ -115,6 +115,8 @@ export default async function HomePage() {
     supabase
       .from("calibration_items")
       .select("id, equipment_name, next_calibration_date")
+      .eq("is_active", true)
+      .not("next_calibration_date", "is", null)
       .gte("next_calibration_date", todayString)
       .lte("next_calibration_date", inThirtyDaysString)
       .order("next_calibration_date", { ascending: true }),
