@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { getPortalUser } from "@/lib/auth/portal-user";
+import { MobileNavigation } from "@/components/layout/mobile-navigation";
 
 const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
@@ -35,7 +36,7 @@ export function AppShell({
 }>) {
   return (
     <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-950">
-      <aside className="fixed right-0 top-0 z-20 flex h-screen w-[260px] flex-col border-l border-slate-200 bg-white">
+      <aside className="fixed right-0 top-0 z-20 hidden h-screen w-[260px] flex-col border-l border-slate-200 bg-white lg:flex">
         <nav className="flex-1 space-y-2 p-4 pt-6">
           {navigationItems.map((item) => {
             const Icon = item.icon;
@@ -55,28 +56,29 @@ export function AppShell({
 
       </aside>
 
-      <div className="mr-[260px] min-h-screen">
-        <header className="flex min-h-[130px] items-center border-b border-slate-200 bg-white px-10 shadow-sm">
-          <div className="grid w-full grid-cols-[180px_1fr_180px] items-center">
+      <div className="min-h-screen lg:mr-[260px]">
+        <header className="flex min-h-20 items-center border-b border-slate-200 bg-white px-4 shadow-sm sm:px-6 lg:min-h-[130px] lg:px-10">
+          <div className="grid w-full grid-cols-[44px_1fr] items-center gap-3 lg:grid-cols-[180px_1fr_180px] lg:gap-0">
+            <MobileNavigation />
             <Image
               src="/caeli-logo.png"
               alt="Caeli"
               width={105}
               height={61}
               priority
-              className="h-auto w-[105px] justify-self-start"
+              className="hidden h-auto w-[105px] justify-self-start lg:block"
             />
 
             <div className="text-center">
-              <h1 className="text-[42px] font-black leading-tight tracking-tight">
+              <h1 className="text-xl font-black leading-tight tracking-tight sm:text-2xl lg:text-[42px]">
                 Caeli Quality Hub
               </h1>
-              <p className="mt-3 text-[21px] font-bold text-slate-500">
+              <p className="mt-1 hidden text-sm font-bold text-slate-500 sm:block lg:mt-3 lg:text-[21px]">
                 מחלקת איכות
               </p>
             </div>
 
-            <p className="text-left text-[16px] font-bold text-slate-600">
+            <p className="hidden text-left text-[16px] font-bold text-slate-600 lg:block">
               <Suspense fallback={<span className="block h-[16px] w-20 animate-pulse rounded bg-slate-200" />}>
                 <UserName />
               </Suspense>
@@ -84,7 +86,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="px-10 py-12">
+        <main className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
           <div className="mx-auto w-full max-w-[1250px]">
             <Suspense fallback={<ContentSkeleton />}>
               <AuthGate>{children}</AuthGate>

@@ -100,7 +100,7 @@ export function TaskTable({ initialTasks }: { initialTasks: TaskRow[] }) {
       </div>
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 font-semibold text-red-700">{error}</div>}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <Table>
+        <Table className="min-w-[900px]">
           <TableHeader><TableRow className="bg-slate-50">
             <TableHead className="w-24 text-center font-bold">בוצעה</TableHead><TableHead className="w-20 text-center font-bold">מצב</TableHead><TableHead className="text-right font-bold">כותרת</TableHead><TableHead className="text-right font-bold">סטטוס</TableHead><TableHead className="text-right font-bold">עדיפות</TableHead><TableHead className="text-right font-bold">תאריך יעד</TableHead><TableHead className="text-right font-bold">עדכון אחרון</TableHead><TableHead className="w-24 text-center font-bold">עריכה</TableHead>
           </TableRow></TableHeader>
