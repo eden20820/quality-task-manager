@@ -52,25 +52,24 @@ export type ManualExpiryActionResult = {
 async function getAuthorizedClient() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
 
-  if (!user) {
+  if (!userId) {
     throw new Error("Unauthorized");
   }
 
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("is_active")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (error || !profile?.is_active) {
     throw new Error("User is not active");
   }
 
-  return { supabase, user };
+  return { supabase, user: { id: userId } };
 }
 
 function serializeItem(
@@ -257,6 +256,9 @@ export async function confirmExpiryImport(
 
   const incomingFingerprints =
     validItems.map(buildFingerprint);
+  const incomingFingerprintSet = new Set(
+    incomingFingerprints
+  );
 
   const importedAt = new Date().toISOString();
 
@@ -291,6 +293,13 @@ export async function confirmExpiryImport(
   let updatedRows = 0;
   let unchangedRows = 0;
 
+  const newRows: Array<Record<string, unknown>> = [];
+  const rowsToUpdate: Array<{
+    id: string;
+    values: Record<string, unknown>;
+    rowNumber: number;
+  }> = [];
+
   for (const item of validItems) {
     const fingerprint = buildFingerprint(item);
     const existing = existingMap.get(fingerprint);
@@ -300,34 +309,21 @@ export async function confirmExpiryImport(
       : null;
 
     if (!existing) {
-      const { error } = await supabase
-        .from("expiry_items")
-        .insert({
-          material_name: item.materialName,
-          expiry_date: expiryDate,
-          quantity: item.quantity,
-          location: item.location || null,
-          invalid_expiry_text: null,
-          is_rejected: item.isRejected,
-          is_active: true,
-          fingerprint,
-          row_key: fingerprint,
-          source_file_name: fileName,
-          source_row_number: item.rowNumber,
-          created_by: user.id,
-          last_seen_at: importedAt,
-        });
-
-      if (error) {
-        console.error(
-          "Insert expiry item error:",
-          error
-        );
-
-        throw new Error(
-          `נכשלה הוספת החומר בשורה ${item.rowNumber}`
-        );
-      }
+      newRows.push({
+        material_name: item.materialName,
+        expiry_date: expiryDate,
+        quantity: item.quantity,
+        location: item.location || null,
+        invalid_expiry_text: null,
+        is_rejected: item.isRejected,
+        is_active: true,
+        fingerprint,
+        row_key: fingerprint,
+        source_file_name: fileName,
+        source_row_number: item.rowNumber,
+        created_by: user.id,
+        last_seen_at: importedAt,
+      });
 
       insertedRows += 1;
       continue;
@@ -339,9 +335,10 @@ export async function confirmExpiryImport(
       existing.is_rejected !== item.isRejected ||
       existing.is_active !== true;
 
-    const { error } = await supabase
-      .from("expiry_items")
-      .update({
+    rowsToUpdate.push({
+      id: existing.id,
+      rowNumber: item.rowNumber,
+      values: {
         quantity: item.quantity,
         location: item.location || null,
         is_rejected: item.isRejected,
@@ -349,24 +346,41 @@ export async function confirmExpiryImport(
         source_file_name: fileName,
         source_row_number: item.rowNumber,
         last_seen_at: importedAt,
-      })
-      .eq("id", existing.id);
-
-    if (error) {
-      console.error(
-        "Update expiry item error:",
-        error
-      );
-
-      throw new Error(
-        `נכשל עדכון החומר בשורה ${item.rowNumber}`
-      );
-    }
+      },
+    });
 
     if (hasChanged) {
       updatedRows += 1;
     } else {
       unchangedRows += 1;
+    }
+  }
+
+  if (newRows.length > 0) {
+    const { error } = await supabase.from("expiry_items").insert(newRows);
+    if (error) {
+      console.error("Bulk insert expiry items error:", error);
+      throw new Error("נכשלה הוספת החומרים החדשים");
+    }
+  }
+
+  const updateBatchSize = 20;
+  for (let index = 0; index < rowsToUpdate.length; index += updateBatchSize) {
+    const batch = rowsToUpdate.slice(index, index + updateBatchSize);
+    const results = await Promise.all(
+      batch.map((row) =>
+        supabase
+          .from("expiry_items")
+          .update(row.values)
+          .eq("id", row.id)
+      )
+    );
+    const failedIndex = results.findIndex(
+      (result) => result.error
+    );
+    if (failedIndex >= 0) {
+      console.error("Update expiry item error:", results[failedIndex].error);
+      throw new Error(`נכשל עדכון החומר בשורה ${batch[failedIndex].rowNumber}`);
     }
   }
 
@@ -378,7 +392,7 @@ export async function confirmExpiryImport(
     (item) =>
       item.is_active &&
       item.fingerprint &&
-      !incomingFingerprints.includes(item.fingerprint)
+      !incomingFingerprintSet.has(item.fingerprint)
   );
 
   if (activeItemsToDisable.length > 0) {

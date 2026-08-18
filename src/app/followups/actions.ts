@@ -8,11 +8,12 @@ const categories = new Set(["pka", "nonconformity", "eco"]);
 
 async function authorized() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  const { data: profile } = await supabase.from("profiles").select("is_active").eq("id", user.id).single();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
+  if (!userId) throw new Error("Unauthorized");
+  const { data: profile } = await supabase.from("profiles").select("is_active").eq("id", userId).single();
   if (!profile?.is_active) throw new Error("User is not active");
-  return { supabase, user };
+  return { supabase, user: { id: userId } };
 }
 
 export async function createFollowup(_: FollowupResult, formData: FormData): Promise<FollowupResult> {

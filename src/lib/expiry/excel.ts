@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 import { parseWorksheet } from "./parser";
 
 import { ParsedExpiryItem } from "./types";
@@ -11,8 +9,8 @@ export async function parseExpiryExcel(
   const buffer =
     await file.arrayBuffer();
 
-  const workbook =
-    XLSX.read(buffer);
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(buffer);
 
   const sheet =
     workbook.Sheets[

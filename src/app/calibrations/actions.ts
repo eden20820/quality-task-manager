@@ -1,18 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/server";
 
 type Result = { success: boolean; message: string; imported?: number; removed?: number; missingDates?: number };
 
 async function authorized() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  const { data: profile } = await supabase.from("profiles").select("is_active").eq("id", user.id).single();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
+  if (!userId) throw new Error("Unauthorized");
+  const { data: profile } = await supabase.from("profiles").select("is_active").eq("id", userId).single();
   if (!profile?.is_active) throw new Error("User is not active");
-  return { supabase, user };
+  return { supabase, user: { id: userId } };
 }
 
 function clean(value: unknown) { return String(value ?? "").trim(); }
@@ -21,8 +21,8 @@ function dateValue(value: unknown): string | null {
     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
   }
   if (typeof value === "number") {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (parsed) return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+    const date = new Date(Date.UTC(1899, 11, 30) + value * 86_400_000);
+    if (!Number.isNaN(date.getTime())) return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
   }
   const text = clean(value);
   const match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
@@ -52,6 +52,7 @@ export async function importCalibrations(formData: FormData): Promise<Result> {
   try {
     const file = formData.get("file");
     if (!(file instanceof File) || !file.size) return { success: false, message: "יש לבחור קובץ Excel" };
+    const XLSX = await import("xlsx");
     const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true });
     const rowsToUpsert: Array<Record<string, unknown>> = [];
     const { supabase, user } = await authorized();
