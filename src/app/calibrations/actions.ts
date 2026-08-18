@@ -97,6 +97,37 @@ export async function createCalibration(_: Result, formData: FormData): Promise<
   } catch (error) { console.error(error); return { success: false, message: "שמירת הכיול נכשלה" }; }
 }
 
+export async function updateCalibration(formData: FormData): Promise<Result> {
+  try {
+    const id = clean(formData.get("id"));
+    const equipmentName = clean(formData.get("equipment_name"));
+    const nextDate = clean(formData.get("next_calibration_date"));
+    if (!id || !equipmentName) return { success: false, message: "יש להזין שם מכשיר" };
+    if (nextDate && !/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return { success: false, message: "תאריך הכיול אינו תקין" };
+    const { supabase } = await authorized();
+    const serialNumber = clean(formData.get("serial_number"));
+    const { data: existing } = await supabase.from("calibration_items").select("row_key").eq("id", id).single();
+    const { error } = await supabase.from("calibration_items").update({
+      equipment_name: equipmentName,
+      equipment_code: serialNumber || null,
+      serial_number: serialNumber || null,
+      model: clean(formData.get("model")) || null,
+      location: clean(formData.get("location")) || null,
+      last_calibration_date: clean(formData.get("last_calibration_date")) || null,
+      next_calibration_date: nextDate || null,
+      certificate_number: clean(formData.get("certificate_number")) || null,
+      calibration_lab: clean(formData.get("calibration_lab")) || null,
+      notes: clean(formData.get("notes")) || null,
+      is_active: clean(formData.get("is_active")) === "true",
+      row_key: serialNumber ? `${equipmentName.toLowerCase()}|${serialNumber.toLowerCase()}` : existing?.row_key,
+      updated_at: new Date().toISOString(),
+    }).eq("id", id);
+    if (error) throw error;
+    revalidatePath("/calibrations"); revalidatePath("/"); revalidatePath("/calendar");
+    return { success: true, message: "פרטי המכשיר עודכנו" };
+  } catch (error) { console.error(error); return { success: false, message: "עדכון המכשיר נכשל" }; }
+}
+
 export async function deleteCalibration(id: string) {
   const { supabase } = await authorized();
   await supabase.from("calibration_items").delete().eq("id", id);
