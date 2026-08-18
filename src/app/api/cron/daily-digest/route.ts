@@ -23,13 +23,11 @@ function israelDateParts() {
 
 async function processDailyDigest(date: string) {
   const supabase = createAdminClient();
-  const alertDate = new Date(`${date}T12:00:00Z`); alertDate.setUTCDate(alertDate.getUTCDate() - 7);
-  const openedDate = alertDate.toISOString().slice(0, 10);
   const [tasksResult, remindersResult, profilesResult, followupsResult] = await Promise.all([
     supabase.from("tasks").select("id, title, description, priority, assignees").eq("due_date", date).not("status", "in", "(completed,cancelled)"),
     supabase.from("reminders").select("id, title, notes, created_by, reminder_date, repeat_unit, repeat_interval").lte("reminder_date", date),
     supabase.from("profiles").select("id, email, full_name, is_active").eq("is_active", true),
-    supabase.from("quality_followups").select("id, category, reference_number, name, quantity, opened_at, notes").eq("status", "open").lte("opened_at", openedDate),
+    supabase.from("quality_followups").select("id, category, reference_number, name, quantity, opened_at, created_at, notes").eq("status", "open"),
   ]);
 
   const loadError = tasksResult.error ?? remindersResult.error ?? profilesResult.error ?? followupsResult.error;
@@ -39,9 +37,15 @@ async function processDailyDigest(date: string) {
   }
 
   const weeklyFollowups = ((followupsResult.data ?? []) as DailyFollowup[]).filter((item) => {
-    const opened = new Date(`${item.opened_at}T12:00:00Z`);
+    const createdDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jerusalem",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(item.created_at));
+    const created = new Date(`${createdDate}T12:00:00Z`);
     const current = new Date(`${date}T12:00:00Z`);
-    const daysOpen = Math.round((current.getTime() - opened.getTime()) / 86_400_000);
+    const daysOpen = Math.round((current.getTime() - created.getTime()) / 86_400_000);
     return daysOpen >= 7 && daysOpen % 7 === 0;
   });
   const recipients = groupDailyItems({
