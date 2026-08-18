@@ -17,9 +17,20 @@ export async function createReminder(
   const title = String(formData.get("title") ?? "").trim();
   const reminderDate = String(formData.get("reminder_date") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
+  const repeat = String(formData.get("repeat") ?? "none");
   if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(reminderDate)) {
     return { success: false, message: "יש למלא כותרת ותאריך" };
   }
+
+  const repeatOptions: Record<string, { repeat_unit: "day" | "month" | null; repeat_interval: number | null }> = {
+    none: { repeat_unit: null, repeat_interval: null },
+    daily: { repeat_unit: "day", repeat_interval: 1 },
+    monthly: { repeat_unit: "month", repeat_interval: 1 },
+    quarterly: { repeat_unit: "month", repeat_interval: 3 },
+    yearly: { repeat_unit: "month", repeat_interval: 12 },
+  };
+  const recurrence = repeatOptions[repeat];
+  if (!recurrence) return { success: false, message: "אפשרות החזרה אינה תקינה" };
 
   const supabase = await createClient();
   const { error } = await supabase.from("reminders").insert({
@@ -27,6 +38,7 @@ export async function createReminder(
     reminder_date: reminderDate,
     notes: notes || null,
     created_by: portalUser.userId,
+    ...recurrence,
   });
 
   if (error) {
