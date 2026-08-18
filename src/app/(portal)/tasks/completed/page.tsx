@@ -1,3 +1,6 @@
+import { Undo2 } from "lucide-react";
+
+import { restoreTask } from "@/app/tasks/actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -115,6 +118,10 @@ export default async function CompletedTasksPage() {
                 <TableHead className="text-right text-base font-bold">
                   שעה
                 </TableHead>
+
+                <TableHead className="w-28 text-center text-base font-bold">
+                  שחזור
+                </TableHead>
               </TableRow>
             </TableHeader>
 
@@ -152,12 +159,21 @@ export default async function CompletedTasksPage() {
                       <TableCell>{completed.date}</TableCell>
 
                       <TableCell>{completed.time}</TableCell>
+
+                      <TableCell className="text-center">
+                        <form action={restoreTask.bind(null, task.id)}>
+                          <button className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold hover:bg-slate-50">
+                            <Undo2 className="h-4 w-4" />
+                            שחזור
+                          </button>
+                        </form>
+                      </TableCell>
                     </TableRow>
                   );
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <div className="space-y-3">
                       <Badge variant="secondary">
                         אין משימות שהושלמו
