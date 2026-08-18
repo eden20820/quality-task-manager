@@ -27,6 +27,7 @@ export async function createReminder(
     daily: { repeat_unit: "day", repeat_interval: 1 },
     monthly: { repeat_unit: "month", repeat_interval: 1 },
     quarterly: { repeat_unit: "month", repeat_interval: 3 },
+    semiannual: { repeat_unit: "month", repeat_interval: 6 },
     yearly: { repeat_unit: "month", repeat_interval: 12 },
   };
   const recurrence = repeatOptions[repeat];
