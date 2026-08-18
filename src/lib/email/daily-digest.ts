@@ -16,7 +16,7 @@ export type DailyReminder = {
   notes: string | null;
   created_by: string;
 };
-export type DailyFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; opened_at: string; notes: string | null };
+export type DailyFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; opened_at: string; notes: string | null };
 
 export type DigestRecipient = {
   name: string;
@@ -73,7 +73,7 @@ function buildReminderItems(reminders: DailyReminder[]) {
 
 function buildFollowupItems(items: DailyFollowup[]) {
   const labels = { pka: 'פק״ע', nonconformity: "אי התאמה", eco: "ECO" };
-  return items.map((item) => `<li style="margin:0 0 14px"><strong>${labels[item.category]} ${escapeHtml(item.reference_number)}</strong><div style="margin-top:4px;color:#dc2626">הרשומה פתוחה כבר שבוע</div>${item.notes ? `<div style="margin-top:4px;color:#475569">${escapeHtml(item.notes)}</div>` : ""}</li>`).join("");
+  return items.map((item) => `<li style="margin:0 0 14px"><strong>${labels[item.category]} ${escapeHtml(item.reference_number)}${item.name ? ` — ${escapeHtml(item.name)}` : ""}</strong>${item.category === "pka" && item.quantity !== null ? `<div style="margin-top:4px;color:#475569">כמות: ${item.quantity}</div>` : ""}<div style="margin-top:4px;color:#dc2626">הרשומה פתוחה כבר שבוע</div>${item.notes ? `<div style="margin-top:4px;color:#475569">${escapeHtml(item.notes)}</div>` : ""}</li>`).join("");
 }
 
 function buildDigestHtml(recipient: DigestRecipient) {
