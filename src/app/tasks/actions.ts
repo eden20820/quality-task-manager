@@ -38,19 +38,71 @@ export async function completeTask(taskId: string): Promise<{ success: boolean; 
 
   const { supabase, user } = await getAuthorizedClient();
 
+  const { data: task, error: loadError } = await supabase
+    .from("tasks")
+    .select("status")
+    .eq("id", taskId)
+    .single();
+
+  if (loadError || !task || task.status === "completed") {
+    return { success: false, message: "לא ניתן להשלים את המשימה" };
+  }
+
   const { error } = await supabase
     .from("tasks")
     .update({
       status: "completed",
+      previous_status: task.status,
       completed_by: user.id,
     })
-    .eq("id", taskId);
+    .eq("id", taskId)
+    .eq("status", task.status);
 
   if (error) {
     console.error("Complete task error:", error);
     return { success: false, message: "השלמת המשימה נכשלה. נסה שוב." };
   }
   return { success: true, message: "המשימה הושלמה" };
+}
+
+export async function restoreTask(taskId: string): Promise<void> {
+  if (!taskId) throw new Error("Missing task ID");
+
+  const { supabase } = await getAuthorizedClient();
+  const { data: task, error: loadError } = await supabase
+    .from("tasks")
+    .select("status, previous_status")
+    .eq("id", taskId)
+    .single();
+
+  if (loadError || !task || task.status !== "completed") {
+    throw new Error("Task cannot be restored");
+  }
+
+  const activeStatuses = new Set(["new", "in_progress", "waiting"]);
+  const restoredStatus = activeStatuses.has(task.previous_status)
+    ? task.previous_status
+    : "new";
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({
+      status: restoredStatus,
+      previous_status: null,
+      completed_by: null,
+    })
+    .eq("id", taskId)
+    .eq("status", "completed");
+
+  if (error) {
+    console.error("Restore task error:", error);
+    throw new Error("Failed to restore task");
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/tasks/completed");
+  revalidatePath("/calendar");
+  revalidatePath("/");
 }
 
 export async function updateTask(formData: FormData) {
