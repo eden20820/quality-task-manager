@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import {
   ClipboardList,
   LayoutDashboard,
@@ -11,11 +10,8 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
@@ -41,19 +37,8 @@ const navigationItems = [
 export function AppSidebar() {
   return (
     <Sidebar side="right" collapsible="icon">
-      <SidebarHeader className="border-b p-4">
-        <div className="text-right">
-          <Image src="/caeli-logo.png" alt="Caeli" width={90} height={52} className="mb-2 h-auto w-[90px]" />
-          <p className="text-lg font-bold">Caeli Quality Hub</p>
-        </div>
-      </SidebarHeader>
-
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sm font-semibold">
-            ניווט
-          </SidebarGroupLabel>
-
+        <SidebarGroup className="pt-4">
           <SidebarGroupContent>
             <SidebarMenu>
               {navigationItems.map((item) => {
@@ -76,11 +61,6 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-4">
-        <p className="text-xs text-muted-foreground">
-          מחלקת איכות
-        </p>
-      </SidebarFooter>
     </Sidebar>
   );
 }
