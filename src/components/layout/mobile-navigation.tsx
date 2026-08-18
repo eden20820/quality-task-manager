@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   ClipboardList,
   FolderArchive,
+  Gauge,
+  ListChecks,
   LayoutDashboard,
   Menu,
   X,
@@ -19,7 +21,9 @@ const navigationItems = [
   { title: "משימות", href: "/tasks", icon: ClipboardList },
   { title: "משימות שהושלמו", href: "/tasks/completed", icon: CheckCircle2 },
   { title: "יומן ותזכורות", href: "/calendar", icon: CalendarDays },
-  { title: "ניהול חומרים", href: "/expiry", icon: CalendarClock },
+  { title: "מעקב פגי תוקף", href: "/expiry", icon: CalendarClock },
+  { title: "מעקב כיולים", href: "/calibrations", icon: Gauge },
+  { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
 ];
 

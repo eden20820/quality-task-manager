@@ -89,6 +89,7 @@ export default async function HomePage() {
     { data: expiringItems, error: expiryError },
     { data: monthlyReminders, error: remindersError },
     { data: monthlyDeadlineTasks, error: deadlineTasksError },
+    { data: upcomingCalibrations, error: calibrationsError },
   ] = await Promise.all([
     tasksQuery,
     supabase
@@ -111,11 +112,18 @@ export default async function HomePage() {
       .gte("due_date", formatDateForDatabase(monthStart))
       .lt("due_date", formatDateForDatabase(nextMonthStart))
       .order("due_date", { ascending: true }),
+    supabase
+      .from("calibration_items")
+      .select("id, equipment_name, next_calibration_date")
+      .gte("next_calibration_date", todayString)
+      .lte("next_calibration_date", inThirtyDaysString)
+      .order("next_calibration_date", { ascending: true }),
   ]);
   if (tasksError) console.error("Load dashboard error:", tasksError);
   if (expiryError) console.error("Load dashboard expiry error:", expiryError);
   if (remindersError) console.error("Load dashboard reminders error:", remindersError);
   if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
+  if (calibrationsError) console.error("Load dashboard calibrations error:", calibrationsError);
 
   const allTasks = dashboardTasks ?? [];
   const newTasks = allTasks.filter((task) => task.status === "new").length;
@@ -134,6 +142,7 @@ export default async function HomePage() {
     ...monthReminderTitles,
     ...(monthlyDeadlineTasks ?? []).map((task) => task.title),
   ];
+  const calibrationNames = (upcomingCalibrations ?? []).map((item) => item.equipment_name);
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks },
@@ -156,6 +165,13 @@ export default async function HomePage() {
       details: monthEventTitles,
       emptyText: "אין תזכורות או דדליינים בחודש הנוכחי",
       href: "/calendar",
+    },
+    {
+      title: "כיולים קרובים / עד 30 יום",
+      value: upcomingCalibrations?.length ?? 0,
+      details: calibrationNames,
+      emptyText: "אין כיולים ב־30 הימים הקרובים",
+      href: "/calibrations",
     },
   ];
 

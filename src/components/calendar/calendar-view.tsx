@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Gauge, ListChecks, Plus, Trash2 } from "lucide-react";
 
 import { createReminder, deleteReminder, type ReminderActionResult } from "@/app/calendar/actions";
 import { reminderOccursOn, type RecurringReminder } from "@/lib/reminders/recurrence";
 
 export type CalendarTask = { id: string; title: string; due_date: string; priority: string };
 export type Reminder = RecurringReminder & { id: string; title: string; notes: string | null };
+export type CalendarCalibration = { id: string; equipment_name: string; equipment_code: string | null; location: string | null; next_calibration_date: string };
+export type CalendarFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; opened_at: string };
 
 const initialState: ReminderActionResult = { success: false, message: "" };
 const weekDays = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -17,7 +19,7 @@ function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; reminders: Reminder[] }) {
+export function CalendarView({ tasks, reminders, calibrations, followups }: { tasks: CalendarTask[]; reminders: Reminder[]; calibrations: CalendarCalibration[]; followups: CalendarFollowup[] }) {
   const [month, setMonth] = useState(() => { const value = new Date(); value.setDate(1); return value; });
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [state, formAction, pending] = useActionState(createReminder, initialState);
@@ -29,8 +31,8 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
   }, [month]);
 
   const eventsByDate = useMemo(() => {
-    const map = new Map<string, { tasks: CalendarTask[]; reminders: Reminder[] }>();
-    const get = (key: string) => map.get(key) ?? { tasks: [], reminders: [] };
+    const map = new Map<string, { tasks: CalendarTask[]; reminders: Reminder[]; calibrations: CalendarCalibration[]; followups: CalendarFollowup[] }>();
+    const get = (key: string) => map.get(key) ?? { tasks: [], reminders: [], calibrations: [], followups: [] };
     tasks.forEach((task) => { const value = get(task.due_date); value.tasks.push(task); map.set(task.due_date, value); });
     reminders.forEach((reminder) => {
       cells.forEach((day) => {
@@ -39,10 +41,12 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
         const value = get(key); value.reminders.push(reminder); map.set(key, value);
       });
     });
+    calibrations.forEach((item) => { const value = get(item.next_calibration_date); value.calibrations.push(item); map.set(item.next_calibration_date, value); });
+    followups.forEach((item) => { const date = new Date(`${item.opened_at}T12:00:00`); date.setDate(date.getDate() + 7); const key = dateKey(date); const value = get(key); value.followups.push(item); map.set(key, value); });
     return map;
-  }, [tasks, reminders, cells]);
+  }, [tasks, reminders, calibrations, followups, cells]);
 
-  const selectedEvents = eventsByDate.get(selectedDate) ?? { tasks: [], reminders: [] };
+  const selectedEvents = eventsByDate.get(selectedDate) ?? { tasks: [], reminders: [], calibrations: [], followups: [] };
 
   return <div className="space-y-7">
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -60,11 +64,11 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
         <div className="grid grid-cols-7 border-b bg-slate-50">{weekDays.map((day) => <div key={day} className="p-1.5 text-center text-xs font-bold text-slate-500 sm:p-3 sm:text-sm">{day}</div>)}</div>
         <div className="grid grid-cols-7">{cells.map((day) => {
           const key = dateKey(day); const events = eventsByDate.get(key); const currentMonth = day.getMonth() === month.getMonth(); const today = key === dateKey(new Date());
-          const eventCount = (events?.tasks.length ?? 0) + (events?.reminders.length ?? 0);
+          const eventCount = (events?.tasks.length ?? 0) + (events?.reminders.length ?? 0) + (events?.calibrations.length ?? 0) + (events?.followups.length ?? 0);
           return <button key={key} aria-label={`${day.getDate()} בחודש, ${eventCount} אירועים`} onClick={() => setSelectedDate(key)} className={`min-h-16 min-w-0 border-b border-l p-1 text-right transition hover:bg-blue-50 sm:min-h-28 sm:p-2 ${selectedDate === key ? "bg-blue-50 ring-2 ring-inset ring-blue-500" : ""} ${currentMonth ? "" : "bg-slate-50 text-slate-400"}`}>
             <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${today ? "bg-blue-600 text-white" : ""}`}>{day.getDate()}</span>
-            <div className="mt-1 flex flex-wrap justify-center gap-1 sm:hidden">{events?.tasks.length ? <i className="h-2 w-2 rounded-full bg-amber-400" /> : null}{events?.reminders.length ? <i className="h-2 w-2 rounded-full bg-blue-500" /> : null}{eventCount > 2 ? <span className="text-[9px] font-bold text-slate-500">+{eventCount}</span> : null}</div>
-            <div className="mt-2 hidden space-y-1 sm:block">{events?.tasks.slice(0, 2).map((task) => <div key={task.id} className="truncate rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{task.title}</div>)}{events?.reminders.slice(0, 2).map((item) => <div key={item.id} className="truncate rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">{item.title}</div>)}{events && events.tasks.length + events.reminders.length > 4 && <div className="text-xs font-bold text-slate-500">עוד {events.tasks.length + events.reminders.length - 4}</div>}</div>
+            <div className="mt-1 flex flex-wrap justify-center gap-1 sm:hidden">{events?.tasks.length ? <i className="h-2 w-2 rounded-full bg-amber-400" /> : null}{events?.reminders.length ? <i className="h-2 w-2 rounded-full bg-blue-500" /> : null}{events?.calibrations.length ? <i className="h-2 w-2 rounded-full bg-emerald-500" /> : null}{events?.followups.length ? <i className="h-2 w-2 rounded-full bg-red-500" /> : null}{eventCount > 2 ? <span className="text-[9px] font-bold text-slate-500">+{eventCount}</span> : null}</div>
+            <div className="mt-2 hidden space-y-1 sm:block">{events?.tasks.slice(0, 1).map((task) => <div key={task.id} className="truncate rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{task.title}</div>)}{events?.reminders.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">{item.title}</div>)}{events?.calibrations.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-900">כיול: {item.equipment_name}</div>)}{events?.followups.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-900">התראה: {item.reference_number}</div>)}</div>
           </button>;
         })}</div>
       </section>
@@ -93,11 +97,13 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
           <div className="space-y-3">
             {selectedEvents.tasks.map((task) => <Link key={task.id} href={`/tasks/${task.id}/edit`} className="block rounded-xl border-r-4 border-amber-400 bg-amber-50 p-3 hover:bg-amber-100"><span className="flex items-center gap-2 font-bold"><ClipboardList className="h-4 w-4" />{task.title}</span><span className="mt-1 block text-xs text-slate-500">דדליין של משימה</span></Link>)}
             {selectedEvents.reminders.map((item) => <div key={item.id} className="rounded-xl border-r-4 border-blue-500 bg-blue-50 p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-bold">{item.title}</p>{item.notes && <p className="mt-1 text-sm text-slate-600">{item.notes}</p>}</div><form action={deleteReminder.bind(null, item.id)}><button aria-label="מחק תזכורת" className="rounded p-1 text-slate-400 hover:bg-white hover:text-red-600"><Trash2 className="h-4 w-4" /></button></form></div></div>)}
-            {!selectedEvents.tasks.length && !selectedEvents.reminders.length && <p className="py-5 text-center text-sm text-slate-500">אין אירועים בתאריך הזה</p>}
+            {selectedEvents.calibrations.map((item) => <Link key={item.id} href="/calibrations" className="block rounded-xl border-r-4 border-emerald-500 bg-emerald-50 p-3"><p className="flex items-center gap-2 font-bold"><Gauge className="h-4 w-4" />כיול: {item.equipment_name}</p><p className="mt-1 text-xs text-slate-500">{[item.equipment_code, item.location].filter(Boolean).join(" • ") || "מועד כיול"}</p></Link>)}
+            {selectedEvents.followups.map((item) => <Link key={item.id} href="/followups" className="block rounded-xl border-r-4 border-red-500 bg-red-50 p-3"><p className="flex items-center gap-2 font-bold"><ListChecks className="h-4 w-4" />התראת {item.category === "pka" ? 'פק״ע' : item.category === "eco" ? "ECO" : "אי התאמה"}: {item.reference_number}</p><p className="mt-1 text-xs text-red-600">לא נסגרה בתוך שבוע</p></Link>)}
+            {!selectedEvents.tasks.length && !selectedEvents.reminders.length && !selectedEvents.calibrations.length && !selectedEvents.followups.length && <p className="py-5 text-center text-sm text-slate-500">אין אירועים בתאריך הזה</p>}
           </div>
         </section>
       </aside>
     </div>
-    <div className="flex gap-5 text-sm font-semibold text-slate-600"><span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-amber-300" /> משימה עם דדליין</span><span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-blue-300" /> תזכורת ידנית</span></div>
+    <div className="flex flex-wrap gap-5 text-sm font-semibold text-slate-600"><span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-amber-300" /> משימה עם דדליין</span><span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-blue-300" /> תזכורת ידנית</span><span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-emerald-300" /> כיול</span><span className="flex items-center gap-2"><i className="h-3 w-3 rounded bg-red-300" /> התראת מעקב</span></div>
   </div>;
 }
