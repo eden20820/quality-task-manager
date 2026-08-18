@@ -1,5 +1,6 @@
 ﻿
 import Link from "next/link";
+import { Bell, CalendarDays, ClipboardList } from "lucide-react";
 
 import { clearDashboardTasks } from "@/app/tasks/actions";
 import { ClearDashboardButton } from "@/components/clear-dashboard-button";
@@ -46,14 +47,26 @@ function formatDateForDatabase(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function getIsraelToday() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+  return new Date(value("year"), value("month") - 1, value("day"));
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
 
   const portalUser = await getPortalUser();
   const dashboardClearedAt = portalUser?.profile.dashboard_cleared_at ?? null;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = getIsraelToday();
 
   const todayString = formatDateForDatabase(today);
 
@@ -61,8 +74,12 @@ export default async function HomePage() {
   inThirtyDays.setDate(inThirtyDays.getDate() + 30);
   const inThirtyDaysString = formatDateForDatabase(inThirtyDays);
 
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const weekStartString = formatDateForDatabase(weekStart);
+  const weekEndString = formatDateForDatabase(weekEnd);
 
   let tasksQuery = supabase
     .from("tasks")
@@ -87,8 +104,8 @@ export default async function HomePage() {
   const [
     { data: dashboardTasks, error: tasksError },
     { data: expiringItems, error: expiryError },
-    { data: monthlyReminders, error: remindersError },
-    { data: monthlyDeadlineTasks, error: deadlineTasksError },
+    { data: weeklyReminders, error: remindersError },
+    { data: weeklyDeadlineTasks, error: deadlineTasksError },
     { data: upcomingCalibrations, error: calibrationsError },
   ] = await Promise.all([
     tasksQuery,
@@ -103,14 +120,14 @@ export default async function HomePage() {
     supabase
       .from("reminders")
       .select("id, title, reminder_date, repeat_unit, repeat_interval")
-      .lt("reminder_date", formatDateForDatabase(nextMonthStart))
+      .lte("reminder_date", weekEndString)
       .order("reminder_date", { ascending: true }),
     supabase
       .from("tasks")
       .select("id, title, due_date")
       .not("status", "in", "(completed,cancelled)")
-      .gte("due_date", formatDateForDatabase(monthStart))
-      .lt("due_date", formatDateForDatabase(nextMonthStart))
+      .gte("due_date", weekStartString)
+      .lte("due_date", weekEndString)
       .order("due_date", { ascending: true }),
     supabase
       .from("calibration_items")
@@ -137,13 +154,23 @@ export default async function HomePage() {
   ).length;
   const visibleRecentTasks = allTasks.slice(0, 5);
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
-  const monthReminderTitles = (monthlyReminders ?? []).flatMap((reminder) =>
-    reminderDatesInRange(reminder, formatDateForDatabase(monthStart), formatDateForDatabase(nextMonthStart)).map(() => reminder.title)
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    const dateString = formatDateForDatabase(date);
+    return {
+      date,
+      dateString,
+      tasks: (weeklyDeadlineTasks ?? []).filter((task) => task.due_date === dateString),
+      reminders: (weeklyReminders ?? []).filter((reminder) =>
+        reminderDatesInRange(reminder, dateString, dateString).length > 0
+      ),
+    };
+  });
+  const weeklyEventCount = weekDays.reduce(
+    (total, day) => total + day.tasks.length + day.reminders.length,
+    0
   );
-  const monthEventTitles = [
-    ...monthReminderTitles,
-    ...(monthlyDeadlineTasks ?? []).map((task) => task.title),
-  ];
   const calibrationNames = (upcomingCalibrations ?? []).map((item) => item.equipment_name);
 
   const summaryCards = [
@@ -160,13 +187,6 @@ export default async function HomePage() {
       details: expiringNames,
       emptyText: "אין חומרים שעומדים לפוג",
       href: "/expiry",
-    },
-    {
-      title: "תזכורות החודש",
-      value: monthEventTitles.length,
-      details: monthEventTitles,
-      emptyText: "אין תזכורות או דדליינים בחודש הנוכחי",
-      href: "/calendar",
     },
     {
       title: "כיולים קרובים / עד 30 יום",
@@ -227,6 +247,63 @@ export default async function HomePage() {
               </Card>
             </Link>
           ))}
+
+          <Card className="md:col-span-2">
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                    <CalendarDays className="h-5 w-5" />
+                    השבוע שלי
+                  </CardTitle>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {weeklyEventCount > 0
+                      ? `${weeklyEventCount} משימות ותזכורות השבוע`
+                      : "אין משימות או תזכורות השבוע"}
+                  </p>
+                </div>
+                <Link href="/calendar" className="text-sm font-bold text-slate-600 hover:text-slate-950">
+                  ליומן המלא
+                </Link>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+                {weekDays.map((day) => {
+                  const isToday = day.dateString === todayString;
+                  const dayName = new Intl.DateTimeFormat("he-IL", { weekday: "short" }).format(day.date);
+                  const shortDate = new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit" }).format(day.date);
+
+                  return (
+                    <div key={day.dateString} className={`min-h-32 rounded-xl border p-3 ${isToday ? "border-blue-300 bg-blue-50" : "bg-slate-50/70"}`}>
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                        <span className={`font-extrabold ${isToday ? "text-blue-700" : "text-slate-800"}`}>{dayName}</span>
+                        <span className="text-xs font-bold text-slate-500">{shortDate}</span>
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {day.tasks.map((task) => (
+                          <Link key={task.id} href={`/tasks/${task.id}/edit`} title={task.title} className="flex items-start gap-1.5 rounded-md bg-amber-100 px-2 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-200">
+                            <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span className="line-clamp-2">{task.title}</span>
+                          </Link>
+                        ))}
+                        {day.reminders.map((reminder) => (
+                          <Link key={reminder.id} href="/calendar" title={reminder.title} className="flex items-start gap-1.5 rounded-md bg-blue-100 px-2 py-1.5 text-xs font-bold text-blue-900 hover:bg-blue-200">
+                            <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span className="line-clamp-2">{reminder.title}</span>
+                          </Link>
+                        ))}
+                        {!day.tasks.length && !day.reminders.length && (
+                          <p className="pt-2 text-center text-xs text-slate-400">אין אירועים</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
