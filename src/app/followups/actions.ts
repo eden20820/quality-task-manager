@@ -42,6 +42,16 @@ export async function toggleFollowup(id: string, status: "open" | "closed") {
   revalidatePath("/followups"); revalidatePath("/calendar");
 }
 
+export async function toggleFollowupAlerts(id: string, alertsEnabled: boolean) {
+  const { supabase } = await authorized();
+  const { error } = await supabase
+    .from("quality_followups")
+    .update({ alerts_enabled: alertsEnabled, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/followups"); revalidatePath("/calendar");
+}
+
 export async function deleteFollowup(id: string) {
   const { supabase } = await authorized();
   await supabase.from("quality_followups").delete().eq("id", id);
