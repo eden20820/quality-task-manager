@@ -80,6 +80,7 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
               <option value="daily">כל יום</option>
               <option value="monthly">כל חודש</option>
               <option value="quarterly">כל 3 חודשים</option>
+              <option value="semiannual">כל 6 חודשים</option>
               <option value="yearly">כל שנה</option>
             </select>
             <textarea name="notes" placeholder="הערה (לא חובה)" rows={3} className="w-full rounded-lg border p-3" />
