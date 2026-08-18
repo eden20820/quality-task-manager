@@ -36,21 +36,7 @@ export function AppShell({
   return (
     <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-950">
       <aside className="fixed right-0 top-0 z-20 flex h-screen w-[260px] flex-col border-l border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-6 py-5">
-          <Image
-            src="/caeli-logo.png"
-            alt="Caeli"
-            width={105}
-            height={61}
-            priority
-            className="h-auto w-[105px]"
-          />
-          <h2 className="mt-3 text-[21px] font-extrabold leading-tight">
-            Caeli Quality Hub
-          </h2>
-        </div>
-
-        <nav className="flex-1 space-y-2 p-4">
+        <nav className="flex-1 space-y-2 p-4 pt-6">
           {navigationItems.map((item) => {
             const Icon = item.icon;
 
@@ -67,11 +53,6 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="border-t border-slate-200 px-6 py-5">
-          <Suspense fallback={<span className="block h-[18px] w-24 animate-pulse rounded bg-slate-200" />}>
-            <UserName />
-          </Suspense>
-        </div>
       </aside>
 
       <div className="mr-[260px] min-h-screen">
