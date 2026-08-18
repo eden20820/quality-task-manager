@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { groupDailyItems, sendDailyDigest, type DailyReminder, type DailyTask } from "@/lib/email/daily-digest";
 import { EXPIRY_RECIPIENTS, sendExpiryAlert, type ExpiringMaterial } from "@/lib/email/expiry-alert";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reminderOccursOn } from "@/lib/reminders/recurrence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ async function processDailyDigest(date: string) {
   const supabase = createAdminClient();
   const [tasksResult, remindersResult, profilesResult] = await Promise.all([
     supabase.from("tasks").select("id, title, description, priority, assignees").eq("due_date", date).not("status", "in", "(completed,cancelled)"),
-    supabase.from("reminders").select("id, title, notes, created_by").eq("reminder_date", date),
+    supabase.from("reminders").select("id, title, notes, created_by, reminder_date, repeat_unit, repeat_interval").lte("reminder_date", date),
     supabase.from("profiles").select("id, email, full_name, is_active").eq("is_active", true),
   ]);
 
@@ -36,7 +37,7 @@ async function processDailyDigest(date: string) {
 
   const recipients = groupDailyItems({
     tasks: (tasksResult.data ?? []) as DailyTask[],
-    reminders: (remindersResult.data ?? []) as DailyReminder[],
+    reminders: (remindersResult.data ?? []).filter((reminder) => reminderOccursOn(reminder, date)) as DailyReminder[],
     profiles: profilesResult.data ?? [],
   });
   if (recipients.length === 0) return NextResponse.json({ ok: true, date, sent: 0, message: "No daily items" });

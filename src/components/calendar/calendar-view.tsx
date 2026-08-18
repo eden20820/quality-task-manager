@@ -5,9 +5,10 @@ import { useActionState, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Plus, Trash2 } from "lucide-react";
 
 import { createReminder, deleteReminder, type ReminderActionResult } from "@/app/calendar/actions";
+import { reminderOccursOn, type RecurringReminder } from "@/lib/reminders/recurrence";
 
 export type CalendarTask = { id: string; title: string; due_date: string; priority: string };
-export type Reminder = { id: string; title: string; reminder_date: string; notes: string | null };
+export type Reminder = RecurringReminder & { id: string; title: string; notes: string | null };
 
 const initialState: ReminderActionResult = { success: false, message: "" };
 const weekDays = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -21,19 +22,26 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [state, formAction, pending] = useActionState(createReminder, initialState);
 
-  const eventsByDate = useMemo(() => {
-    const map = new Map<string, { tasks: CalendarTask[]; reminders: Reminder[] }>();
-    const get = (key: string) => map.get(key) ?? { tasks: [], reminders: [] };
-    tasks.forEach((task) => { const value = get(task.due_date); value.tasks.push(task); map.set(task.due_date, value); });
-    reminders.forEach((reminder) => { const value = get(reminder.reminder_date); value.reminders.push(reminder); map.set(reminder.reminder_date, value); });
-    return map;
-  }, [tasks, reminders]);
-
   const cells = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1);
     const start = new Date(first); start.setDate(1 - first.getDay());
     return Array.from({ length: 42 }, (_, index) => { const day = new Date(start); day.setDate(start.getDate() + index); return day; });
   }, [month]);
+
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, { tasks: CalendarTask[]; reminders: Reminder[] }>();
+    const get = (key: string) => map.get(key) ?? { tasks: [], reminders: [] };
+    tasks.forEach((task) => { const value = get(task.due_date); value.tasks.push(task); map.set(task.due_date, value); });
+    reminders.forEach((reminder) => {
+      cells.forEach((day) => {
+        const key = dateKey(day);
+        if (!reminderOccursOn(reminder, key)) return;
+        const value = get(key); value.reminders.push(reminder); map.set(key, value);
+      });
+    });
+    return map;
+  }, [tasks, reminders, cells]);
+
   const selectedEvents = eventsByDate.get(selectedDate) ?? { tasks: [], reminders: [] };
 
   return <div className="space-y-7">
@@ -67,6 +75,13 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
           <form action={formAction} className="mt-4 space-y-3">
             <input name="title" required placeholder="מה להזכיר?" className="h-11 w-full rounded-lg border px-3" />
             <input name="reminder_date" type="date" required defaultValue={selectedDate} key={selectedDate} className="h-11 w-full rounded-lg border px-3" />
+            <select name="repeat" defaultValue="none" className="h-11 w-full rounded-lg border bg-white px-3">
+              <option value="none">ללא חזרה</option>
+              <option value="daily">כל יום</option>
+              <option value="monthly">כל חודש</option>
+              <option value="quarterly">כל 3 חודשים</option>
+              <option value="yearly">כל שנה</option>
+            </select>
             <textarea name="notes" placeholder="הערה (לא חובה)" rows={3} className="w-full rounded-lg border p-3" />
             <button disabled={pending} className="h-11 w-full rounded-lg bg-slate-950 font-bold text-white disabled:opacity-50">{pending ? "שומר..." : "הוסף תזכורת"}</button>
             {state.message && <p className={`text-sm font-bold ${state.success ? "text-emerald-600" : "text-red-600"}`}>{state.message}</p>}

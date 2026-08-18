@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalUser } from "@/lib/auth/portal-user";
+import { reminderDatesInRange } from "@/lib/reminders/recurrence";
 
 const statusLabels: Record<string, string> = {
   new: "חדשה",
@@ -100,8 +101,7 @@ export default async function HomePage() {
       .order("expiry_date", { ascending: true }),
     supabase
       .from("reminders")
-      .select("id, title, reminder_date")
-      .gte("reminder_date", formatDateForDatabase(monthStart))
+      .select("id, title, reminder_date, repeat_unit, repeat_interval")
       .lt("reminder_date", formatDateForDatabase(nextMonthStart))
       .order("reminder_date", { ascending: true }),
     supabase
@@ -127,8 +127,11 @@ export default async function HomePage() {
   ).length;
   const visibleRecentTasks = allTasks.slice(0, 5);
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
+  const monthReminderTitles = (monthlyReminders ?? []).flatMap((reminder) =>
+    reminderDatesInRange(reminder, formatDateForDatabase(monthStart), formatDateForDatabase(nextMonthStart)).map(() => reminder.title)
+  );
   const monthEventTitles = [
-    ...(monthlyReminders ?? []).map((reminder) => reminder.title),
+    ...monthReminderTitles,
     ...(monthlyDeadlineTasks ?? []).map((task) => task.title),
   ];
 
