@@ -47,7 +47,7 @@ export default async function EditTaskPage({
     <>
       <div className="mx-auto max-w-4xl">
         <div className="mb-8">
-          <h2 className="text-4xl font-extrabold">
+          <h2 className="text-3xl font-extrabold sm:text-4xl">
             עריכת משימה #{task.task_number}
           </h2>
 

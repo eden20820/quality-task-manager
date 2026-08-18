@@ -111,7 +111,7 @@ export function DocumentsCenter({ initialDocuments }: { initialDocuments: Docume
   }
 
   return <div className="space-y-7">
-    <div><h2 className="text-4xl font-extrabold">מרכז מסמכים</h2><p className="mt-2 text-lg text-slate-500">העלאה, שמירה ואיתור של מסמכי מחלקת האיכות</p></div>
+    <div><h2 className="text-3xl font-extrabold sm:text-4xl">מרכז מסמכים</h2><p className="mt-2 text-base text-slate-500 sm:text-lg">העלאה, שמירה ואיתור של מסמכי מחלקת האיכות</p></div>
 
     <form onSubmit={handleUpload} className="rounded-2xl border bg-white p-6 shadow-sm">
       <h3 className="flex items-center gap-2 text-xl font-extrabold"><Upload className="h-5 w-5" /> העלאת מסמך חדש</h3>

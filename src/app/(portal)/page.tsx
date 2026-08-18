@@ -160,7 +160,7 @@ export default async function HomePage() {
     <>
       <div className="space-y-8">
         <div className="text-center">
-          <h2 className="text-4xl font-extrabold">
+          <h2 className="text-3xl font-extrabold sm:text-4xl">
             לוח בקרה
           </h2>
         </div>
@@ -234,7 +234,8 @@ export default async function HomePage() {
 
           <CardContent>
             {visibleRecentTasks.length > 0 ? (
-              <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <div className="min-w-[760px] divide-y divide-slate-200">
                 {visibleRecentTasks.map((task) => (
                   <div
                     key={task.id}
@@ -279,6 +280,7 @@ export default async function HomePage() {
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
             ) : (
               <div className="flex h-52 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-slate-500">

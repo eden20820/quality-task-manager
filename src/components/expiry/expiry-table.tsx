@@ -492,7 +492,7 @@ export function ExpiryTable({ rows }: Props) {
         </div>
 
         <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-          <Table>
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow className="bg-slate-50">
                 <TableHead className="text-right font-bold">

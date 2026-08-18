@@ -16,7 +16,7 @@ export default function NewTaskPage() {
     <>
       <div className="mx-auto max-w-4xl">
         <div className="mb-8">
-          <h2 className="text-4xl font-extrabold">משימה חדשה</h2>
+          <h2 className="text-3xl font-extrabold sm:text-4xl">משימה חדשה</h2>
           <p className="mt-2 text-lg text-slate-500">
             הזן את פרטי המשימה ושייך אותה לעובדים הרלוונטיים
           </p>
@@ -186,5 +186,4 @@ export default function NewTaskPage() {
     </>
   );
 }
-
 

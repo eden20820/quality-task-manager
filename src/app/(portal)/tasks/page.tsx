@@ -15,7 +15,7 @@ export default async function TasksPage() {
 
   return <div className="space-y-8">
     <div className="flex items-center justify-between gap-4">
-      <div><h2 className="text-4xl font-extrabold">משימות</h2><p className="mt-2 text-lg text-slate-500">ניהול, סינון ומעקב אחר כל המשימות הפעילות</p></div>
+      <div><h2 className="text-3xl font-extrabold sm:text-4xl">משימות</h2><p className="mt-2 text-base text-slate-500 sm:text-lg">ניהול, סינון ומעקב אחר כל המשימות הפעילות</p></div>
       <Link href="/tasks/new" className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-base font-bold text-primary-foreground shadow-sm hover:bg-primary/90">משימה חדשה</Link>
     </div>
     <TaskTable initialTasks={(data ?? []) as TaskRow[]} />

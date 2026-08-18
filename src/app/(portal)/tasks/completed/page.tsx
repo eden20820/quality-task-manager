@@ -79,17 +79,17 @@ export default async function CompletedTasksPage() {
     <>
       <div className="space-y-8">
         <div>
-          <h2 className="text-4xl font-extrabold">
+          <h2 className="text-3xl font-extrabold sm:text-4xl">
             משימות שהושלמו
           </h2>
 
-          <p className="mt-2 text-lg text-slate-500">
+          <p className="mt-2 text-base text-slate-500 sm:text-lg">
             מעקב אחר משימות שבוצעו, מי השלים אותן ומתי
           </p>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <Table>
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow className="bg-slate-50">
                 <TableHead className="w-20 text-center text-base font-bold">
@@ -177,4 +177,3 @@ export default async function CompletedTasksPage() {
     </>
   );
 }
-

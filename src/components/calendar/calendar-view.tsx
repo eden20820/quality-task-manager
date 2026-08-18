@@ -38,12 +38,13 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
 
   return <div className="space-y-7">
     <div className="flex flex-wrap items-end justify-between gap-4">
-      <div><h2 className="text-4xl font-extrabold">יומן ותזכורות</h2><p className="mt-2 text-lg text-slate-500">משימות עם דדליין ותזכורות שהוספת ידנית</p></div>
+      <div><h2 className="text-3xl font-extrabold sm:text-4xl">יומן ותזכורות</h2><p className="mt-2 text-base text-slate-500 sm:text-lg">משימות עם דדליין ותזכורות שהוספת ידנית</p></div>
       <button onClick={() => setSelectedDate(dateKey(new Date()))} className="rounded-lg border bg-white px-4 py-2 font-bold hover:bg-slate-50">חזרה להיום</button>
     </div>
 
     <div className="grid gap-6 xl:grid-cols-[1fr_330px]">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="min-w-[700px]">
         <div className="flex items-center justify-between border-b p-5">
           <button aria-label="החודש הבא" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="rounded-lg p-2 hover:bg-slate-100"><ChevronRight /></button>
           <h3 className="text-xl font-extrabold">{new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" }).format(month)}</h3>
@@ -57,6 +58,7 @@ export function CalendarView({ tasks, reminders }: { tasks: CalendarTask[]; remi
             <div className="mt-2 space-y-1">{events?.tasks.slice(0, 2).map((task) => <div key={task.id} className="truncate rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{task.title}</div>)}{events?.reminders.slice(0, 2).map((item) => <div key={item.id} className="truncate rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">{item.title}</div>)}{events && events.tasks.length + events.reminders.length > 4 && <div className="text-xs font-bold text-slate-500">עוד {events.tasks.length + events.reminders.length - 4}</div>}</div>
           </button>;
         })}</div>
+        </div>
       </section>
 
       <aside className="space-y-5">

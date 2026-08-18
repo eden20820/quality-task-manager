@@ -97,7 +97,7 @@ export default async function ExpiryPage() {
       <div className="space-y-8">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
-            <h1 className="text-4xl font-extrabold">
+            <h1 className="text-3xl font-extrabold sm:text-4xl">
               ניהול חומרים
             </h1>
 
