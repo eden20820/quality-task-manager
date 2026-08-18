@@ -163,10 +163,6 @@ export default async function HomePage() {
           <h2 className="text-4xl font-extrabold">
             לוח בקרה
           </h2>
-
-          <p className="mt-2 text-lg text-slate-500">
-            תמונת מצב של המשימות במחלקה
-          </p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
