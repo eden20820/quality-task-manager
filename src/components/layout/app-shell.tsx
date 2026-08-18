@@ -1,5 +1,6 @@
 ﻿import Link from "next/link";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { Suspense } from "react";
 import {
   CheckCircle2,
@@ -35,13 +36,18 @@ export function AppShell({
   return (
     <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-950">
       <aside className="fixed right-0 top-0 z-20 flex h-screen w-[260px] flex-col border-l border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-6 py-7">
-          <h2 className="text-[24px] font-extrabold leading-tight">
-            CAELI Quality
+        <div className="border-b border-slate-200 px-6 py-5">
+          <Image
+            src="/caeli-logo.png"
+            alt="Caeli"
+            width={105}
+            height={61}
+            priority
+            className="h-auto w-[105px]"
+          />
+          <h2 className="mt-3 text-[21px] font-extrabold leading-tight">
+            Caeli Quality Hub
           </h2>
-          <p className="mt-2 text-[16px] font-semibold text-slate-500">
-            מערכת ניהול משימות
-          </p>
         </div>
 
         <nav className="flex-1 space-y-2 p-4">
@@ -71,11 +77,18 @@ export function AppShell({
       <div className="mr-[260px] min-h-screen">
         <header className="flex min-h-[130px] items-center border-b border-slate-200 bg-white px-10 shadow-sm">
           <div className="grid w-full grid-cols-[180px_1fr_180px] items-center">
-            <div />
+            <Image
+              src="/caeli-logo.png"
+              alt="Caeli"
+              width={105}
+              height={61}
+              priority
+              className="h-auto w-[105px] justify-self-start"
+            />
 
             <div className="text-center">
               <h1 className="text-[42px] font-black leading-tight tracking-tight">
-                מערכת ניהול משימות
+                Caeli Quality Hub
               </h1>
               <p className="mt-3 text-[21px] font-bold text-slate-500">
                 מחלקת איכות
@@ -129,4 +142,3 @@ function ContentSkeleton() {
     </div>
   );
 }
-
