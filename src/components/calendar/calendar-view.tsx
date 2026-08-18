@@ -10,7 +10,7 @@ import { reminderOccursOn, type RecurringReminder } from "@/lib/reminders/recurr
 export type CalendarTask = { id: string; title: string; due_date: string; priority: string };
 export type Reminder = RecurringReminder & { id: string; title: string; notes: string | null };
 export type CalendarCalibration = { id: string; equipment_name: string; equipment_code: string | null; location: string | null; next_calibration_date: string };
-export type CalendarFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; opened_at: string };
+export type CalendarFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; opened_at: string; created_at: string };
 
 const initialState: ReminderActionResult = { success: false, message: "" };
 const weekDays = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -42,7 +42,16 @@ export function CalendarView({ tasks, reminders, calibrations, followups }: { ta
       });
     });
     calibrations.forEach((item) => { const value = get(item.next_calibration_date); value.calibrations.push(item); map.set(item.next_calibration_date, value); });
-    followups.forEach((item) => { const date = new Date(`${item.opened_at}T12:00:00`); date.setDate(date.getDate() + 7); const key = dateKey(date); const value = get(key); value.followups.push(item); map.set(key, value); });
+    followups.forEach((item) => {
+      const created = new Date(item.created_at);
+      const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+      cells.forEach((day) => {
+        const daysSinceCreated = Math.round((day.getTime() - createdDay.getTime()) / 86_400_000);
+        if (daysSinceCreated < 7 || daysSinceCreated % 7 !== 0) return;
+        const key = dateKey(day);
+        const value = get(key); value.followups.push(item); map.set(key, value);
+      });
+    });
     return map;
   }, [tasks, reminders, calibrations, followups, cells]);
 
