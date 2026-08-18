@@ -16,12 +16,14 @@ export type DailyReminder = {
   notes: string | null;
   created_by: string;
 };
+export type DailyFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; opened_at: string; notes: string | null };
 
 export type DigestRecipient = {
   name: string;
   email: string;
   tasks: DailyTask[];
   reminders: DailyReminder[];
+  followups: DailyFollowup[];
 };
 
 type SendResult =
@@ -69,6 +71,11 @@ function buildReminderItems(reminders: DailyReminder[]) {
     .join("");
 }
 
+function buildFollowupItems(items: DailyFollowup[]) {
+  const labels = { pka: 'פק״ע', nonconformity: "אי התאמה", eco: "ECO" };
+  return items.map((item) => `<li style="margin:0 0 14px"><strong>${labels[item.category]} ${escapeHtml(item.reference_number)}</strong><div style="margin-top:4px;color:#dc2626">הרשומה פתוחה כבר שבוע</div>${item.notes ? `<div style="margin-top:4px;color:#475569">${escapeHtml(item.notes)}</div>` : ""}</li>`).join("");
+}
+
 function buildDigestHtml(recipient: DigestRecipient) {
   const link = calendarLink();
   const tasksSection = recipient.tasks.length
@@ -77,18 +84,21 @@ function buildDigestHtml(recipient: DigestRecipient) {
   const remindersSection = recipient.reminders.length
     ? `<h2 style="margin:24px 0 12px;font-size:19px">תזכורות להיום</h2><ul style="margin:0;padding-right:22px">${buildReminderItems(recipient.reminders)}</ul>`
     : "";
+  const followupsSection = recipient.followups.length ? `<h2 style="margin:24px 0 12px;font-size:19px">התראות מעקב פתוחות</h2><ul style="margin:0;padding-right:22px">${buildFollowupItems(recipient.followups)}</ul>` : "";
 
-  return `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#0f172a"><div style="background:#0f172a;color:white;padding:22px 26px;border-radius:12px 12px 0 0"><h1 style="margin:0;font-size:24px">משימות ותזכורות יומיות</h1><p style="margin:8px 0 0;color:#cbd5e1">מערכת ניהול משימות – מחלקת איכות</p></div><div style="border:1px solid #e2e8f0;border-top:0;padding:26px;border-radius:0 0 12px 12px"><p style="font-size:17px">בוקר טוב ${escapeHtml(recipient.name)},</p><p>אלו המשימות והתזכורות שלך להיום:</p>${tasksSection}${remindersSection}${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:10px;background:#0f172a;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">פתיחת היומן</a>` : ""}</div></div>`;
+  return `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#0f172a"><div style="background:#0f172a;color:white;padding:22px 26px;border-radius:12px 12px 0 0"><h1 style="margin:0;font-size:24px">משימות ותזכורות יומיות</h1><p style="margin:8px 0 0;color:#cbd5e1">Caeli Quality Hub</p></div><div style="border:1px solid #e2e8f0;border-top:0;padding:26px;border-radius:0 0 12px 12px"><p style="font-size:17px">בוקר טוב ${escapeHtml(recipient.name)},</p><p>אלו המשימות, התזכורות וההתראות להיום:</p>${tasksSection}${remindersSection}${followupsSection}${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:10px;background:#0f172a;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">פתיחת היומן</a>` : ""}</div></div>`;
 }
 
 export function groupDailyItems({
   tasks,
   reminders,
   profiles,
+  followups = [],
 }: {
   tasks: DailyTask[];
   reminders: DailyReminder[];
   profiles: Array<{ id: string; email: string | null; full_name: string | null; is_active: boolean }>;
+  followups?: DailyFollowup[];
 }) {
   const recipients = new Map<string, DigestRecipient>();
 
@@ -96,7 +106,7 @@ export function groupDailyItems({
     const key = email.toLowerCase();
     const existing = recipients.get(key);
     if (existing) return existing;
-    const recipient = { name, email, tasks: [], reminders: [] };
+    const recipient = { name, email, tasks: [], reminders: [], followups: [] };
     recipients.set(key, recipient);
     return recipient;
   };
@@ -113,6 +123,13 @@ export function groupDailyItems({
     const profile = profilesById.get(reminder.created_by);
     if (profile?.email) {
       getRecipient(profile.email, profile.full_name?.trim() || profile.email).reminders.push(reminder);
+    }
+  }
+
+  if (followups.length) {
+    for (const key of ["eden", "sergey"] as const) {
+      const assignee = ASSIGNEES[key];
+      getRecipient(assignee.email, assignee.name).followups.push(...followups);
     }
   }
 

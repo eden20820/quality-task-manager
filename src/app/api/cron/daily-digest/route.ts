@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { groupDailyItems, sendDailyDigest, type DailyReminder, type DailyTask } from "@/lib/email/daily-digest";
+import { groupDailyItems, sendDailyDigest, type DailyFollowup, type DailyReminder, type DailyTask } from "@/lib/email/daily-digest";
 import { EXPIRY_RECIPIENTS, sendExpiryAlert, type ExpiringMaterial } from "@/lib/email/expiry-alert";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { reminderOccursOn } from "@/lib/reminders/recurrence";
@@ -23,13 +23,16 @@ function israelDateParts() {
 
 async function processDailyDigest(date: string) {
   const supabase = createAdminClient();
-  const [tasksResult, remindersResult, profilesResult] = await Promise.all([
+  const alertDate = new Date(`${date}T12:00:00Z`); alertDate.setUTCDate(alertDate.getUTCDate() - 7);
+  const openedDate = alertDate.toISOString().slice(0, 10);
+  const [tasksResult, remindersResult, profilesResult, followupsResult] = await Promise.all([
     supabase.from("tasks").select("id, title, description, priority, assignees").eq("due_date", date).not("status", "in", "(completed,cancelled)"),
     supabase.from("reminders").select("id, title, notes, created_by, reminder_date, repeat_unit, repeat_interval").lte("reminder_date", date),
     supabase.from("profiles").select("id, email, full_name, is_active").eq("is_active", true),
+    supabase.from("quality_followups").select("id, category, reference_number, opened_at, notes").eq("status", "open").eq("opened_at", openedDate),
   ]);
 
-  const loadError = tasksResult.error ?? remindersResult.error ?? profilesResult.error;
+  const loadError = tasksResult.error ?? remindersResult.error ?? profilesResult.error ?? followupsResult.error;
   if (loadError) {
     console.error("Daily digest load error:", loadError);
     return NextResponse.json({ ok: false, error: "Failed to load daily items" }, { status: 500 });
@@ -39,6 +42,7 @@ async function processDailyDigest(date: string) {
     tasks: (tasksResult.data ?? []) as DailyTask[],
     reminders: (remindersResult.data ?? []).filter((reminder) => reminderOccursOn(reminder, date)) as DailyReminder[],
     profiles: profilesResult.data ?? [],
+    followups: (followupsResult.data ?? []) as DailyFollowup[],
   });
   if (recipients.length === 0) return NextResponse.json({ ok: true, date, sent: 0, message: "No daily items" });
 
