@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,8 +34,16 @@ export default function LoginPage() {
     >
       <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
         <div className="mb-8 text-center">
+          <Image
+            src="/caeli-logo.png"
+            alt="Caeli"
+            width={125}
+            height={72}
+            priority
+            className="mx-auto mb-5 h-auto w-[125px]"
+          />
           <h1 className="text-3xl font-extrabold text-slate-950">
-            מערכת ניהול משימות
+            Caeli Quality Hub
           </h1>
 
           <p className="mt-3 text-lg font-semibold text-slate-500">

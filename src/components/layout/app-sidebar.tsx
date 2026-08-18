@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   ClipboardList,
   LayoutDashboard,
@@ -42,8 +43,8 @@ export function AppSidebar() {
     <Sidebar side="right" collapsible="icon">
       <SidebarHeader className="border-b p-4">
         <div className="text-right">
-          <p className="text-lg font-bold">CAELI Quality</p>
-          <p className="text-sm text-muted-foreground">מערכת משימות</p>
+          <Image src="/caeli-logo.png" alt="Caeli" width={90} height={52} className="mb-2 h-auto w-[90px]" />
+          <p className="text-lg font-bold">Caeli Quality Hub</p>
         </div>
       </SidebarHeader>
 
