@@ -118,6 +118,7 @@ export async function updateTask(formData: FormData) {
   const dueDate = String(
     formData.get("due_date") ?? ""
   ).trim();
+  const returnTo = String(formData.get("return_to") ?? "/tasks");
 
   if (!taskId || !title) {
     throw new Error("Missing required task details");
@@ -149,7 +150,7 @@ export async function updateTask(formData: FormData) {
   revalidatePath("/tasks/completed");
   revalidatePath("/");
 
-  redirect("/tasks");
+  redirect(returnTo === "/tasks/completed" ? returnTo : "/tasks");
 }
 
 export async function clearDashboardTasks() {

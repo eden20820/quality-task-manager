@@ -61,6 +61,11 @@ export default async function EditTaskPage({
           className="space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
         >
           <input type="hidden" name="task_id" value={task.id} />
+          <input
+            type="hidden"
+            name="return_to"
+            value={task.status === "completed" ? "/tasks/completed" : "/tasks"}
+          />
 
           <div className="space-y-2">
             <label htmlFor="title" className="text-base font-bold">
@@ -146,7 +151,7 @@ export default async function EditTaskPage({
             />
 
             <a
-              href="/tasks"
+              href={task.status === "completed" ? "/tasks/completed" : "/tasks"}
               className="inline-flex h-11 items-center justify-center rounded-md border border-slate-200 bg-white px-8 text-base font-bold transition hover:bg-slate-50"
             >
               ביטול

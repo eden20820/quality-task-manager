@@ -1,4 +1,5 @@
-import { Undo2 } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Undo2 } from "lucide-react";
 
 import { restoreTask } from "@/app/tasks/actions";
 import { Badge } from "@/components/ui/badge";
@@ -119,8 +120,8 @@ export default async function CompletedTasksPage() {
                   שעה
                 </TableHead>
 
-                <TableHead className="w-28 text-center text-base font-bold">
-                  שחזור
+                <TableHead className="w-48 text-center text-base font-bold">
+                  פעולות
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -161,12 +162,22 @@ export default async function CompletedTasksPage() {
                       <TableCell>{completed.time}</TableCell>
 
                       <TableCell className="text-center">
-                        <form action={restoreTask.bind(null, task.id)}>
-                          <button className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold hover:bg-slate-50">
-                            <Undo2 className="h-4 w-4" />
-                            שחזור
-                          </button>
-                        </form>
+                        <div className="flex items-center justify-center gap-2">
+                          <Link
+                            href={`/tasks/${task.id}/edit`}
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold hover:bg-slate-50"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            עריכה
+                          </Link>
+
+                          <form action={restoreTask.bind(null, task.id)}>
+                            <button className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-bold hover:bg-slate-50">
+                              <Undo2 className="h-4 w-4" />
+                              שחזור
+                            </button>
+                          </form>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
