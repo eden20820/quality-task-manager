@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type FollowupResult = { success: boolean; message: string };
 const categories = new Set(["pka", "nonconformity", "eco"]);
+const assignees = new Set(["eden", "sergey"]);
 
 async function authorized() {
   const supabase = await createClient();
@@ -24,11 +25,12 @@ export async function createFollowup(_: FollowupResult, formData: FormData): Pro
     const quantityValue = String(formData.get("quantity") ?? "").trim();
     const openedAt = String(formData.get("opened_at") ?? "");
     const status = String(formData.get("status") ?? "open");
+    const assigneeKey = String(formData.get("assignee_key") ?? "");
     const quantity = quantityValue === "" ? null : Number(quantityValue);
-    if (!categories.has(category) || !referenceNumber || !name || !/^\d{4}-\d{2}-\d{2}$/.test(openedAt) || !["open", "closed"].includes(status)) return { success: false, message: "יש להזין מספר, שם, תאריך ומצב" };
+    if (!categories.has(category) || !referenceNumber || !name || !/^\d{4}-\d{2}-\d{2}$/.test(openedAt) || !["open", "closed"].includes(status) || !assignees.has(assigneeKey)) return { success: false, message: "יש להזין מספר, שם, תאריך, מצב ואחראי" };
     if (category === "pka" && (!Number.isInteger(quantity) || (quantity ?? -1) < 0)) return { success: false, message: "יש להזין כמות תקינה לפק״ע" };
     const { supabase, user } = await authorized();
-    const { error } = await supabase.from("quality_followups").insert({ category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes: String(formData.get("notes") ?? "").trim() || null, created_by: user.id });
+    const { error } = await supabase.from("quality_followups").insert({ category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, assignee_key: assigneeKey, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes: String(formData.get("notes") ?? "").trim() || null, created_by: user.id });
     if (error?.code === "23505") return { success: false, message: "מספר זה כבר קיים בקטגוריה" };
     if (error) throw error;
     revalidatePath("/followups"); revalidatePath("/calendar");
@@ -50,6 +52,18 @@ export async function toggleFollowupAlerts(id: string, alertsEnabled: boolean) {
     .eq("id", id);
   if (error) throw error;
   revalidatePath("/followups"); revalidatePath("/calendar");
+}
+
+export async function updateFollowupAssignee(id: string, formData: FormData) {
+  const assigneeKey = String(formData.get("assignee_key") ?? "");
+  if (!assignees.has(assigneeKey)) throw new Error("Invalid assignee");
+  const { supabase } = await authorized();
+  const { error } = await supabase
+    .from("quality_followups")
+    .update({ assignee_key: assigneeKey, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/followups");
 }
 
 export async function deleteFollowup(id: string) {
