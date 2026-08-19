@@ -30,16 +30,25 @@ async function isAuthorizedCronRequest(request: Request) {
     return true;
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !publishableKey) return false;
+
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase.rpc("verify_quality_cron_secret", {
-      candidate: presentedSecret,
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/verify_quality_cron_secret`, {
+      method: "POST",
+      headers: {
+        apikey: publishableKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ candidate: presentedSecret }),
+      cache: "no-store",
     });
-    if (error) {
-      console.error("Cron secret verification error:", error);
+    if (!response.ok) {
+      console.error("Cron secret verification failed:", response.status);
       return false;
     }
-    return data === true;
+    return (await response.json()) === true;
   } catch (error) {
     console.error("Cron authorization error:", error);
     return false;
