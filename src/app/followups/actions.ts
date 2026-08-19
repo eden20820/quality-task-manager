@@ -71,6 +71,24 @@ export async function updateFollowupAssignee(id: string, formData: FormData) {
   revalidatePath("/followups");
 }
 
+export async function updateFollowupNotes(id: string, formData: FormData): Promise<FollowupResult> {
+  try {
+    const notes = String(formData.get("notes") ?? "").trim();
+    if (notes.length > 2000) return { success: false, message: "ההערה ארוכה מדי" };
+    const { supabase } = await authorized();
+    const { error } = await supabase
+      .from("quality_followups")
+      .update({ notes: notes || null, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw error;
+    revalidatePath("/followups");
+    return { success: true, message: "ההערה נשמרה" };
+  } catch (error) {
+    console.error("Update followup notes error:", error);
+    return { success: false, message: "שמירת ההערה נכשלה" };
+  }
+}
+
 export async function deleteFollowup(id: string) {
   const { supabase } = await authorized();
   await supabase.from("quality_followups").delete().eq("id", id);
