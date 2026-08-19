@@ -5,7 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 
 export type FollowupResult = { success: boolean; message: string };
 const categories = new Set(["pka", "nonconformity", "eco"]);
-const assignees = new Set(["eden", "sergey"]);
+const assignees = new Set(["eden", "sergey", "quality_manager"]);
+
+function validAssignee(category: string, assigneeKey: string) {
+  return assignees.has(assigneeKey) && (assigneeKey !== "quality_manager" || category === "nonconformity" || category === "eco");
+}
 
 async function authorized() {
   const supabase = await createClient();
@@ -27,7 +31,7 @@ export async function createFollowup(_: FollowupResult, formData: FormData): Pro
     const status = String(formData.get("status") ?? "open");
     const assigneeKey = String(formData.get("assignee_key") ?? "");
     const quantity = quantityValue === "" ? null : Number(quantityValue);
-    if (!categories.has(category) || !referenceNumber || !name || !/^\d{4}-\d{2}-\d{2}$/.test(openedAt) || !["open", "closed"].includes(status) || !assignees.has(assigneeKey)) return { success: false, message: "יש להזין מספר, שם, תאריך, מצב ואחראי" };
+    if (!categories.has(category) || !referenceNumber || !name || !/^\d{4}-\d{2}-\d{2}$/.test(openedAt) || !["open", "closed"].includes(status) || !validAssignee(category, assigneeKey)) return { success: false, message: "יש להזין מספר, שם, תאריך, מצב ואחראי תקין" };
     if (category === "pka" && (!Number.isInteger(quantity) || (quantity ?? -1) < 0)) return { success: false, message: "יש להזין כמות תקינה לפק״ע" };
     const { supabase, user } = await authorized();
     const { error } = await supabase.from("quality_followups").insert({ category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, assignee_key: assigneeKey, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes: String(formData.get("notes") ?? "").trim() || null, created_by: user.id });
@@ -56,8 +60,9 @@ export async function toggleFollowupAlerts(id: string, alertsEnabled: boolean) {
 
 export async function updateFollowupAssignee(id: string, formData: FormData) {
   const assigneeKey = String(formData.get("assignee_key") ?? "");
-  if (!assignees.has(assigneeKey)) throw new Error("Invalid assignee");
   const { supabase } = await authorized();
+  const { data: followup, error: loadError } = await supabase.from("quality_followups").select("category").eq("id", id).single();
+  if (loadError || !followup || !validAssignee(followup.category, assigneeKey)) throw new Error("Invalid assignee");
   const { error } = await supabase
     .from("quality_followups")
     .update({ assignee_key: assigneeKey, updated_at: new Date().toISOString() })
