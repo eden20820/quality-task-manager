@@ -12,6 +12,7 @@ const categories: Category[] = ["pka", "nonconformity", "eco"];
 const labels = { pka: 'פק"ע', nonconformity: "אי התאמה", eco: "ECO" } as const;
 const initial: FollowupResult = { success: false, message: "" };
 const dateFormatter = new Intl.DateTimeFormat("he-IL");
+const referenceNumberCollator = new Intl.Collator("he-IL", { numeric: true, sensitivity: "base" });
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function dueDate(value: string) { const date = new Date(value); date.setDate(date.getDate() + 7); return date; }
@@ -74,7 +75,7 @@ export function FollowupsBoard({ rows }: { rows: Followup[] }) {
   const [query, setQuery] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const counts = useMemo(() => Object.fromEntries(categories.map((category) => [category, rows.filter((row) => row.category === category && row.status !== "closed").length])) as Record<Category, number>, [rows]);
-  const visibleRows = useMemo(() => { const normalizedQuery = query.trim().toLocaleLowerCase("he"); return rows.filter((row) => row.category === activeCategory && (statusFilter === "all" || (statusFilter === "active" ? row.status !== "closed" : row.status === statusFilter)) && (!normalizedQuery || `${row.reference_number} ${row.name ?? ""} ${row.notes ?? ""}`.toLocaleLowerCase("he").includes(normalizedQuery))); }, [activeCategory, query, rows, statusFilter]);
+  const visibleRows = useMemo(() => { const normalizedQuery = query.trim().toLocaleLowerCase("he"); return rows.filter((row) => row.category === activeCategory && (statusFilter === "all" || (statusFilter === "active" ? row.status !== "closed" : row.status === statusFilter)) && (!normalizedQuery || `${row.reference_number} ${row.name ?? ""} ${row.notes ?? ""}`.toLocaleLowerCase("he").includes(normalizedQuery))).sort((first, second) => referenceNumberCollator.compare(first.reference_number, second.reference_number)); }, [activeCategory, query, rows, statusFilter]);
 
   return <div className="space-y-5">
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-extrabold sm:text-4xl">פק״ע, אי התאמה, ECO</h1><p className="mt-2 text-slate-500">מעקב מרוכז אחר רשומות פתוחות וסגורות</p></div><button onClick={() => setShowAddForm((value) => !value)} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 font-bold text-white"><Plus className="h-4 w-4" />הוספת {labels[activeCategory]}</button></div>
