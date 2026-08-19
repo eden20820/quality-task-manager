@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { Bell, BellOff, CheckCircle2, CircleDot, Plus, Search, Trash2, X } from "lucide-react";
-import { createFollowup, deleteFollowup, toggleFollowup, toggleFollowupAlerts, updateFollowupAssignee, type FollowupResult } from "@/app/followups/actions";
+import { Bell, BellOff, Check, CheckCircle2, CircleDot, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { createFollowup, deleteFollowup, toggleFollowup, toggleFollowupAlerts, updateFollowupAssignee, updateFollowupNotes, type FollowupResult } from "@/app/followups/actions";
 
 export type Followup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; status: "open" | "closed"; alerts_enabled: boolean; assignee_key: "eden" | "sergey" | "quality_manager" | null; opened_at: string; created_at: string; notes: string | null };
 type Category = Followup["category"];
@@ -35,6 +35,25 @@ function AddFollowupForm({ category, onClose }: { category: Category; onClose: (
   </form>;
 }
 
+function NotesEditor({ row }: { row: Followup }) {
+  const [editing, setEditing] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function save(formData: FormData) {
+    setPending(true);
+    setMessage("");
+    const result = await updateFollowupNotes(row.id, formData);
+    setPending(false);
+    if (result.success) setEditing(false);
+    else setMessage(result.message);
+  }
+
+  if (!editing) return <button type="button" onClick={() => setEditing(true)} className={`group flex w-full items-start gap-1.5 text-right ${row.notes ? "text-slate-600" : "font-bold text-sky-700"}`} title={row.notes ? "עריכת הערה" : "הוספת הערה"}><span className="line-clamp-2 flex-1">{row.notes || "הוספת הערה"}</span><Pencil className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-60 group-hover:opacity-100" /></button>;
+
+  return <form action={save} className="min-w-64 space-y-2"><textarea autoFocus name="notes" defaultValue={row.notes ?? ""} maxLength={2000} rows={3} placeholder="כתיבת הערה..." className="w-full resize-y rounded-lg border bg-white p-2 text-sm" /><div className="flex items-center gap-1"><button disabled={pending} aria-label="שמירת הערה" title="שמירה" className="rounded-lg bg-slate-950 p-2 text-white disabled:opacity-50"><Check className="h-3.5 w-3.5" /></button><button type="button" onClick={() => { setEditing(false); setMessage(""); }} aria-label="ביטול עריכת הערה" title="ביטול" className="rounded-lg border p-2 text-slate-500"><X className="h-3.5 w-3.5" /></button>{pending ? <span className="text-xs text-slate-500">שומר...</span> : null}{message ? <span role="alert" className="text-xs font-bold text-red-600">{message}</span> : null}</div></form>;
+}
+
 function FollowupsTable({ category, rows }: { category: Category; rows: Followup[] }) {
   if (!rows.length) return <div className="rounded-2xl border border-dashed bg-white py-16 text-center text-sm text-slate-500">אין רשומות מתאימות להצגה</div>;
   return <div className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="max-h-[65vh] overflow-auto"><table className="w-full min-w-[1020px] border-collapse text-right text-sm">
@@ -43,7 +62,7 @@ function FollowupsTable({ category, rows }: { category: Category; rows: Followup
       <td className="whitespace-nowrap px-4 py-3 font-extrabold">{row.reference_number}</td><td className="max-w-56 px-4 py-3 font-semibold text-slate-700"><span className="line-clamp-2">{row.name || "—"}</span></td>{category === "pka" ? <td className="whitespace-nowrap px-4 py-3">{row.quantity ?? "—"}</td> : null}<td className="whitespace-nowrap px-4 py-3"><form action={updateFollowupAssignee.bind(null, row.id)}><select name="assignee_key" defaultValue={row.assignee_key ?? ""} onChange={(event) => event.currentTarget.form?.requestSubmit()} aria-label={`אחראי על ${row.reference_number}`} className={`h-9 rounded-lg border px-2 text-sm font-bold ${row.assignee_key ? "bg-white" : "border-amber-300 bg-amber-50 text-amber-800"}`}><option value="" disabled>לא הוגדר</option><option value="eden">עדן</option><option value="sergey">סרגיי</option>{category !== "pka" ? <option value="quality_manager">עמית</option> : null}</select></form></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDate(row.opened_at)}</td>
       <td className="whitespace-nowrap px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${row.status === "open" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>{row.status === "open" ? <CircleDot className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{row.status === "open" ? "פתוחה" : "סגורה"}</span></td>
       <td className="whitespace-nowrap px-4 py-3">{row.status === "closed" ? <span className="text-slate-400">—</span> : !row.alerts_enabled ? <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-400"><BellOff className="h-3.5 w-3.5" />כבויה</span> : <span className={`text-xs font-bold ${overdue ? "text-red-600" : "text-slate-600"}`}>{formatDate(alertDate.toISOString())}</span>}</td>
-      <td className="max-w-64 px-4 py-3 text-slate-600"><span className="line-clamp-2" title={row.notes ?? undefined}>{row.notes || "—"}</span></td>
+      <td className="max-w-72 px-4 py-3"><NotesEditor row={row} /></td>
       <td className="px-4 py-3"><div className="flex items-center justify-center gap-1"><form action={toggleFollowup.bind(null, row.id, row.status === "open" ? "closed" : "open")}><button title={row.status === "open" ? "סימון כסגורה" : "פתיחה מחדש"} aria-label={row.status === "open" ? "סימון כסגורה" : "פתיחה מחדש"} className="rounded-lg p-2 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">{row.status === "open" ? <CheckCircle2 className="h-4 w-4" /> : <CircleDot className="h-4 w-4" />}</button></form><form action={toggleFollowupAlerts.bind(null, row.id, !row.alerts_enabled)}><button title={row.alerts_enabled ? "כיבוי התראות" : "הפעלת התראות"} aria-label={row.alerts_enabled ? "כיבוי התראות" : "הפעלת התראות"} className={`rounded-lg p-2 hover:bg-amber-50 ${row.alerts_enabled ? "text-amber-600" : "text-slate-400"}`}>{row.alerts_enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}</button></form><form action={deleteFollowup.bind(null, row.id)}><button title="מחיקה" aria-label="מחיקה" className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button></form></div></td>
     </tr>; })}</tbody>
   </table></div></div>;
