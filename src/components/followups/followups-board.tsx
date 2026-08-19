@@ -2,9 +2,9 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { Bell, BellOff, CheckCircle2, CircleDot, Plus, Search, Trash2, X } from "lucide-react";
-import { createFollowup, deleteFollowup, toggleFollowup, toggleFollowupAlerts, type FollowupResult } from "@/app/followups/actions";
+import { createFollowup, deleteFollowup, toggleFollowup, toggleFollowupAlerts, updateFollowupAssignee, type FollowupResult } from "@/app/followups/actions";
 
-export type Followup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; status: "open" | "closed"; alerts_enabled: boolean; opened_at: string; created_at: string; notes: string | null };
+export type Followup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; status: "open" | "closed"; alerts_enabled: boolean; assignee_key: "eden" | "sergey" | null; opened_at: string; created_at: string; notes: string | null };
 type Category = Followup["category"];
 type StatusFilter = "all" | Followup["status"];
 
@@ -22,12 +22,13 @@ function AddFollowupForm({ category, onClose }: { category: Category; onClose: (
   return <form action={action} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
     <input type="hidden" name="category" value={category} />
     <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-extrabold">הוספת {labels[category]}</h2><p className="text-xs text-slate-500">ההתראות נספרות ממועד ההוספה למערכת</p></div><button type="button" onClick={onClose} aria-label="סגירת טופס ההוספה" className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"><X className="h-4 w-4" /></button></div>
-    <div className={`grid gap-3 ${category === "pka" ? "lg:grid-cols-7" : "lg:grid-cols-6"}`}>
+    <div className={`grid gap-3 ${category === "pka" ? "lg:grid-cols-8" : "lg:grid-cols-7"}`}>
       <input required name="reference_number" placeholder={`מספר ${labels[category]}`} className="h-10 rounded-lg border bg-white px-3" />
       <input required name="name" placeholder="שם" className="h-10 rounded-lg border bg-white px-3 lg:col-span-2" />
       {category === "pka" ? <input required name="quantity" type="number" min="0" step="1" placeholder="כמות" className="h-10 rounded-lg border bg-white px-3" /> : null}
       <input required name="opened_at" type="date" defaultValue={today()} aria-label="תאריך הרשומה" className="h-10 rounded-lg border bg-white px-3" />
       <select name="status" defaultValue="open" aria-label="מצב הרשומה" className="h-10 rounded-lg border bg-white px-3 font-bold"><option value="open">נפתח</option><option value="closed">נסגר</option></select>
+      <select required name="assignee_key" defaultValue="" aria-label="אחראי" className="h-10 rounded-lg border bg-white px-3 font-bold"><option value="" disabled>בחירת אחראי</option><option value="eden">עדן</option><option value="sergey">סרגיי</option></select>
       <input name="notes" placeholder="הערה (לא חובה)" className="h-10 rounded-lg border bg-white px-3" />
     </div>
     <div className="mt-3 flex items-center justify-end gap-3">{state.message ? <p role="status" className={`text-sm font-bold ${state.success ? "text-emerald-700" : "text-red-600"}`}>{state.message}</p> : null}<button disabled={pending} className="flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-950 px-6 font-bold text-white disabled:opacity-60"><Plus className="h-4 w-4" />{pending ? "שומר..." : "הוספה"}</button></div>
@@ -36,10 +37,10 @@ function AddFollowupForm({ category, onClose }: { category: Category; onClose: (
 
 function FollowupsTable({ category, rows }: { category: Category; rows: Followup[] }) {
   if (!rows.length) return <div className="rounded-2xl border border-dashed bg-white py-16 text-center text-sm text-slate-500">אין רשומות מתאימות להצגה</div>;
-  return <div className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="max-h-[65vh] overflow-auto"><table className="w-full min-w-[900px] border-collapse text-right text-sm">
-    <thead className="sticky top-0 z-10 bg-slate-100 text-xs text-slate-600 shadow-[0_1px_0_0_#e2e8f0]"><tr><th className="px-4 py-3">מספר</th><th className="px-4 py-3">שם</th>{category === "pka" ? <th className="px-4 py-3">כמות</th> : null}<th className="px-4 py-3">תאריך הרשומה</th><th className="px-4 py-3">מצב</th><th className="px-4 py-3">התראה הבאה</th><th className="px-4 py-3">הערות</th><th className="px-4 py-3 text-center">פעולות</th></tr></thead>
+  return <div className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="max-h-[65vh] overflow-auto"><table className="w-full min-w-[1020px] border-collapse text-right text-sm">
+    <thead className="sticky top-0 z-10 bg-slate-100 text-xs text-slate-600 shadow-[0_1px_0_0_#e2e8f0]"><tr><th className="px-4 py-3">מספר</th><th className="px-4 py-3">שם</th>{category === "pka" ? <th className="px-4 py-3">כמות</th> : null}<th className="px-4 py-3">אחראי</th><th className="px-4 py-3">תאריך הרשומה</th><th className="px-4 py-3">מצב</th><th className="px-4 py-3">התראה הבאה</th><th className="px-4 py-3">הערות</th><th className="px-4 py-3 text-center">פעולות</th></tr></thead>
     <tbody className="divide-y divide-slate-100">{rows.map((row) => { const alertDate = dueDate(row.created_at); const overdue = row.alerts_enabled && row.status === "open" && alertDate < new Date(); return <tr key={row.id} className={`transition-colors hover:bg-slate-50 ${overdue ? "bg-red-50/70" : ""}`}>
-      <td className="whitespace-nowrap px-4 py-3 font-extrabold">{row.reference_number}</td><td className="max-w-56 px-4 py-3 font-semibold text-slate-700"><span className="line-clamp-2">{row.name || "—"}</span></td>{category === "pka" ? <td className="whitespace-nowrap px-4 py-3">{row.quantity ?? "—"}</td> : null}<td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDate(row.opened_at)}</td>
+      <td className="whitespace-nowrap px-4 py-3 font-extrabold">{row.reference_number}</td><td className="max-w-56 px-4 py-3 font-semibold text-slate-700"><span className="line-clamp-2">{row.name || "—"}</span></td>{category === "pka" ? <td className="whitespace-nowrap px-4 py-3">{row.quantity ?? "—"}</td> : null}<td className="whitespace-nowrap px-4 py-3"><form action={updateFollowupAssignee.bind(null, row.id)}><select name="assignee_key" defaultValue={row.assignee_key ?? ""} onChange={(event) => event.currentTarget.form?.requestSubmit()} aria-label={`אחראי על ${row.reference_number}`} className={`h-9 rounded-lg border px-2 text-sm font-bold ${row.assignee_key ? "bg-white" : "border-amber-300 bg-amber-50 text-amber-800"}`}><option value="" disabled>לא הוגדר</option><option value="eden">עדן</option><option value="sergey">סרגיי</option></select></form></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDate(row.opened_at)}</td>
       <td className="whitespace-nowrap px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${row.status === "open" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-700"}`}>{row.status === "open" ? <CircleDot className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{row.status === "open" ? "פתוחה" : "סגורה"}</span></td>
       <td className="whitespace-nowrap px-4 py-3">{row.status === "closed" ? <span className="text-slate-400">—</span> : !row.alerts_enabled ? <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-400"><BellOff className="h-3.5 w-3.5" />כבויה</span> : <span className={`text-xs font-bold ${overdue ? "text-red-600" : "text-slate-600"}`}>{formatDate(alertDate.toISOString())}</span>}</td>
       <td className="max-w-64 px-4 py-3 text-slate-600"><span className="line-clamp-2" title={row.notes ?? undefined}>{row.notes || "—"}</span></td>
