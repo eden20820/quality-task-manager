@@ -21,6 +21,31 @@ function israelDateParts() {
   return { date: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
 }
 
+async function isAuthorizedCronRequest(request: Request) {
+  const authorization = request.headers.get("authorization");
+  const presentedSecret = authorization?.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (!presentedSecret) return false;
+
+  if (process.env.CRON_SECRET && presentedSecret === process.env.CRON_SECRET) {
+    return true;
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.rpc("verify_quality_cron_secret", {
+      candidate: presentedSecret,
+    });
+    if (error) {
+      console.error("Cron secret verification error:", error);
+      return false;
+    }
+    return data === true;
+  } catch (error) {
+    console.error("Cron authorization error:", error);
+    return false;
+  }
+}
+
 async function processDailyDigest(date: string) {
   const supabase = createAdminClient();
   const [tasksResult, remindersResult, profilesResult, followupsResult] = await Promise.all([
@@ -143,7 +168,7 @@ async function processExpiryAlerts(date: string) {
 }
 
 export async function GET(request: Request) {
-  if (!process.env.CRON_SECRET || request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!(await isAuthorizedCronRequest(request))) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
