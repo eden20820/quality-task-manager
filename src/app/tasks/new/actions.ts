@@ -1,19 +1,50 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ASSIGNEES, sendTaskAssignmentEmails } from "@/lib/email/task-notification";
 
-export async function createTask(formData: FormData) {
+type UploadedFile = {
+  file_name: string;
+  storage_path: string;
+  mime_type: string | null;
+  file_size: number;
+};
+
+type CreateTaskResult =
+  | { success: true; taskId: string }
+  | { success: false; error: string };
+
+function parseUploadedFiles(value: FormDataEntryValue | null, userId: string): UploadedFile[] | null {
+  if (typeof value !== "string" || !value) return [];
+
+  try {
+    const files = JSON.parse(value) as UploadedFile[];
+    if (!Array.isArray(files) || files.length > 20) return null;
+
+    const valid = files.every((file) =>
+      typeof file.file_name === "string" &&
+      file.file_name.length > 0 &&
+      typeof file.storage_path === "string" &&
+      file.storage_path.startsWith(`${userId}/`) &&
+      (typeof file.mime_type === "string" || file.mime_type === null) &&
+      Number.isInteger(file.file_size) &&
+      file.file_size >= 0 &&
+      file.file_size <= 10 * 1024 * 1024
+    );
+    return valid ? files : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function createTask(formData: FormData): Promise<CreateTaskResult> {
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) return { success: false, error: "ההתחברות פגה. יש להתחבר מחדש." };
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -22,14 +53,12 @@ export async function createTask(formData: FormData) {
   const dueDate = String(formData.get("due_date") ?? "").trim();
   const assigneeKeys = formData.getAll("assignees").map(String)
     .filter((key): key is keyof typeof ASSIGNEES => key in ASSIGNEES);
+  const uploadedFiles = parseUploadedFiles(formData.get("uploaded_files"), user.id);
 
-  if (!title) {
-    redirect("/tasks/new?error=missing-title");
-  }
+  if (!title) return { success: false, error: "יש להזין כותרת למשימה" };
 
-  if (assigneeKeys.length === 0) {
-    redirect("/tasks/new?error=missing-assignee");
-  }
+  if (assigneeKeys.length === 0) return { success: false, error: "יש לבחור לפחות אחראי אחד" };
+  if (!uploadedFiles) return { success: false, error: "פרטי הקבצים שצורפו אינם תקינים" };
 
   const { data: task, error } = await supabase.from("tasks").insert({
     title, description, status, priority, due_date: dueDate || null,
@@ -38,7 +67,23 @@ export async function createTask(formData: FormData) {
 
   if (error || !task) {
     console.error("Create task error:", error);
-    redirect("/tasks/new?error=create-failed");
+    return { success: false, error: "שמירת המשימה נכשלה. נסה שוב." };
+  }
+
+  if (uploadedFiles.length > 0) {
+    const { error: fileError } = await supabase.from("task_files").insert(
+      uploadedFiles.map((file) => ({
+        task_id: task.id,
+        uploaded_by: user.id,
+        ...file,
+      }))
+    );
+
+    if (fileError) {
+      console.error("Save task files error:", fileError);
+      await supabase.storage.from("task-files").remove(uploadedFiles.map((file) => file.storage_path));
+      return { success: false, error: "המשימה נשמרה, אך קישור הקבצים אליה נכשל" };
+    }
   }
 
   // כשל בשירות המייל לא מבטל משימה שכבר נוצרה ולא גורם לכפילות בניסיון חוזר.
@@ -58,5 +103,5 @@ export async function createTask(formData: FormData) {
     console.error("Save email notification log error:", notificationLogError);
   }
 
-  redirect("/tasks");
+  return { success: true, taskId: task.id };
 }
