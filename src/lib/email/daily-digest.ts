@@ -16,7 +16,7 @@ export type DailyReminder = {
   notes: string | null;
   created_by: string;
 };
-export type DailyFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; opened_at: string; created_at: string; notes: string | null };
+export type DailyFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; assignee_key: "eden" | "sergey" | null; opened_at: string; created_at: string; notes: string | null };
 
 export type DigestRecipient = {
   name: string;
@@ -126,10 +126,11 @@ export function groupDailyItems({
     }
   }
 
-  if (followups.length) {
-    for (const key of ["eden", "sergey"] as const) {
+  for (const followup of followups) {
+    const keys = followup.assignee_key ? [followup.assignee_key] : (["eden", "sergey"] as const);
+    for (const key of keys) {
       const assignee = ASSIGNEES[key];
-      getRecipient(assignee.email, assignee.name).followups.push(...followups);
+      getRecipient(assignee.email, assignee.name).followups.push(followup);
     }
   }
 
