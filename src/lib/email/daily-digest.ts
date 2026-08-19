@@ -16,7 +16,7 @@ export type DailyReminder = {
   notes: string | null;
   created_by: string;
 };
-export type DailyFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; assignee_key: "eden" | "sergey" | null; opened_at: string; created_at: string; notes: string | null };
+export type DailyFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; assignee_key: "eden" | "sergey" | "quality_manager" | null; opened_at: string; created_at: string; notes: string | null };
 
 export type DigestRecipient = {
   name: string;
