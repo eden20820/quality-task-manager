@@ -107,6 +107,7 @@ export default async function HomePage() {
     { data: weeklyReminders, error: remindersError },
     { data: weeklyDeadlineTasks, error: deadlineTasksError },
     { data: upcomingCalibrations, error: calibrationsError },
+    { data: calibrationSettings, error: calibrationSettingsError },
   ] = await Promise.all([
     tasksQuery,
     supabase
@@ -137,12 +138,18 @@ export default async function HomePage() {
       .gte("next_calibration_date", todayString)
       .lte("next_calibration_date", inThirtyDaysString)
       .order("next_calibration_date", { ascending: true }),
+    supabase
+      .from("portal_settings")
+      .select("calibration_alerts_enabled")
+      .eq("id", "global")
+      .maybeSingle(),
   ]);
   if (tasksError) console.error("Load dashboard error:", tasksError);
   if (expiryError) console.error("Load dashboard expiry error:", expiryError);
   if (remindersError) console.error("Load dashboard reminders error:", remindersError);
   if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
   if (calibrationsError) console.error("Load dashboard calibrations error:", calibrationsError);
+  if (calibrationSettingsError) console.error("Load calibration settings error:", calibrationSettingsError);
 
   const allTasks = dashboardTasks ?? [];
   const newTasks = allTasks.filter((task) => task.status === "new").length;
@@ -171,7 +178,8 @@ export default async function HomePage() {
     (total, day) => total + day.tasks.length + day.reminders.length,
     0
   );
-  const calibrationNames = (upcomingCalibrations ?? []).map((item) => item.equipment_name);
+  const calibrationAlertsEnabled = calibrationSettings?.calibration_alerts_enabled ?? true;
+  const calibrationNames = calibrationAlertsEnabled ? (upcomingCalibrations ?? []).map((item) => item.equipment_name) : [];
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks },
@@ -190,9 +198,9 @@ export default async function HomePage() {
     },
     {
       title: "כיולים קרובים / עד 30 יום",
-      value: upcomingCalibrations?.length ?? 0,
+      value: calibrationAlertsEnabled ? upcomingCalibrations?.length ?? 0 : 0,
       details: calibrationNames,
-      emptyText: "אין כיולים ב־30 הימים הקרובים",
+      emptyText: calibrationAlertsEnabled ? "אין כיולים ב־30 הימים הקרובים" : "התראות הכיולים כבויות",
       href: "/calibrations",
     },
   ];
