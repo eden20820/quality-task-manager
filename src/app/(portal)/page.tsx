@@ -107,7 +107,8 @@ export default async function HomePage() {
     { data: weeklyReminders, error: remindersError },
     { data: weeklyDeadlineTasks, error: deadlineTasksError },
     { data: upcomingCalibrations, error: calibrationsError },
-    { data: calibrationSettings, error: calibrationSettingsError },
+    { data: upcomingSuppliers, error: suppliersError },
+    { data: alertSettings, error: alertSettingsError },
   ] = await Promise.all([
     tasksQuery,
     supabase
@@ -139,8 +140,15 @@ export default async function HomePage() {
       .lte("next_calibration_date", inThirtyDaysString)
       .order("next_calibration_date", { ascending: true }),
     supabase
+      .from("suppliers")
+      .select("id, supplier_name, expiration_date")
+      .not("expiration_date", "is", null)
+      .gte("expiration_date", todayString)
+      .lte("expiration_date", inThirtyDaysString)
+      .order("expiration_date", { ascending: true }),
+    supabase
       .from("portal_settings")
-      .select("calibration_alerts_enabled")
+      .select("calibration_alerts_enabled, supplier_alerts_enabled")
       .eq("id", "global")
       .maybeSingle(),
   ]);
@@ -149,7 +157,8 @@ export default async function HomePage() {
   if (remindersError) console.error("Load dashboard reminders error:", remindersError);
   if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
   if (calibrationsError) console.error("Load dashboard calibrations error:", calibrationsError);
-  if (calibrationSettingsError) console.error("Load calibration settings error:", calibrationSettingsError);
+  if (suppliersError) console.error("Load dashboard suppliers error:", suppliersError);
+  if (alertSettingsError) console.error("Load dashboard alert settings error:", alertSettingsError);
 
   const allTasks = dashboardTasks ?? [];
   const newTasks = allTasks.filter((task) => task.status === "new").length;
@@ -178,8 +187,10 @@ export default async function HomePage() {
     (total, day) => total + day.tasks.length + day.reminders.length,
     0
   );
-  const calibrationAlertsEnabled = calibrationSettings?.calibration_alerts_enabled ?? true;
+  const calibrationAlertsEnabled = alertSettings?.calibration_alerts_enabled ?? true;
   const calibrationNames = calibrationAlertsEnabled ? (upcomingCalibrations ?? []).map((item) => item.equipment_name) : [];
+  const supplierAlertsEnabled = alertSettings?.supplier_alerts_enabled ?? true;
+  const supplierNames = supplierAlertsEnabled ? (upcomingSuppliers ?? []).map((item) => item.supplier_name) : [];
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks },
@@ -202,6 +213,13 @@ export default async function HomePage() {
       details: calibrationNames,
       emptyText: calibrationAlertsEnabled ? "אין כיולים ב־30 הימים הקרובים" : "התראות הכיולים כבויות",
       href: "/calibrations",
+    },
+    {
+      title: "תוקף ספקים / עד 30 יום",
+      value: supplierAlertsEnabled ? upcomingSuppliers?.length ?? 0 : 0,
+      details: supplierNames,
+      emptyText: supplierAlertsEnabled ? "אין ספקים שתוקפם יפוג ב־30 הימים הקרובים" : "התראות הספקים כבויות",
+      href: "/suppliers",
     },
   ];
 
@@ -232,7 +250,7 @@ export default async function HomePage() {
           ))}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-3">
           {detailCards.map((card) => (
             <Link key={card.title} href={card.href} className="group block">
               <Card className="h-full transition group-hover:-translate-y-0.5 group-hover:border-slate-300 group-hover:shadow-md">
@@ -256,7 +274,7 @@ export default async function HomePage() {
             </Link>
           ))}
 
-          <Card className="md:col-span-2">
+          <Card className="md:col-span-3">
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
