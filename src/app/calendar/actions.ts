@@ -25,6 +25,7 @@ export async function createReminder(
   const repeatOptions: Record<string, { repeat_unit: "day" | "month" | null; repeat_interval: number | null }> = {
     none: { repeat_unit: null, repeat_interval: null },
     daily: { repeat_unit: "day", repeat_interval: 1 },
+    weekly: { repeat_unit: "day", repeat_interval: 7 },
     monthly: { repeat_unit: "month", repeat_interval: 1 },
     quarterly: { repeat_unit: "month", repeat_interval: 3 },
     semiannual: { repeat_unit: "month", repeat_interval: 6 },

@@ -105,6 +105,7 @@ export function CalendarView({ initialMonth, tasks, reminders, calibrations, fol
             <select name="repeat" defaultValue="none" className="h-11 w-full rounded-lg border bg-white px-3">
               <option value="none">ללא חזרה</option>
               <option value="daily">כל יום</option>
+              <option value="weekly">כל שבוע</option>
               <option value="monthly">כל חודש</option>
               <option value="quarterly">כל 3 חודשים</option>
               <option value="semiannual">כל 6 חודשים</option>
