@@ -11,6 +11,7 @@ import {
   FolderArchive,
   Gauge,
   ListChecks,
+  Truck,
 } from "lucide-react";
 
 import { getPortalUser } from "@/lib/auth/portal-user";
@@ -23,6 +24,7 @@ const navigationItems = [
   { title: "יומן ותזכורות", href: "/calendar", icon: CalendarDays },
   { title: "מעקב פגי תוקף", href: "/expiry", icon: CalendarClock },
   { title: "מעקב כיולים", href: "/calibrations", icon: Gauge },
+  { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
   { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
 ];
@@ -91,7 +93,7 @@ export function AppShell({
         </header>
 
         <main className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
-          <div className="mx-auto w-full max-w-[1250px]">
+          <div className="mx-auto w-full max-w-[1800px]">
             <Suspense fallback={<ContentSkeleton />}>
               <AuthGate>{children}</AuthGate>
             </Suspense>

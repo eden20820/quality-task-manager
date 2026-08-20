@@ -13,6 +13,7 @@ import {
   ListChecks,
   LayoutDashboard,
   Menu,
+  Truck,
   X,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ const navigationItems = [
   { title: "יומן ותזכורות", href: "/calendar", icon: CalendarDays },
   { title: "מעקב פגי תוקף", href: "/expiry", icon: CalendarClock },
   { title: "מעקב כיולים", href: "/calibrations", icon: Gauge },
+  { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
   { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
 ];
