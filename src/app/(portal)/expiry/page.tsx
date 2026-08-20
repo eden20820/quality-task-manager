@@ -4,6 +4,8 @@ import {
   type ExpiryRow,
 } from "@/components/expiry/expiry-table";
 import { UploadDialog } from "@/components/expiry/upload-dialog";
+import { PaginationControls } from "@/components/pagination-controls";
+import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
 import { createClient } from "@/lib/supabase/server";
 
 function daysBetween(date: Date) {
@@ -32,25 +34,51 @@ function formatExpiryDate(value: string | null) {
   return `${day}/${month}/${year}`;
 }
 
-export default async function ExpiryPage() {
+function databaseDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export default async function ExpiryPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const page = parsePage((await searchParams).page);
+  const { from, to } = pageRange(page);
   const supabase = await createClient();
 
-  const { data: items, error } = await supabase
-    .from("expiry_items")
-    .select(`
-      id,
-      material_name,
-      expiry_date,
-      quantity,
-      location,
-      invalid_expiry_text,
-      is_rejected
-    `)
-    .eq("is_active", true)
-    .order("expiry_date", {
-      ascending: true,
-      nullsFirst: false,
-    });
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const inThirtyDays = new Date(today);
+  inThirtyDays.setDate(today.getDate() + 30);
+  const inNinetyDays = new Date(today);
+  inNinetyDays.setDate(today.getDate() + 90);
+  const todayString = databaseDate(today);
+  const inThirtyDaysString = databaseDate(inThirtyDays);
+  const inNinetyDaysString = databaseDate(inNinetyDays);
+
+  const [
+    { data: items, error, count: totalCount },
+    { count: expiredCount },
+    { count: next30Count },
+    { count: next90Count },
+    { count: invalidCount },
+  ] = await Promise.all([
+    supabase
+      .from("expiry_items")
+      .select(`
+        id,
+        material_name,
+        expiry_date,
+        quantity,
+        location,
+        invalid_expiry_text,
+        is_rejected
+      `, { count: "exact" })
+      .eq("is_active", true)
+      .order("expiry_date", { ascending: true, nullsFirst: false })
+      .range(from, to),
+    supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true).lt("expiry_date", todayString),
+    supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true).gte("expiry_date", todayString).lte("expiry_date", inThirtyDaysString),
+    supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true).gt("expiry_date", inThirtyDaysString).lte("expiry_date", inNinetyDaysString),
+    supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true).is("expiry_date", null).not("invalid_expiry_text", "is", null),
+  ]);
 
   if (error) {
     console.error("Load expiry items error:", error);
@@ -70,28 +98,6 @@ export default async function ExpiryPage() {
     isRejected: item.is_rejected ?? false,
   }));
 
-  const expiredCount = rows.filter(
-    (row) => row.daysLeft < 0
-  ).length;
-
-  const next30Count = rows.filter(
-    (row) =>
-      row.daysLeft >= 0 &&
-      row.daysLeft <= 30
-  ).length;
-
-  const next90Count = rows.filter(
-    (row) =>
-      row.daysLeft > 30 &&
-      row.daysLeft <= 90
-  ).length;
-
-  const invalidCount = (items ?? []).filter(
-    (item) =>
-      !item.expiry_date &&
-      Boolean(item.invalid_expiry_text)
-  ).length;
-
   return (
     <>
       <div className="space-y-8">
@@ -108,16 +114,18 @@ export default async function ExpiryPage() {
         </div>
 
         <ExpiryDashboard
-          total={rows.length}
-          expired={expiredCount}
-          next30={next30Count}
-          next90={next90Count}
-          invalid={invalidCount}
+          total={totalCount ?? 0}
+          expired={expiredCount ?? 0}
+          next30={next30Count ?? 0}
+          next90={next90Count ?? 0}
+          invalid={invalidCount ?? 0}
         />
 
         <UploadDialog />
 
-        <ExpiryTable rows={rows} />
+        <ExpiryTable key={page} rows={rows} />
+
+        <PaginationControls basePath="/expiry" page={page} pageSize={PAGE_SIZE} total={totalCount ?? 0} />
       </div>
     </>
   );

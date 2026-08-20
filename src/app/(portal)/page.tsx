@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalUser } from "@/lib/auth/portal-user";
-import { reminderDatesInRange } from "@/lib/reminders/recurrence";
+import { reminderOccursOn } from "@/lib/reminders/recurrence";
 
 const statusLabels: Record<string, string> = {
   new: "חדשה",
@@ -81,7 +81,7 @@ export default async function HomePage() {
   const weekStartString = formatDateForDatabase(weekStart);
   const weekEndString = formatDateForDatabase(weekEnd);
 
-  let tasksQuery = supabase
+  let recentTasksQuery = supabase
     .from("tasks")
     .select(`
       id,
@@ -92,17 +92,41 @@ export default async function HomePage() {
       due_date,
       created_at
     `)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  let newTasksQuery = supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "new");
+  let inProgressTasksQuery = supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "in_progress");
+  let waitingTasksQuery = supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "waiting");
+  let overdueTasksQuery = supabase
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .not("status", "in", "(completed,cancelled)")
+    .lt("due_date", todayString);
 
   if (dashboardClearedAt) {
-    tasksQuery = tasksQuery.gt(
-      "created_at",
-      dashboardClearedAt
-    );
+    recentTasksQuery = recentTasksQuery.gt("created_at", dashboardClearedAt);
+    newTasksQuery = newTasksQuery.gt("created_at", dashboardClearedAt);
+    inProgressTasksQuery = inProgressTasksQuery.gt("created_at", dashboardClearedAt);
+    waitingTasksQuery = waitingTasksQuery.gt("created_at", dashboardClearedAt);
+    overdueTasksQuery = overdueTasksQuery.gt("created_at", dashboardClearedAt);
   }
 
   const [
-    { data: dashboardTasks, error: tasksError },
+    { data: recentTasks, error: recentTasksError },
+    { count: newTasks, error: newTasksError },
+    { count: inProgressTasks, error: inProgressTasksError },
+    { count: waitingTasks, error: waitingTasksError },
+    { count: overdueTasks, error: overdueTasksError },
     { data: expiringItems, error: expiryError },
     { data: weeklyReminders, error: remindersError },
     { data: weeklyDeadlineTasks, error: deadlineTasksError },
@@ -110,7 +134,11 @@ export default async function HomePage() {
     { data: upcomingSuppliers, error: suppliersError },
     { data: alertSettings, error: alertSettingsError },
   ] = await Promise.all([
-    tasksQuery,
+    recentTasksQuery,
+    newTasksQuery,
+    inProgressTasksQuery,
+    waitingTasksQuery,
+    overdueTasksQuery,
     supabase
       .from("expiry_items")
       .select("id, material_name, expiry_date")
@@ -152,7 +180,11 @@ export default async function HomePage() {
       .eq("id", "global")
       .maybeSingle(),
   ]);
-  if (tasksError) console.error("Load dashboard error:", tasksError);
+  if (recentTasksError) console.error("Load recent dashboard tasks error:", recentTasksError);
+  if (newTasksError) console.error("Count new dashboard tasks error:", newTasksError);
+  if (inProgressTasksError) console.error("Count in-progress dashboard tasks error:", inProgressTasksError);
+  if (waitingTasksError) console.error("Count waiting dashboard tasks error:", waitingTasksError);
+  if (overdueTasksError) console.error("Count overdue dashboard tasks error:", overdueTasksError);
   if (expiryError) console.error("Load dashboard expiry error:", expiryError);
   if (remindersError) console.error("Load dashboard reminders error:", remindersError);
   if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
@@ -160,15 +192,7 @@ export default async function HomePage() {
   if (suppliersError) console.error("Load dashboard suppliers error:", suppliersError);
   if (alertSettingsError) console.error("Load dashboard alert settings error:", alertSettingsError);
 
-  const allTasks = dashboardTasks ?? [];
-  const newTasks = allTasks.filter((task) => task.status === "new").length;
-  const inProgressTasks = allTasks.filter((task) => task.status === "in_progress").length;
-  const waitingTasks = allTasks.filter((task) => task.status === "waiting").length;
-  const overdueTasks = allTasks.filter((task) =>
-    task.due_date && task.due_date < todayString &&
-    task.status !== "completed" && task.status !== "cancelled"
-  ).length;
-  const visibleRecentTasks = allTasks.slice(0, 5);
+  const visibleRecentTasks = recentTasks ?? [];
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
   const weekDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(weekStart);
@@ -179,7 +203,7 @@ export default async function HomePage() {
       dateString,
       tasks: (weeklyDeadlineTasks ?? []).filter((task) => task.due_date === dateString),
       reminders: (weeklyReminders ?? []).filter((reminder) =>
-        reminderDatesInRange(reminder, dateString, dateString).length > 0
+        reminderOccursOn(reminder, dateString)
       ),
     };
   });
@@ -193,10 +217,10 @@ export default async function HomePage() {
   const supplierNames = supplierAlertsEnabled ? (upcomingSuppliers ?? []).map((item) => item.supplier_name) : [];
 
   const summaryCards = [
-    { title: "משימות חדשות", value: newTasks },
-    { title: "בטיפול", value: inProgressTasks },
-    { title: "ממתינות", value: waitingTasks },
-    { title: "באיחור", value: overdueTasks },
+    { title: "משימות חדשות", value: newTasks ?? 0 },
+    { title: "בטיפול", value: inProgressTasks ?? 0 },
+    { title: "ממתינות", value: waitingTasks ?? 0 },
+    { title: "באיחור", value: overdueTasks ?? 0 },
   ];
 
   const detailCards = [

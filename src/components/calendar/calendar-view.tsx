@@ -20,9 +20,21 @@ function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function CalendarView({ tasks, reminders, calibrations, followups, suppliers }: { tasks: CalendarTask[]; reminders: Reminder[]; calibrations: CalendarCalibration[]; followups: CalendarFollowup[]; suppliers: CalendarSupplier[] }) {
-  const [month, setMonth] = useState(() => { const value = new Date(); value.setDate(1); return value; });
-  const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function CalendarView({ initialMonth, tasks, reminders, calibrations, followups, suppliers }: { initialMonth: string; tasks: CalendarTask[]; reminders: Reminder[]; calibrations: CalendarCalibration[]; followups: CalendarFollowup[]; suppliers: CalendarSupplier[] }) {
+  const month = useMemo(() => {
+    const [year, monthNumber] = initialMonth.split("-").map(Number);
+    return new Date(year, monthNumber - 1, 1);
+  }, [initialMonth]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return today.getFullYear() === month.getFullYear() && today.getMonth() === month.getMonth()
+      ? dateKey(today)
+      : dateKey(month);
+  });
   const [state, formAction, pending] = useActionState(createReminder, initialState);
 
   const cells = useMemo(() => {
@@ -62,15 +74,15 @@ export function CalendarView({ tasks, reminders, calibrations, followups, suppli
   return <div className="space-y-7">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h2 className="text-3xl font-extrabold sm:text-4xl">יומן ותזכורות</h2><p className="mt-2 text-base text-slate-500 sm:text-lg">משימות עם דדליין ותזכורות שהוספת ידנית</p></div>
-      <button onClick={() => setSelectedDate(dateKey(new Date()))} className="rounded-lg border bg-white px-4 py-2 font-bold hover:bg-slate-50">חזרה להיום</button>
+      <Link href="/calendar" className="rounded-lg border bg-white px-4 py-2 font-bold hover:bg-slate-50">חזרה להיום</Link>
     </div>
 
     <div className="grid gap-6 xl:grid-cols-[1fr_330px]">
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b p-3 sm:p-5">
-          <button aria-label="החודש הבא" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="rounded-lg p-2 hover:bg-slate-100"><ChevronRight /></button>
+          <Link aria-label="החודש הבא" href={`/calendar?month=${monthKey(new Date(month.getFullYear(), month.getMonth() + 1, 1))}`} className="rounded-lg p-2 hover:bg-slate-100"><ChevronRight /></Link>
           <h3 className="text-base font-extrabold sm:text-xl">{new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric" }).format(month)}</h3>
-          <button aria-label="החודש הקודם" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="rounded-lg p-2 hover:bg-slate-100"><ChevronLeft /></button>
+          <Link aria-label="החודש הקודם" href={`/calendar?month=${monthKey(new Date(month.getFullYear(), month.getMonth() - 1, 1))}`} className="rounded-lg p-2 hover:bg-slate-100"><ChevronLeft /></Link>
         </div>
         <div className="grid grid-cols-7 border-b bg-slate-50">{weekDays.map((day) => <div key={day} className="p-1.5 text-center text-xs font-bold text-slate-500 sm:p-3 sm:text-sm">{day}</div>)}</div>
         <div className="grid grid-cols-7">{cells.map((day) => {

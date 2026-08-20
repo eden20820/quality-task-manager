@@ -3,6 +3,7 @@ import { Pencil, Undo2 } from "lucide-react";
 
 import { restoreTask } from "@/app/tasks/actions";
 import { DeleteCompletedTaskButton } from "@/components/tasks/delete-completed-task-button";
+import { PaginationControls } from "@/components/pagination-controls";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -13,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
+import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
 
 function formatCompletedDate(value: string | null) {
   if (!value) {
@@ -38,10 +40,12 @@ function formatCompletedDate(value: string | null) {
   };
 }
 
-export default async function CompletedTasksPage() {
+export default async function CompletedTasksPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const page = parsePage((await searchParams).page);
+  const { from, to } = pageRange(page);
   const supabase = await createClient();
 
-  const { data: tasks, error } = await supabase
+  const { data: tasks, error, count } = await supabase
     .from("tasks")
     .select(`
       id,
@@ -50,9 +54,10 @@ export default async function CompletedTasksPage() {
       priority,
       completed_at,
       completed_by
-    `)
+    `, { count: "exact" })
     .eq("status", "completed")
-    .order("completed_at", { ascending: false });
+    .order("completed_at", { ascending: false })
+    .range(from, to);
 
   if (error) {
     console.error("Load completed tasks error:", error);
@@ -206,6 +211,7 @@ export default async function CompletedTasksPage() {
             </TableBody>
           </Table>
         </div>
+        <PaginationControls basePath="/tasks/completed" page={page} pageSize={PAGE_SIZE} total={count ?? 0} />
       </div>
     </>
   );

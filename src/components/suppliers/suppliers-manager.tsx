@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, BellOff, Building2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
-import { createSupplier, deleteSupplier, setSupplierAlertsEnabled, updateSupplier } from "@/app/suppliers/actions";
+import { createSupplier, deleteSupplier, setSupplierAlertsEnabled, updateSupplier, type SupplierActionResult } from "@/app/suppliers/actions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export type SupplierRow = {
@@ -69,19 +69,20 @@ function SupplierFields({ row }: { row?: SupplierRow }) {
 
 export function SuppliersManager({ rows, alertsEnabled }: { rows: SupplierRow[]; alertsEnabled: boolean }) {
   const router = useRouter();
-  const [createState, createAction, creating] = useActionState(createSupplier, initialState);
+  const [adding, setAdding] = useState(false);
+  const [createState, createAction, creating] = useActionState(async (previousState: SupplierActionResult, formData: FormData) => {
+    const result = await createSupplier(previousState, formData);
+    if (result.success) {
+      setAdding(false);
+      router.refresh();
+    }
+    return result;
+  }, initialState);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-  const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<SupplierRow | null>(null);
   const [editMessage, setEditMessage] = useState("");
   const [savingEdit, startEdit] = useTransition();
-
-  useEffect(() => {
-    if (!createState.success) return;
-    setAdding(false);
-    router.refresh();
-  }, [createState, router]);
 
   const counts = useMemo(() => ({
     all: rows.length,
