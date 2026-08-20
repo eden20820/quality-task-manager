@@ -2,8 +2,8 @@
 
 import { useActionState, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck2, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
-import { createCalibration, deleteCalibration, importCalibrations, updateCalibration } from "@/app/calibrations/actions";
+import { Bell, BellOff, CalendarCheck2, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { createCalibration, deleteCalibration, importCalibrations, setCalibrationAlertsEnabled, updateCalibration } from "@/app/calibrations/actions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export type CalibrationRow = {
@@ -30,7 +30,7 @@ function dateStatus(value: string | null) {
   return { text: "בתוקף", color: "bg-emerald-100 text-emerald-700" };
 }
 
-export function CalibrationsManager({ rows }: { rows: CalibrationRow[] }) {
+export function CalibrationsManager({ rows, alertsEnabled }: { rows: CalibrationRow[]; alertsEnabled: boolean }) {
   const router = useRouter(); const fileRef = useRef<HTMLInputElement>(null);
   const [state, action, pending] = useActionState(createCalibration, initial);
   const [uploading, startUpload] = useTransition(); const [uploadMessage, setUploadMessage] = useState("");
@@ -66,7 +66,15 @@ export function CalibrationsManager({ rows }: { rows: CalibrationRow[] }) {
   }
   const cards: Array<[Filter, string, number, string]> = [["all", "כלים פעילים", counts.all, "text-slate-950"], ["expired", "כיול באיחור", counts.expired, "text-red-600"], ["upcoming", "כיול עד 90 יום", counts.upcoming, "text-orange-600"], ["missing", "חסר מועד", counts.missing, "text-slate-500"]];
   return <div className="space-y-7">
-    <div><h1 className="text-3xl font-extrabold sm:text-4xl">מעקב כיולים</h1><p className="mt-2 text-slate-500">רשימת ציוד לכיול לפי טופס 7.1.5.1.0</p></div>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div><h1 className="text-3xl font-extrabold sm:text-4xl">מעקב כיולים</h1><p className="mt-2 text-slate-500">רשימת ציוד לכיול לפי טופס 7.1.5.1.0</p></div>
+      <form action={setCalibrationAlertsEnabled.bind(null, !alertsEnabled)}>
+        <button type="submit" className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-5 font-bold transition ${alertsEnabled ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100" : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}>
+          {alertsEnabled ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+          {alertsEnabled ? "כיבוי התראות כיולים" : "הפעלת התראות כיולים"}
+        </button>
+      </form>
+    </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([key, title, value, color]) => <button key={key} onClick={() => setFilter(key)} className={`rounded-2xl border bg-white p-5 text-center shadow-sm transition hover:-translate-y-0.5 ${filter === key ? "ring-2 ring-slate-900" : ""}`}><p className="text-sm font-bold text-slate-500">{title}</p><p className={`mt-2 text-4xl font-extrabold ${color}`}>{value}</p></button>)}</div>
     <section className="grid gap-5 lg:grid-cols-2">
       <div className="rounded-2xl border bg-white p-6 shadow-sm"><h2 className="flex items-center gap-2 text-xl font-extrabold"><FileSpreadsheet className="text-emerald-600" /> סנכרון קובץ בקרת כיולים</h2><p className="mt-2 text-sm text-slate-500">המערכת קוראת את גיליון הציוד הפעיל ואת גיליון “כלים שהוסרו”, ומעדכנת את הרשימה לפי המספר הסידורי.</p><input ref={fileRef} hidden type="file" accept=".xlsx,.xls" onChange={(event) => upload(event.target.files?.[0])} /><button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 font-bold text-white disabled:opacity-50"><Upload className="h-5 w-5" />{uploading ? "מסנכרן..." : "בחירת קובץ Excel"}</button>{uploadMessage && <p className="mt-3 text-sm font-bold text-slate-700">{uploadMessage}</p>}</div>
