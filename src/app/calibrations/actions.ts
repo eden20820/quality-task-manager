@@ -134,3 +134,19 @@ export async function deleteCalibration(id: string) {
   await supabase.from("calibration_items").delete().eq("id", id);
   revalidatePath("/calibrations"); revalidatePath("/"); revalidatePath("/calendar");
 }
+
+export async function setCalibrationAlertsEnabled(enabled: boolean) {
+  const { supabase, user } = await authorized();
+  const { error } = await supabase
+    .from("portal_settings")
+    .update({
+      calibration_alerts_enabled: enabled,
+      updated_by: user.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", "global");
+  if (error) throw error;
+  revalidatePath("/calibrations");
+  revalidatePath("/");
+  revalidatePath("/calendar");
+}
