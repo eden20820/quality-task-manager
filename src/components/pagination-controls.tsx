@@ -5,6 +5,7 @@ type PaginationControlsProps = {
   page: number;
   pageSize: number;
   total: number;
+  query?: Record<string, string | undefined>;
 };
 
 export function PaginationControls({
@@ -12,13 +13,21 @@ export function PaginationControls({
   page,
   pageSize,
   total,
+  query = {},
 }: PaginationControlsProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (totalPages <= 1) return null;
 
-  const pageHref = (targetPage: number) =>
-    targetPage === 1 ? basePath : `${basePath}?page=${targetPage}`;
+  const pageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    Object.entries(query).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    if (targetPage > 1) params.set("page", String(targetPage));
+    const search = params.toString();
+    return search ? `${basePath}?${search}` : basePath;
+  };
 
   return (
     <nav

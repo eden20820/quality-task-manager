@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import Link from "next/link";
+import { useActionState, useState } from "react";
 import { Bell, BellOff, Check, CheckCircle2, CircleDot, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { createFollowup, deleteFollowup, toggleFollowup, toggleFollowupAlerts, updateFollowupAssignee, updateFollowupNotes, type FollowupResult } from "@/app/followups/actions";
 
@@ -12,11 +13,16 @@ const categories: Category[] = ["pka", "nonconformity", "eco"];
 const labels = { pka: 'פק"ע', nonconformity: "אי התאמה", eco: "ECO" } as const;
 const initial: FollowupResult = { success: false, message: "" };
 const dateFormatter = new Intl.DateTimeFormat("he-IL");
-const referenceNumberCollator = new Intl.Collator("he-IL", { numeric: true, sensitivity: "base" });
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function dueDate(value: string) { const date = new Date(value); date.setDate(date.getDate() + 7); return date; }
 function formatDate(value: string) { return dateFormatter.format(new Date(`${value.slice(0, 10)}T12:00:00`)); }
+
+function followupsHref(category: Category, status: StatusFilter, query: string) {
+  const params = new URLSearchParams({ category, status });
+  if (query) params.set("q", query);
+  return `/followups?${params.toString()}`;
+}
 
 function AddFollowupForm({ category, onClose }: { category: Category; onClose: () => void }) {
   const [state, action, pending] = useActionState(createFollowup, initial);
@@ -69,20 +75,15 @@ function FollowupsTable({ category, rows }: { category: Category; rows: Followup
   </table></div></div>;
 }
 
-export function FollowupsBoard({ rows }: { rows: Followup[] }) {
-  const [activeCategory, setActiveCategory] = useState<Category>("pka");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
-  const [query, setQuery] = useState("");
+export function FollowupsBoard({ rows, activeCategory, statusFilter, query, total, counts }: { rows: Followup[]; activeCategory: Category; statusFilter: StatusFilter; query: string; total: number; counts: Record<Category, number> }) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const counts = useMemo(() => Object.fromEntries(categories.map((category) => [category, rows.filter((row) => row.category === category && row.status !== "closed").length])) as Record<Category, number>, [rows]);
-  const visibleRows = useMemo(() => { const normalizedQuery = query.trim().toLocaleLowerCase("he"); return rows.filter((row) => row.category === activeCategory && (statusFilter === "all" || (statusFilter === "active" ? row.status !== "closed" : row.status === statusFilter)) && (!normalizedQuery || `${row.reference_number} ${row.name ?? ""} ${row.notes ?? ""}`.toLocaleLowerCase("he").includes(normalizedQuery))).sort((first, second) => referenceNumberCollator.compare(first.reference_number, second.reference_number)); }, [activeCategory, query, rows, statusFilter]);
 
   return <div className="space-y-5">
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-extrabold sm:text-4xl">פק״ע, אי התאמה, ECO</h1><p className="mt-2 text-slate-500">מעקב מרוכז אחר רשומות פתוחות וסגורות</p></div><button onClick={() => setShowAddForm((value) => !value)} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 font-bold text-white"><Plus className="h-4 w-4" />הוספת {labels[activeCategory]}</button></div>
-    <div className="grid grid-cols-3 rounded-2xl border bg-white p-1 shadow-sm" role="tablist" aria-label="סוג רשומה">{categories.map((category) => <button key={category} role="tab" aria-selected={activeCategory === category} onClick={() => { setActiveCategory(category); setShowAddForm(false); }} className={`rounded-xl px-2 py-3 text-sm font-extrabold transition-colors sm:text-base ${activeCategory === category ? "bg-slate-950 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}><span>{labels[category]}</span><span className={`me-2 rounded-full px-2 py-0.5 text-xs ${activeCategory === category ? "bg-white/15 text-white" : "bg-amber-100 text-amber-800"}`}>{counts[category]} פעילות</span></button>)}</div>
+    <div className="grid grid-cols-3 rounded-2xl border bg-white p-1 shadow-sm" role="tablist" aria-label="סוג רשומה">{categories.map((category) => <Link key={category} role="tab" aria-selected={activeCategory === category} href={followupsHref(category, statusFilter, query)} onClick={() => setShowAddForm(false)} className={`rounded-xl px-2 py-3 text-center text-sm font-extrabold transition-colors sm:text-base ${activeCategory === category ? "bg-slate-950 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}><span>{labels[category]}</span><span className={`me-2 rounded-full px-2 py-0.5 text-xs ${activeCategory === category ? "bg-white/15 text-white" : "bg-amber-100 text-amber-800"}`}>{counts[category]} פעילות</span></Link>)}</div>
     {showAddForm ? <AddFollowupForm key={activeCategory} category={activeCategory} onClose={() => setShowAddForm(false)} /> : null}
-    <div className="flex flex-col gap-3 rounded-2xl border bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"><div className="relative w-full sm:max-w-sm"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="חיפוש לפי מספר, שם או הערה" className="h-10 w-full rounded-lg border bg-slate-50 pr-9 pl-3 text-sm" /></div><div className="grid grid-cols-4 rounded-lg bg-slate-100 p-1 text-sm font-bold">{(["active", "waiting", "closed", "all"] as StatusFilter[]).map((status) => <button key={status} onClick={() => setStatusFilter(status)} className={`rounded-md px-3 py-2 ${statusFilter === status ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}>{status === "active" ? "פעילות" : status === "waiting" ? "ממתינות" : status === "closed" ? "סגורות" : "הכול"}</button>)}</div></div>
-    <div className="flex items-center justify-between px-1 text-sm text-slate-500"><span>{visibleRows.length} רשומות מוצגות</span><span className="hidden sm:inline">ניתן לגלול בתוך הטבלה בלבד</span></div>
-    <FollowupsTable category={activeCategory} rows={visibleRows} />
+    <div className="flex flex-col gap-3 rounded-2xl border bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"><form action="/followups" method="get" className="flex w-full gap-2 sm:max-w-md"><input type="hidden" name="category" value={activeCategory} /><input type="hidden" name="status" value={statusFilter} /><div className="relative min-w-0 flex-1"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input name="q" defaultValue={query} placeholder="חיפוש לפי מספר, שם או הערה" className="h-10 w-full rounded-lg border bg-slate-50 pr-9 pl-3 text-sm" /></div><button className="h-10 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white">חיפוש</button>{query ? <Link href={followupsHref(activeCategory, statusFilter, "")} aria-label="ניקוי חיפוש" title="ניקוי חיפוש" className="flex h-10 w-10 items-center justify-center rounded-lg border text-slate-500"><X className="h-4 w-4" /></Link> : null}</form><div className="grid grid-cols-4 rounded-lg bg-slate-100 p-1 text-sm font-bold">{(["active", "waiting", "closed", "all"] as StatusFilter[]).map((status) => <Link key={status} href={followupsHref(activeCategory, status, query)} className={`rounded-md px-3 py-2 text-center ${statusFilter === status ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}>{status === "active" ? "פעילות" : status === "waiting" ? "ממתינות" : status === "closed" ? "סגורות" : "הכול"}</Link>)}</div></div>
+    <div className="flex items-center justify-between px-1 text-sm text-slate-500"><span>{total} רשומות מתאימות</span><span className="hidden sm:inline">ניתן לגלול בתוך הטבלה בלבד</span></div>
+    <FollowupsTable category={activeCategory} rows={rows} />
   </div>;
 }
