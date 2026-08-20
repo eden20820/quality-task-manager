@@ -105,6 +105,39 @@ export async function restoreTask(taskId: string): Promise<void> {
   revalidatePath("/");
 }
 
+export async function deleteCompletedTask(
+  taskId: string,
+): Promise<{ success: boolean; message: string }> {
+  if (!taskId) {
+    return { success: false, message: "מזהה המשימה חסר" };
+  }
+
+  const { supabase } = await getAuthorizedClient();
+  const { data, error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", taskId)
+    .eq("status", "completed")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Delete completed task error:", error);
+    return { success: false, message: "מחיקת המשימה נכשלה. נסה שוב." };
+  }
+
+  if (!data) {
+    return { success: false, message: "המשימה לא נמצאה או שאינה משימה שהושלמה" };
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/tasks/completed");
+  revalidatePath("/calendar");
+  revalidatePath("/");
+
+  return { success: true, message: "המשימה נמחקה" };
+}
+
 export async function updateTask(formData: FormData) {
   const taskId = String(formData.get("task_id") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();

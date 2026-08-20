@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pencil, Undo2 } from "lucide-react";
 
 import { restoreTask } from "@/app/tasks/actions";
+import { DeleteCompletedTaskButton } from "@/components/tasks/delete-completed-task-button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -120,7 +121,7 @@ export default async function CompletedTasksPage() {
                   שעה
                 </TableHead>
 
-                <TableHead className="w-48 text-center text-base font-bold">
+                <TableHead className="w-72 text-center text-base font-bold">
                   פעולות
                 </TableHead>
               </TableRow>
@@ -177,6 +178,11 @@ export default async function CompletedTasksPage() {
                               שחזור
                             </button>
                           </form>
+
+                          <DeleteCompletedTaskButton
+                            taskId={task.id}
+                            taskTitle={task.title}
+                          />
                         </div>
                       </TableCell>
                     </TableRow>
