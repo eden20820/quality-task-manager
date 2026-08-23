@@ -87,6 +87,7 @@ export default async function HomePage() {
       id,
       task_number,
       title,
+      description,
       status,
       priority,
       due_date,
@@ -433,8 +434,15 @@ export default async function HomePage() {
                       />
                     </div>
 
-                    <div className="font-semibold">
-                      {task.title}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-950">
+                        {task.title}
+                      </p>
+                      {task.description ? (
+                        <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm leading-5 text-slate-600" title={task.description}>
+                          {task.description}
+                        </p>
+                      ) : null}
                     </div>
 
                     <Badge
