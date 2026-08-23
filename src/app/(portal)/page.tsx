@@ -229,10 +229,6 @@ export default async function HomePage() {
   const calibrationNames = calibrationAlertsEnabled ? (upcomingCalibrations ?? []).map((item) => item.equipment_name) : [];
   const supplierNames = supplierAlertsEnabled ? (upcomingSuppliers ?? []).map((item) => item.supplier_name) : [];
 
-  const summaryCards = [
-    { title: "משימות חדשות", value: newTasks ?? 0 },
-  ];
-
   const detailCards = [
     {
       title: "עומדים לפוג / עד 30 יום",
@@ -266,28 +262,18 @@ export default async function HomePage() {
           </h2>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {summaryCards.map((card) => (
-            <Card key={card.title}>
-              <CardHeader>
-                <CardTitle className="text-center text-lg font-bold">
-                  {card.title}
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent>
-                <p className="text-center text-5xl font-extrabold">
-                  {card.value}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <Card className="min-h-40 h-full justify-center">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-center text-lg font-bold">משימות חדשות</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center text-5xl font-extrabold">{newTasks ?? 0}</p>
+            </CardContent>
+          </Card>
           {detailCards.map((card) => (
             <Link key={card.title} href={card.href} className="group block">
-              <Card className="h-full transition group-hover:-translate-y-0.5 group-hover:border-slate-300 group-hover:shadow-md">
+              <Card className="min-h-40 h-full justify-center transition group-hover:-translate-y-0.5 group-hover:border-slate-300 group-hover:shadow-md">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-center text-lg font-bold">
                     {card.title}
@@ -335,6 +321,10 @@ export default async function HomePage() {
                   const isToday = day.dateString === todayString;
                   const dayName = new Intl.DateTimeFormat("he-IL", { weekday: "short" }).format(day.date);
                   const shortDate = new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit" }).format(day.date);
+                  const followupGroups = (["pka", "nonconformity", "eco"] as const).map((category) => ({
+                    category,
+                    items: day.followups.filter((item) => item.category === category),
+                  })).filter((group) => group.items.length > 0);
 
                   return (
                     <div key={day.dateString} className={`min-h-32 rounded-xl border p-3 ${isToday ? "border-blue-300 bg-blue-50" : "bg-slate-50/70"}`}>
@@ -343,36 +333,37 @@ export default async function HomePage() {
                         <span className="text-xs font-bold text-slate-500">{shortDate}</span>
                       </div>
                       <div className="mt-2 space-y-1.5">
-                        {day.tasks.map((task) => (
-                          <Link key={task.id} href={`/tasks/${task.id}/edit`} title={task.title} className="flex items-start gap-1.5 rounded-md bg-amber-100 px-2 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-200">
+                        {day.tasks.length > 0 ? (
+                          <Link href={day.tasks.length === 1 ? `/tasks/${day.tasks[0].id}/edit` : "/tasks"} title={day.tasks.map((item) => item.title).join(" • ")} className="flex items-start gap-1.5 rounded-md bg-amber-100 px-2 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-200">
                             <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span className="line-clamp-2">{task.title}</span>
+                            <span className="line-clamp-2">{day.tasks.length === 1 ? day.tasks[0].title : `משימות עם דדליין — ${day.tasks.length} משימות`}</span>
                           </Link>
-                        ))}
-                        {day.reminders.map((reminder) => (
-                          <Link key={reminder.id} href="/calendar" title={reminder.title} className="flex items-start gap-1.5 rounded-md bg-blue-100 px-2 py-1.5 text-xs font-bold text-blue-900 hover:bg-blue-200">
+                        ) : null}
+                        {day.reminders.length > 0 ? (
+                          <Link href="/calendar" title={day.reminders.map((item) => item.title).join(" • ")} className="flex items-start gap-1.5 rounded-md bg-blue-100 px-2 py-1.5 text-xs font-bold text-blue-900 hover:bg-blue-200">
                             <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span className="line-clamp-2">{reminder.title}</span>
+                            <span className="line-clamp-2">{day.reminders.length === 1 ? day.reminders[0].title : `תזכורות ידניות — ${day.reminders.length} תזכורות`}</span>
                           </Link>
-                        ))}
-                        {day.calibrations.map((item) => (
-                          <Link key={item.id} href="/calibrations" title={`כיול: ${item.equipment_name}`} className="flex items-start gap-1.5 rounded-md bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-200">
+                        ) : null}
+                        {day.calibrations.length > 0 ? (
+                          <Link href="/calibrations" title={day.calibrations.map((item) => item.equipment_name).join(" • ")} className="flex items-start gap-1.5 rounded-md bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-200">
                             <Gauge className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span className="line-clamp-2">כיול: {item.equipment_name}</span>
+                            <span className="line-clamp-2">{day.calibrations.length === 1 ? `כיול: ${day.calibrations[0].equipment_name}` : `כיולים — ${day.calibrations.length} התראות`}</span>
                           </Link>
-                        ))}
-                        {day.suppliers.map((item) => (
-                          <Link key={item.id} href="/suppliers" title={`תוקף ספק: ${item.supplier_name}`} className="flex items-start gap-1.5 rounded-md bg-violet-100 px-2 py-1.5 text-xs font-bold text-violet-900 hover:bg-violet-200">
+                        ) : null}
+                        {day.suppliers.length > 0 ? (
+                          <Link href="/suppliers" title={day.suppliers.map((item) => item.supplier_name).join(" • ")} className="flex items-start gap-1.5 rounded-md bg-violet-100 px-2 py-1.5 text-xs font-bold text-violet-900 hover:bg-violet-200">
                             <Truck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span className="line-clamp-2">תוקף ספק: {item.supplier_name}</span>
+                            <span className="line-clamp-2">{day.suppliers.length === 1 ? `תוקף ספק: ${day.suppliers[0].supplier_name}` : `תוקף ספקים — ${day.suppliers.length} התראות`}</span>
                           </Link>
-                        ))}
-                        {day.followups.map((item) => (
-                          <Link key={item.id} href="/followups" title={`התראת מעקב: ${item.reference_number}`} className="flex items-start gap-1.5 rounded-md bg-red-100 px-2 py-1.5 text-xs font-bold text-red-900 hover:bg-red-200">
+                        ) : null}
+                        {followupGroups.map((group) => {
+                          const label = group.category === "pka" ? 'פק״ע' : group.category === "eco" ? "ECO" : "אי התאמה";
+                          return <Link key={group.category} href="/followups" title={group.items.map((item) => `${item.reference_number}${item.name ? ` — ${item.name}` : ""}`).join(" • ")} className="flex items-start gap-1.5 rounded-md bg-red-100 px-2 py-1.5 text-xs font-bold text-red-900 hover:bg-red-200">
                             <ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span className="line-clamp-2">התראת {item.category === "pka" ? 'פק״ע' : item.category === "eco" ? "ECO" : "אי התאמה"}: {item.reference_number}{item.name ? ` — ${item.name}` : ""}</span>
-                          </Link>
-                        ))}
+                            <span className="line-clamp-2">{group.items.length === 1 ? `התראת ${label}: ${group.items[0].reference_number}${group.items[0].name ? ` — ${group.items[0].name}` : ""}` : `התראת ${label} — ${group.items.length} התראות`}</span>
+                          </Link>;
+                        })}
                         {!day.tasks.length && !day.reminders.length && !day.calibrations.length && !day.suppliers.length && !day.followups.length && (
                           <p className="pt-2 text-center text-xs text-slate-400">אין אירועים</p>
                         )}
