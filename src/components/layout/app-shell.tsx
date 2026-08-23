@@ -32,8 +32,8 @@ const navigationItems = [
 /*
  * AppShell עצמו הוא סינכרוני ולא ממתין לשום דבר —
  * הסיידבר וה-header מצטיירים מיידית בכל ניווט, בלי "הבהוב" של המסך כולו.
- * רק החלקים שתלויים בנתוני המשתמש (השם, ובדיקת ההרשאה שמגינה על children)
- * עטופים ב-Suspense נפרד, כך שהם "משלימים" ברקע בלי לחסום את השלד.
+ * רק בדיקת ההרשאה שמגינה על children עטופה ב-Suspense,
+ * כך שהתוכן משלים ברקע בלי לחסום את שלד הממשק.
  */
 export function AppShell({
   children,
@@ -66,6 +66,14 @@ export function AppShell({
         <header className="flex min-h-20 items-center border-b border-slate-200 bg-white px-4 shadow-sm sm:px-6 lg:min-h-[130px] lg:px-10">
           <div className="grid w-full grid-cols-[44px_1fr] items-center gap-3 lg:grid-cols-[180px_1fr_180px] lg:gap-0">
             <MobileNavigation />
+            <span aria-hidden="true" className="hidden lg:block" />
+
+            <div className="text-center">
+              <h1 className="text-xl font-black leading-tight tracking-tight sm:text-2xl lg:text-[42px]">
+                Caeli Quality Hub
+              </h1>
+            </div>
+
             <Image
               src="/caeli-logo.png"
               alt="Caeli"
@@ -74,21 +82,6 @@ export function AppShell({
               priority
               className="hidden h-auto w-[105px] justify-self-start lg:block"
             />
-
-            <div className="text-center">
-              <h1 className="text-xl font-black leading-tight tracking-tight sm:text-2xl lg:text-[42px]">
-                Caeli Quality Hub
-              </h1>
-              <p className="mt-1 hidden text-sm font-bold text-slate-500 sm:block lg:mt-3 lg:text-[21px]">
-                מחלקת איכות
-              </p>
-            </div>
-
-            <p className="hidden text-left text-[16px] font-bold text-slate-600 lg:block">
-              <Suspense fallback={<span className="block h-[16px] w-20 animate-pulse rounded bg-slate-200" />}>
-                <UserName />
-              </Suspense>
-            </p>
           </div>
         </header>
 
@@ -102,13 +95,6 @@ export function AppShell({
       </div>
     </div>
   );
-}
-
-async function UserName() {
-  // getPortalUser עטופה ב-React cache(), אז הקריאה כאן משתפת
-  // את אותה תוצאה עם AuthGate בלי לשלוף פעמיים באותה בקשה.
-  const portalUser = await getPortalUser();
-  return <>{portalUser?.profile.full_name ?? ""}</>;
 }
 
 async function AuthGate({ children }: { children: React.ReactNode }) {

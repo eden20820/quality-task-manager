@@ -46,9 +46,6 @@ export default function LoginPage() {
             Caeli Quality Hub
           </h1>
 
-          <p className="mt-3 text-lg font-semibold text-slate-500">
-            מחלקת איכות
-          </p>
         </div>
 
         <button
