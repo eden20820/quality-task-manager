@@ -99,34 +99,15 @@ export default async function HomePage() {
     .from("tasks")
     .select("id", { count: "exact", head: true })
     .eq("status", "new");
-  let inProgressTasksQuery = supabase
-    .from("tasks")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "in_progress");
-  let waitingTasksQuery = supabase
-    .from("tasks")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "waiting");
-  let overdueTasksQuery = supabase
-    .from("tasks")
-    .select("id", { count: "exact", head: true })
-    .not("status", "in", "(completed,cancelled)")
-    .lt("due_date", todayString);
 
   if (dashboardClearedAt) {
     recentTasksQuery = recentTasksQuery.gt("created_at", dashboardClearedAt);
     newTasksQuery = newTasksQuery.gt("created_at", dashboardClearedAt);
-    inProgressTasksQuery = inProgressTasksQuery.gt("created_at", dashboardClearedAt);
-    waitingTasksQuery = waitingTasksQuery.gt("created_at", dashboardClearedAt);
-    overdueTasksQuery = overdueTasksQuery.gt("created_at", dashboardClearedAt);
   }
 
   const [
     { data: recentTasks, error: recentTasksError },
     { count: newTasks, error: newTasksError },
-    { count: inProgressTasks, error: inProgressTasksError },
-    { count: waitingTasks, error: waitingTasksError },
-    { count: overdueTasks, error: overdueTasksError },
     { data: expiringItems, error: expiryError },
     { data: weeklyReminders, error: remindersError },
     { data: weeklyDeadlineTasks, error: deadlineTasksError },
@@ -139,9 +120,6 @@ export default async function HomePage() {
   ] = await Promise.all([
     recentTasksQuery,
     newTasksQuery,
-    inProgressTasksQuery,
-    waitingTasksQuery,
-    overdueTasksQuery,
     supabase
       .from("expiry_items")
       .select("id, material_name, expiry_date")
@@ -205,9 +183,6 @@ export default async function HomePage() {
   ]);
   if (recentTasksError) console.error("Load recent dashboard tasks error:", recentTasksError);
   if (newTasksError) console.error("Count new dashboard tasks error:", newTasksError);
-  if (inProgressTasksError) console.error("Count in-progress dashboard tasks error:", inProgressTasksError);
-  if (waitingTasksError) console.error("Count waiting dashboard tasks error:", waitingTasksError);
-  if (overdueTasksError) console.error("Count overdue dashboard tasks error:", overdueTasksError);
   if (expiryError) console.error("Load dashboard expiry error:", expiryError);
   if (remindersError) console.error("Load dashboard reminders error:", remindersError);
   if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
@@ -256,9 +231,6 @@ export default async function HomePage() {
 
   const summaryCards = [
     { title: "משימות חדשות", value: newTasks ?? 0 },
-    { title: "בטיפול", value: inProgressTasks ?? 0 },
-    { title: "ממתינות", value: waitingTasks ?? 0 },
-    { title: "באיחור", value: overdueTasks ?? 0 },
   ];
 
   const detailCards = [
