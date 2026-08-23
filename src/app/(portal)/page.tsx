@@ -1,6 +1,6 @@
 ﻿
 import Link from "next/link";
-import { Bell, CalendarDays, ClipboardList } from "lucide-react";
+import { Bell, CalendarDays, ClipboardList, Gauge, ListChecks, Truck } from "lucide-react";
 
 import { clearDashboardTasks } from "@/app/tasks/actions";
 import { ClearDashboardButton } from "@/components/clear-dashboard-button";
@@ -133,6 +133,9 @@ export default async function HomePage() {
     { data: upcomingCalibrations, error: calibrationsError },
     { data: upcomingSuppliers, error: suppliersError },
     { data: alertSettings, error: alertSettingsError },
+    { data: weeklyCalibrations, error: weeklyCalibrationsError },
+    { data: weeklySuppliers, error: weeklySuppliersError },
+    { data: weeklyFollowups, error: weeklyFollowupsError },
   ] = await Promise.all([
     recentTasksQuery,
     newTasksQuery,
@@ -179,6 +182,26 @@ export default async function HomePage() {
       .select("calibration_alerts_enabled, supplier_alerts_enabled")
       .eq("id", "global")
       .maybeSingle(),
+    supabase
+      .from("calibration_items")
+      .select("id, equipment_name, next_calibration_date")
+      .eq("is_active", true)
+      .gte("next_calibration_date", weekStartString)
+      .lte("next_calibration_date", weekEndString)
+      .order("next_calibration_date", { ascending: true }),
+    supabase
+      .from("suppliers")
+      .select("id, supplier_name, expiration_date")
+      .gte("expiration_date", weekStartString)
+      .lte("expiration_date", weekEndString)
+      .order("expiration_date", { ascending: true }),
+    supabase
+      .from("quality_followups")
+      .select("id, category, reference_number, name, created_at")
+      .in("status", ["open", "waiting"])
+      .eq("alerts_enabled", true)
+      .lte("created_at", `${weekEndString}T23:59:59.999Z`)
+      .order("created_at", { ascending: true }),
   ]);
   if (recentTasksError) console.error("Load recent dashboard tasks error:", recentTasksError);
   if (newTasksError) console.error("Count new dashboard tasks error:", newTasksError);
@@ -191,9 +214,14 @@ export default async function HomePage() {
   if (calibrationsError) console.error("Load dashboard calibrations error:", calibrationsError);
   if (suppliersError) console.error("Load dashboard suppliers error:", suppliersError);
   if (alertSettingsError) console.error("Load dashboard alert settings error:", alertSettingsError);
+  if (weeklyCalibrationsError) console.error("Load weekly calibrations error:", weeklyCalibrationsError);
+  if (weeklySuppliersError) console.error("Load weekly suppliers error:", weeklySuppliersError);
+  if (weeklyFollowupsError) console.error("Load weekly followup alerts error:", weeklyFollowupsError);
 
   const visibleRecentTasks = recentTasks ?? [];
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
+  const calibrationAlertsEnabled = alertSettings?.calibration_alerts_enabled ?? true;
+  const supplierAlertsEnabled = alertSettings?.supplier_alerts_enabled ?? true;
   const weekDays = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(weekStart);
     date.setDate(weekStart.getDate() + index);
@@ -205,15 +233,25 @@ export default async function HomePage() {
       reminders: (weeklyReminders ?? []).filter((reminder) =>
         reminderOccursOn(reminder, dateString)
       ),
+      calibrations: calibrationAlertsEnabled
+        ? (weeklyCalibrations ?? []).filter((item) => item.next_calibration_date === dateString)
+        : [],
+      suppliers: supplierAlertsEnabled
+        ? (weeklySuppliers ?? []).filter((item) => item.expiration_date === dateString)
+        : [],
+      followups: (weeklyFollowups ?? []).filter((item) => {
+        const created = new Date(item.created_at);
+        const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
+        const daysSinceCreated = Math.round((date.getTime() - createdDay.getTime()) / 86_400_000);
+        return daysSinceCreated >= 7 && daysSinceCreated % 7 === 0;
+      }),
     };
   });
   const weeklyEventCount = weekDays.reduce(
-    (total, day) => total + day.tasks.length + day.reminders.length,
+    (total, day) => total + day.tasks.length + day.reminders.length + day.calibrations.length + day.suppliers.length + day.followups.length,
     0
   );
-  const calibrationAlertsEnabled = alertSettings?.calibration_alerts_enabled ?? true;
   const calibrationNames = calibrationAlertsEnabled ? (upcomingCalibrations ?? []).map((item) => item.equipment_name) : [];
-  const supplierAlertsEnabled = alertSettings?.supplier_alerts_enabled ?? true;
   const supplierNames = supplierAlertsEnabled ? (upcomingSuppliers ?? []).map((item) => item.supplier_name) : [];
 
   const summaryCards = [
@@ -308,8 +346,8 @@ export default async function HomePage() {
                   </CardTitle>
                   <p className="mt-1 text-sm font-semibold text-slate-500">
                     {weeklyEventCount > 0
-                      ? `${weeklyEventCount} משימות ותזכורות השבוע`
-                      : "אין משימות או תזכורות השבוע"}
+                      ? `${weeklyEventCount} אירועים והתראות השבוע`
+                      : "אין אירועים או התראות השבוע"}
                   </p>
                 </div>
                 <Link href="/calendar" className="text-sm font-bold text-slate-600 hover:text-slate-950">
@@ -344,13 +382,38 @@ export default async function HomePage() {
                             <span className="line-clamp-2">{reminder.title}</span>
                           </Link>
                         ))}
-                        {!day.tasks.length && !day.reminders.length && (
+                        {day.calibrations.map((item) => (
+                          <Link key={item.id} href="/calibrations" title={`כיול: ${item.equipment_name}`} className="flex items-start gap-1.5 rounded-md bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-900 hover:bg-emerald-200">
+                            <Gauge className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span className="line-clamp-2">כיול: {item.equipment_name}</span>
+                          </Link>
+                        ))}
+                        {day.suppliers.map((item) => (
+                          <Link key={item.id} href="/suppliers" title={`תוקף ספק: ${item.supplier_name}`} className="flex items-start gap-1.5 rounded-md bg-violet-100 px-2 py-1.5 text-xs font-bold text-violet-900 hover:bg-violet-200">
+                            <Truck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span className="line-clamp-2">תוקף ספק: {item.supplier_name}</span>
+                          </Link>
+                        ))}
+                        {day.followups.map((item) => (
+                          <Link key={item.id} href="/followups" title={`התראת מעקב: ${item.reference_number}`} className="flex items-start gap-1.5 rounded-md bg-red-100 px-2 py-1.5 text-xs font-bold text-red-900 hover:bg-red-200">
+                            <ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span className="line-clamp-2">התראת {item.category === "pka" ? 'פק״ע' : item.category === "eco" ? "ECO" : "אי התאמה"}: {item.reference_number}{item.name ? ` — ${item.name}` : ""}</span>
+                          </Link>
+                        ))}
+                        {!day.tasks.length && !day.reminders.length && !day.calibrations.length && !day.suppliers.length && !day.followups.length && (
                           <p className="pt-2 text-center text-xs text-slate-400">אין אירועים</p>
                         )}
                       </div>
                     </div>
                   );
                 })}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-4 text-xs font-semibold text-slate-600">
+                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-amber-300" />משימה עם דדליין</span>
+                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-blue-300" />תזכורת ידנית</span>
+                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-emerald-300" />כיול</span>
+                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-violet-300" />תוקף ספק</span>
+                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-red-300" />התראת מעקב</span>
               </div>
             </CardContent>
           </Card>
