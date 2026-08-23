@@ -138,6 +138,55 @@ export async function deleteCompletedTask(
   return { success: true, message: "המשימה נמחקה" };
 }
 
+export async function deleteActiveTask(
+  taskId: string,
+): Promise<{ success: boolean; message: string }> {
+  if (!taskId) {
+    return { success: false, message: "מזהה המשימה חסר" };
+  }
+
+  const { supabase } = await getAuthorizedClient();
+  const { data: files, error: filesError } = await supabase
+    .from("task_files")
+    .select("storage_path")
+    .eq("task_id", taskId);
+
+  if (filesError) {
+    console.error("Load task files before delete error:", filesError);
+    return { success: false, message: "לא ניתן לטעון את קבצי המשימה לפני המחיקה." };
+  }
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", taskId)
+    .neq("status", "completed")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Delete active task error:", error);
+    return { success: false, message: "מחיקת המשימה נכשלה. נסה שוב." };
+  }
+
+  if (!data) {
+    return { success: false, message: "המשימה לא נמצאה או שכבר הושלמה" };
+  }
+
+  const storagePaths = (files ?? []).map((file) => file.storage_path).filter(Boolean);
+  if (storagePaths.length) {
+    const { error: storageError } = await supabase.storage.from("task-files").remove(storagePaths);
+    if (storageError) console.error("Delete task storage files error:", storageError);
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/tasks/completed");
+  revalidatePath("/calendar");
+  revalidatePath("/");
+
+  return { success: true, message: "המשימה נמחקה" };
+}
+
 export async function updateTask(formData: FormData) {
   const taskId = String(formData.get("task_id") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
