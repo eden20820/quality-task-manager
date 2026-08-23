@@ -287,7 +287,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <div className="space-y-8">
+      <div className="flex flex-col gap-8">
         <div className="text-center">
           <h2 className="text-3xl font-extrabold sm:text-4xl">
             לוח בקרה
@@ -335,8 +335,9 @@ export default async function HomePage() {
               </Card>
             </Link>
           ))}
+        </div>
 
-          <Card className="md:col-span-3">
+          <Card className="order-last">
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -417,7 +418,6 @@ export default async function HomePage() {
               </div>
             </CardContent>
           </Card>
-        </div>
 
         <Card>
           <CardHeader>
