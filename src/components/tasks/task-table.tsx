@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
-import { completeTask } from "@/app/tasks/actions";
+import { completeTask, deleteActiveTask } from "@/app/tasks/actions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
@@ -51,6 +52,7 @@ export function TaskTable({ initialTasks }: { initialTasks: TaskRow[] }) {
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [error, setError] = useState("");
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -92,6 +94,23 @@ export function TaskTable({ initialTasks }: { initialTasks: TaskRow[] }) {
     });
   }
 
+  function removeTask(task: TaskRow) {
+    const confirmed = window.confirm(`האם למחוק לצמיתות את המשימה "${task.title}"? לא ניתן לבטל פעולה זו.`);
+    if (!confirmed) return;
+
+    setError("");
+    setDeletingTaskId(task.id);
+    setTasks((current) => current.filter((item) => item.id !== task.id));
+    startTransition(async () => {
+      const result = await deleteActiveTask(task.id);
+      setDeletingTaskId(null);
+      if (!result.success) {
+        setTasks((current) => [task, ...current]);
+        setError(result.message);
+      }
+    });
+  }
+
   return (
     <div className="space-y-5">
       <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-[1fr_220px_220px]">
@@ -107,7 +126,7 @@ export function TaskTable({ initialTasks }: { initialTasks: TaskRow[] }) {
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <Table className="min-w-[1050px]">
           <TableHeader><TableRow className="bg-slate-50">
-            <TableHead className="w-24 text-center font-bold">בוצעה</TableHead><TableHead className="w-20 text-center font-bold">מצב</TableHead><TableHead className="min-w-72 text-right font-bold">משימה והערות</TableHead><TableHead className="min-w-32 text-right font-bold">אחראים</TableHead><TableHead className="text-right font-bold">סטטוס</TableHead><TableHead className="text-right font-bold">עדיפות</TableHead><TableHead className="text-right font-bold">תאריך יעד</TableHead><TableHead className="text-right font-bold">עדכון אחרון</TableHead><TableHead className="w-24 text-center font-bold">עריכה</TableHead>
+            <TableHead className="w-24 text-center font-bold">בוצעה</TableHead><TableHead className="w-20 text-center font-bold">מצב</TableHead><TableHead className="min-w-72 text-right font-bold">משימה והערות</TableHead><TableHead className="min-w-32 text-right font-bold">אחראים</TableHead><TableHead className="text-right font-bold">סטטוס</TableHead><TableHead className="text-right font-bold">עדיפות</TableHead><TableHead className="text-right font-bold">תאריך יעד</TableHead><TableHead className="text-right font-bold">עדכון אחרון</TableHead><TableHead className="w-44 text-center font-bold">פעולות</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {visibleTasks.length ? visibleTasks.map((task) => (
@@ -117,7 +136,7 @@ export function TaskTable({ initialTasks }: { initialTasks: TaskRow[] }) {
                 <TableCell className="max-w-md align-top"><p className="font-bold text-slate-950">{task.title}</p><p className={`mt-1 whitespace-pre-wrap text-sm leading-5 ${task.description ? "text-slate-600" : "text-slate-400"}`}>{task.description || "אין הערות"}</p></TableCell>
                 <TableCell className="align-top"><div className="flex flex-wrap gap-1.5">{task.assignees.length ? task.assignees.map((assignee) => <span key={assignee} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-800">{assigneeLabels[assignee] ?? assignee}</span>) : <span className="text-sm text-slate-400">לא הוגדר</span>}</div></TableCell>
                 <TableCell><Badge variant="secondary">{statusLabels[task.status] ?? task.status}</Badge></TableCell><TableCell>{priorityLabels[task.priority] ?? task.priority}</TableCell><TableCell>{formatDate(task.due_date)}</TableCell><TableCell>{formatDateTime(task.updated_at)}</TableCell>
-                <TableCell className="text-center"><Link href={`/tasks/${task.id}/edit`} className="inline-flex h-9 items-center rounded-md border px-4 text-sm font-bold hover:bg-slate-50">עריכה</Link></TableCell>
+                <TableCell className="text-center"><div className="flex items-center justify-center gap-2"><Link href={`/tasks/${task.id}/edit`} className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-bold hover:bg-slate-50">עריכה</Link><button type="button" disabled={deletingTaskId === task.id} onClick={() => removeTask(task)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"><Trash2 className="h-4 w-4" />{deletingTaskId === task.id ? "מוחק..." : "מחיקה"}</button></div></TableCell>
               </TableRow>
             )) : <TableRow><TableCell colSpan={9} className="h-64 text-center text-slate-500">אין משימות התואמות לסינון</TableCell></TableRow>}
           </TableBody>
