@@ -398,12 +398,12 @@ export default async function HomePage() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <CardTitle className="text-2xl">
                 משימות אחרונות
               </CardTitle>
 
-              <div className="flex items-center gap-4">
+              <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:justify-start sm:gap-4">
                 {visibleRecentTasks.length > 0 && (
                   <form action={clearDashboardTasks}>
                     <ClearDashboardButton />
@@ -422,12 +422,12 @@ export default async function HomePage() {
 
           <CardContent>
             {visibleRecentTasks.length > 0 ? (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                <div className="min-w-[760px] divide-y divide-slate-200">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="divide-y divide-slate-200">
                 {visibleRecentTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="grid grid-cols-[90px_1fr_130px_110px_130px] items-center gap-4 px-5 py-4"
+                    className="grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-start gap-3 px-4 py-4 sm:grid-cols-[40px_minmax(0,1fr)_auto] lg:grid-cols-[60px_minmax(0,1fr)_130px_110px_130px] lg:items-center lg:gap-4 lg:px-5"
                   >
                     <div className="flex justify-center">
                       <span
@@ -463,17 +463,17 @@ export default async function HomePage() {
 
                     <Badge
                       variant="secondary"
-                      className="w-fit"
+                      className="w-fit max-lg:justify-self-end"
                     >
                       {statusLabels[task.status] ?? task.status}
                     </Badge>
 
-                    <div>
+                    <div className="hidden lg:block">
                       {priorityLabels[task.priority] ??
                         task.priority}
                     </div>
 
-                    <div className="text-sm text-slate-500">
+                    <div className="col-start-2 text-xs text-slate-500 sm:col-start-3 lg:col-start-auto lg:text-sm">
                       {formatDate(task.due_date)}
                     </div>
                   </div>
