@@ -48,6 +48,20 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+@media (max-width: 1023px) {
+  .responsive-table-shell > div:last-child {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .responsive-table-shell table {
+    min-width: 90rem;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+  }
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -123,8 +137,26 @@
   }
   body {
     @apply bg-background text-foreground;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   html {
     @apply font-sans;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    min-width: 0;
   }
 }

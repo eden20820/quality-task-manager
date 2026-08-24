@@ -123,7 +123,21 @@ export function TaskTable({ initialTasks }: { initialTasks: TaskRow[] }) {
         </select>
       </div>
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 font-semibold text-red-700">{error}</div>}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="space-y-3 md:hidden">
+        {visibleTasks.length ? visibleTasks.map((task) => (
+          <article key={task.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0"><p className="break-words font-extrabold text-slate-950">{task.title}</p><p className={`mt-1 whitespace-pre-wrap break-words text-sm leading-5 ${task.description ? "text-slate-600" : "text-slate-400"}`}>{task.description || "אין הערות"}</p></div>
+              <span className={`mt-1 h-3.5 w-3.5 shrink-0 rounded-full ${task.status === "new" ? "bg-emerald-500" : task.status === "in_progress" ? "bg-amber-400" : task.status === "waiting" ? "bg-orange-500" : "bg-slate-400"}`} />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs"><Badge variant="secondary">{statusLabels[task.status] ?? task.status}</Badge><span className="rounded-full bg-slate-100 px-2.5 py-1 font-bold">{priorityLabels[task.priority] ?? task.priority}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 font-bold">יעד: {formatDate(task.due_date)}</span></div>
+            <p className="mt-3 text-sm font-bold text-blue-700">אחראים: {task.assignees.length ? task.assignees.map((assignee) => assigneeLabels[assignee] ?? assignee).join(", ") : "לא הוגדר"}</p>
+            <p className="mt-1 text-xs text-slate-500">עדכון אחרון: {formatDateTime(task.updated_at)}</p>
+            <div className="mt-4 grid grid-cols-3 gap-2"><button type="button" onClick={() => markComplete(task)} className="h-10 rounded-lg bg-emerald-50 px-2 text-sm font-bold text-emerald-800">הושלמה</button><Link href={`/tasks/${task.id}/edit`} className="flex h-10 items-center justify-center rounded-lg border px-2 text-sm font-bold">עריכה</Link><button type="button" disabled={deletingTaskId === task.id} onClick={() => removeTask(task)} className="flex h-10 items-center justify-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 text-sm font-bold text-red-700"><Trash2 className="h-4 w-4" />מחיקה</button></div>
+          </article>
+        )) : <div className="rounded-2xl border border-dashed bg-white p-10 text-center text-slate-500">אין משימות התואמות לסינון</div>}
+      </div>
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
         <Table className="min-w-[1050px]">
           <TableHeader><TableRow className="bg-slate-50">
             <TableHead className="w-24 text-center font-bold">בוצעה</TableHead><TableHead className="w-20 text-center font-bold">מצב</TableHead><TableHead className="min-w-72 text-right font-bold">משימה והערות</TableHead><TableHead className="min-w-32 text-right font-bold">אחראים</TableHead><TableHead className="text-right font-bold">סטטוס</TableHead><TableHead className="text-right font-bold">עדיפות</TableHead><TableHead className="text-right font-bold">תאריך יעד</TableHead><TableHead className="text-right font-bold">עדכון אחרון</TableHead><TableHead className="w-44 text-center font-bold">פעולות</TableHead>

@@ -41,7 +41,7 @@ export function AppShell({
   children: React.ReactNode;
 }>) {
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-950">
+    <div dir="rtl" className="min-h-screen min-w-0 overflow-x-hidden bg-slate-100 text-slate-950">
       <aside className="fixed right-0 top-0 z-20 hidden h-screen w-[260px] flex-col border-l border-slate-200 bg-white lg:flex">
         <nav className="flex-1 space-y-2 p-4 pt-6">
           {navigationItems.map((item) => {
@@ -62,14 +62,14 @@ export function AppShell({
 
       </aside>
 
-      <div className="min-h-screen lg:mr-[260px]">
+      <div className="min-h-screen min-w-0 lg:mr-[260px]">
         <header className="flex min-h-20 items-center border-b border-slate-200 bg-white px-4 shadow-sm sm:px-6 lg:min-h-[130px] lg:px-10">
-          <div className="grid w-full grid-cols-[44px_1fr] items-center gap-3 lg:grid-cols-[180px_1fr_180px] lg:gap-0">
+          <div className="grid min-w-0 w-full grid-cols-[44px_minmax(0,1fr)] items-center gap-3 lg:grid-cols-[180px_minmax(0,1fr)_180px] lg:gap-0">
             <MobileNavigation />
             <span aria-hidden="true" className="hidden lg:block" />
 
             <div className="text-center">
-              <h1 className="text-xl font-black leading-tight tracking-tight sm:text-2xl lg:text-[42px]">
+              <h1 className="truncate text-lg font-black leading-tight tracking-tight min-[380px]:text-xl sm:text-2xl lg:text-[42px]">
                 Caeli Quality Hub
               </h1>
             </div>
@@ -85,8 +85,8 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
-          <div className="mx-auto w-full max-w-[1800px]">
+        <main className="min-w-0 px-3 py-5 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
+          <div className="mx-auto min-w-0 w-full max-w-[1800px]">
             <Suspense fallback={<ContentSkeleton />}>
               <AuthGate>{children}</AuthGate>
             </Suspense>
