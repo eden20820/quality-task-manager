@@ -37,9 +37,8 @@ export default async function CalendarPage({
     : currentMonthKey();
   const { start, end } = calendarRange(monthKey);
   const supabase = await createClient();
-  const [{ data: datedTasks, error: datedTasksError }, { data: undatedTasks, error: undatedTasksError }, { data: oneTimeReminders, error: oneTimeRemindersError }, { data: recurringReminders, error: recurringRemindersError }, { data: calibrations }, { data: followups }, { data: suppliers }, { data: alertSettings }] = await Promise.all([
-    supabase.from("tasks").select("id, title, due_date, created_at, priority, assignees").not("status", "in", "(completed,cancelled)").gte("due_date", start).lte("due_date", end).order("due_date"),
-    supabase.from("tasks").select("id, title, due_date, created_at, priority, assignees").not("status", "in", "(completed,cancelled)").is("due_date", null).lte("created_at", `${end}T23:59:59.999Z`).order("created_at"),
+  const [{ data: tasks, error: tasksError }, { data: oneTimeReminders, error: oneTimeRemindersError }, { data: recurringReminders, error: recurringRemindersError }, { data: calibrations }, { data: followups }, { data: suppliers }, { data: alertSettings }] = await Promise.all([
+    supabase.from("tasks").select("id, title, due_date, priority, assignees").not("status", "in", "(completed,cancelled)").gte("due_date", start).lte("due_date", end).order("due_date"),
     supabase.from("reminders").select("id, title, reminder_date, notes, repeat_unit, repeat_interval").is("repeat_unit", null).gte("reminder_date", start).lte("reminder_date", end).order("reminder_date"),
     supabase.from("reminders").select("id, title, reminder_date, notes, repeat_unit, repeat_interval").not("repeat_unit", "is", null).lte("reminder_date", end).order("reminder_date"),
     supabase.from("calibration_items").select("id, equipment_name, equipment_code, location, next_calibration_date").eq("is_active", true).gte("next_calibration_date", start).lte("next_calibration_date", end).order("next_calibration_date"),
@@ -47,11 +46,9 @@ export default async function CalendarPage({
     supabase.from("suppliers").select("id, supplier_name, product_service, certification_type, expiration_date").gte("expiration_date", start).lte("expiration_date", end).order("expiration_date"),
     supabase.from("portal_settings").select("calibration_alerts_enabled, supplier_alerts_enabled").eq("id", "global").maybeSingle(),
   ]);
-  if (datedTasksError) console.error("Load dated calendar tasks error:", datedTasksError);
-  if (undatedTasksError) console.error("Load undated calendar tasks error:", undatedTasksError);
+  if (tasksError) console.error("Load calendar tasks error:", tasksError);
   if (oneTimeRemindersError) console.error("Load one-time reminders error:", oneTimeRemindersError);
   if (recurringRemindersError) console.error("Load recurring reminders error:", recurringRemindersError);
   const reminders = [...(oneTimeReminders ?? []), ...(recurringReminders ?? [])];
-  const tasks = [...(datedTasks ?? []), ...(undatedTasks ?? [])];
   return <CalendarView key={monthKey} initialMonth={monthKey} tasks={(tasks ?? []) as CalendarTask[]} reminders={reminders as Reminder[]} calibrations={(alertSettings?.calibration_alerts_enabled === false ? [] : (calibrations ?? [])) as CalendarCalibration[]} followups={(followups ?? []) as CalendarFollowup[]} suppliers={(alertSettings?.supplier_alerts_enabled === false ? [] : (suppliers ?? [])) as CalendarSupplier[]} />;
 }
