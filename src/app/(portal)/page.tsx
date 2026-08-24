@@ -29,6 +29,18 @@ const priorityLabels: Record<string, string> = {
   urgent: "דחופה",
 };
 
+const assigneeLabels: Record<string, string> = {
+  eden: "עדן",
+  sergey: "סרגיי",
+  quality_manager: "עמית",
+};
+
+function formatAssignees(assignees: string[]) {
+  return assignees.length > 0
+    ? assignees.map((assignee) => assigneeLabels[assignee] ?? assignee).join(", ")
+    : "לא הוגדר";
+}
+
 function formatDate(value: string | null) {
   if (!value) return "ללא תאריך";
 
@@ -88,6 +100,7 @@ export default async function HomePage() {
       task_number,
       title,
       description,
+      assignees,
       status,
       priority,
       due_date,
@@ -443,6 +456,9 @@ export default async function HomePage() {
                           {task.description}
                         </p>
                       ) : null}
+                      <p className="mt-1 text-xs font-bold text-blue-700">
+                        אחראי: {formatAssignees(task.assignees ?? [])}
+                      </p>
                     </div>
 
                     <Badge
