@@ -98,7 +98,18 @@ export default async function CompletedTasksPage({ searchParams }: { searchParam
           </p>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="space-y-3 md:hidden">
+          {completedTasks.length > 0 ? completedTasks.map((task) => {
+            const completed = formatCompletedDate(task.completed_at);
+            return <article key={task.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex min-w-0 items-start justify-between gap-3"><p className="min-w-0 break-words font-extrabold">{task.title}</p><Badge variant="secondary">הושלמה</Badge></div>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs font-bold text-slate-500">הושלמה על ידי</dt><dd className="mt-1 font-semibold">{task.completed_by ? profileNames.get(task.completed_by) ?? "משתמש לא ידוע" : "לא תועד"}</dd></div><div><dt className="text-xs font-bold text-slate-500">מועד</dt><dd className="mt-1 font-semibold">{completed.date}, {completed.time}</dd></div></dl>
+              <div className="mt-4 grid grid-cols-3 gap-2"><Link href={`/tasks/${task.id}/edit`} className="flex h-10 items-center justify-center gap-1 rounded-lg border text-sm font-bold"><Pencil className="h-4 w-4" />עריכה</Link><form action={restoreTask.bind(null, task.id)}><button className="flex h-10 w-full items-center justify-center gap-1 rounded-lg border text-sm font-bold"><Undo2 className="h-4 w-4" />שחזור</button></form><DeleteCompletedTaskButton taskId={task.id} taskTitle={task.title} /></div>
+            </article>;
+          }) : <div className="rounded-2xl border border-dashed bg-white p-10 text-center text-slate-500">אין משימות שהושלמו</div>}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
           <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow className="bg-slate-50">
