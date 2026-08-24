@@ -136,7 +136,7 @@ export function SuppliersManager({ rows, alertsEnabled }: { rows: SupplierRow[];
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([key, title, value, color]) => <button key={key} onClick={() => setFilter(key)} className={`rounded-2xl border bg-white p-5 text-center shadow-sm transition hover:-translate-y-0.5 ${filter === key ? "ring-2 ring-slate-900" : ""}`}><p className="text-sm font-bold text-slate-500">{title}</p><p className={`mt-2 text-4xl font-extrabold ${color}`}>{value}</p></button>)}</div>
 
-    <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+    <section className="responsive-table-shell overflow-hidden rounded-2xl border bg-white shadow-sm">
       <div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-xl font-extrabold"><Building2 />רשימת ספקים ({visible.length})</h2>
