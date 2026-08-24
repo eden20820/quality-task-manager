@@ -72,6 +72,15 @@ function getIsraelToday() {
   return new Date(value("year"), value("month") - 1, value("day"));
 }
 
+function getIsraelDateKey(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
 export default async function HomePage() {
   const supabase = await createClient();
 
@@ -125,6 +134,7 @@ export default async function HomePage() {
     { data: expiringItems, error: expiryError },
     { data: weeklyReminders, error: remindersError },
     { data: weeklyDeadlineTasks, error: deadlineTasksError },
+    { data: weeklyUndatedTasks, error: undatedTasksError },
     { data: upcomingCalibrations, error: calibrationsError },
     { data: upcomingSuppliers, error: suppliersError },
     { data: alertSettings, error: alertSettingsError },
@@ -149,11 +159,18 @@ export default async function HomePage() {
       .order("reminder_date", { ascending: true }),
     supabase
       .from("tasks")
-      .select("id, title, due_date")
+      .select("id, title, due_date, created_at")
       .not("status", "in", "(completed,cancelled)")
       .gte("due_date", weekStartString)
       .lte("due_date", weekEndString)
       .order("due_date", { ascending: true }),
+    supabase
+      .from("tasks")
+      .select("id, title, due_date, created_at")
+      .not("status", "in", "(completed,cancelled)")
+      .is("due_date", null)
+      .lte("created_at", `${weekEndString}T23:59:59.999Z`)
+      .order("created_at", { ascending: true }),
     supabase
       .from("calibration_items")
       .select("id, equipment_name, next_calibration_date")
@@ -200,6 +217,7 @@ export default async function HomePage() {
   if (expiryError) console.error("Load dashboard expiry error:", expiryError);
   if (remindersError) console.error("Load dashboard reminders error:", remindersError);
   if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
+  if (undatedTasksError) console.error("Load dashboard undated tasks error:", undatedTasksError);
   if (calibrationsError) console.error("Load dashboard calibrations error:", calibrationsError);
   if (suppliersError) console.error("Load dashboard suppliers error:", suppliersError);
   if (alertSettingsError) console.error("Load dashboard alert settings error:", alertSettingsError);
@@ -218,7 +236,10 @@ export default async function HomePage() {
     return {
       date,
       dateString,
-      tasks: (weeklyDeadlineTasks ?? []).filter((task) => task.due_date === dateString),
+      tasks: [
+        ...(weeklyDeadlineTasks ?? []).filter((task) => task.due_date === dateString),
+        ...(weeklyUndatedTasks ?? []).filter((task) => getIsraelDateKey(task.created_at) <= dateString),
+      ],
       reminders: (weeklyReminders ?? []).filter((reminder) =>
         reminderOccursOn(reminder, dateString)
       ),

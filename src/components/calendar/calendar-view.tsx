@@ -7,7 +7,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Gauge, ListChec
 import { createReminder, deleteReminder, type ReminderActionResult } from "@/app/calendar/actions";
 import { reminderOccursOn, type RecurringReminder } from "@/lib/reminders/recurrence";
 
-export type CalendarTask = { id: string; title: string; due_date: string; priority: string; assignees: string[] };
+export type CalendarTask = { id: string; title: string; due_date: string | null; created_at: string; priority: string; assignees: string[] };
 export type Reminder = RecurringReminder & { id: string; title: string; notes: string | null };
 export type CalendarCalibration = { id: string; equipment_name: string; equipment_code: string | null; location: string | null; next_calibration_date: string };
 export type CalendarFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; opened_at: string; created_at: string };
@@ -20,6 +20,15 @@ const assigneeLabels: Record<string, string> = { eden: "עדן", sergey: "סרג
 function taskLabel(task: CalendarTask) {
   const assignees = task.assignees?.map((assignee) => assigneeLabels[assignee] ?? assignee) ?? [];
   return assignees.length > 0 ? `${task.title} — ${assignees.join(", ")}` : task.title;
+}
+
+function israelDateKey(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
 }
 
 function dateKey(date: Date) {
@@ -52,7 +61,18 @@ export function CalendarView({ initialMonth, tasks, reminders, calibrations, fol
   const eventsByDate = useMemo(() => {
     const map = new Map<string, { tasks: CalendarTask[]; reminders: Reminder[]; calibrations: CalendarCalibration[]; followups: CalendarFollowup[]; suppliers: CalendarSupplier[] }>();
     const get = (key: string) => map.get(key) ?? { tasks: [], reminders: [], calibrations: [], followups: [], suppliers: [] };
-    tasks.forEach((task) => { const value = get(task.due_date); value.tasks.push(task); map.set(task.due_date, value); });
+    tasks.forEach((task) => {
+      if (task.due_date) {
+        const value = get(task.due_date); value.tasks.push(task); map.set(task.due_date, value);
+        return;
+      }
+      const createdDate = israelDateKey(task.created_at);
+      cells.forEach((day) => {
+        const key = dateKey(day);
+        if (key < createdDate) return;
+        const value = get(key); value.tasks.push(task); map.set(key, value);
+      });
+    });
     reminders.forEach((reminder) => {
       cells.forEach((day) => {
         const key = dateKey(day);
