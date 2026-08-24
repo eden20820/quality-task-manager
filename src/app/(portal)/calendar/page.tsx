@@ -38,7 +38,7 @@ export default async function CalendarPage({
   const { start, end } = calendarRange(monthKey);
   const supabase = await createClient();
   const [{ data: tasks, error: tasksError }, { data: oneTimeReminders, error: oneTimeRemindersError }, { data: recurringReminders, error: recurringRemindersError }, { data: calibrations }, { data: followups }, { data: suppliers }, { data: alertSettings }] = await Promise.all([
-    supabase.from("tasks").select("id, title, due_date, priority").not("status", "in", "(completed,cancelled)").gte("due_date", start).lte("due_date", end).order("due_date"),
+    supabase.from("tasks").select("id, title, due_date, priority, assignees").not("status", "in", "(completed,cancelled)").gte("due_date", start).lte("due_date", end).order("due_date"),
     supabase.from("reminders").select("id, title, reminder_date, notes, repeat_unit, repeat_interval").is("repeat_unit", null).gte("reminder_date", start).lte("reminder_date", end).order("reminder_date"),
     supabase.from("reminders").select("id, title, reminder_date, notes, repeat_unit, repeat_interval").not("repeat_unit", "is", null).lte("reminder_date", end).order("reminder_date"),
     supabase.from("calibration_items").select("id, equipment_name, equipment_code, location, next_calibration_date").eq("is_active", true).gte("next_calibration_date", start).lte("next_calibration_date", end).order("next_calibration_date"),

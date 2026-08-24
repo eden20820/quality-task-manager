@@ -7,7 +7,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Gauge, ListChec
 import { createReminder, deleteReminder, type ReminderActionResult } from "@/app/calendar/actions";
 import { reminderOccursOn, type RecurringReminder } from "@/lib/reminders/recurrence";
 
-export type CalendarTask = { id: string; title: string; due_date: string; priority: string };
+export type CalendarTask = { id: string; title: string; due_date: string; priority: string; assignees: string[] };
 export type Reminder = RecurringReminder & { id: string; title: string; notes: string | null };
 export type CalendarCalibration = { id: string; equipment_name: string; equipment_code: string | null; location: string | null; next_calibration_date: string };
 export type CalendarFollowup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; opened_at: string; created_at: string };
@@ -15,6 +15,12 @@ export type CalendarSupplier = { id: string; supplier_name: string; product_serv
 
 const initialState: ReminderActionResult = { success: false, message: "" };
 const weekDays = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
+const assigneeLabels: Record<string, string> = { eden: "עדן", sergey: "סרגיי", quality_manager: "עמית" };
+
+function taskLabel(task: CalendarTask) {
+  const assignees = task.assignees?.map((assignee) => assigneeLabels[assignee] ?? assignee) ?? [];
+  return assignees.length > 0 ? `${task.title} — ${assignees.join(", ")}` : task.title;
+}
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -91,7 +97,7 @@ export function CalendarView({ initialMonth, tasks, reminders, calibrations, fol
           return <button key={key} aria-label={`${day.getDate()} בחודש, ${eventCount} אירועים`} onClick={() => setSelectedDate(key)} className={`min-h-16 min-w-0 border-b border-l p-1 text-right transition hover:bg-blue-50 sm:min-h-28 sm:p-2 ${selectedDate === key ? "bg-blue-50 ring-2 ring-inset ring-blue-500" : ""} ${currentMonth ? "" : "bg-slate-50 text-slate-400"}`}>
             <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 sm:text-sm ${today ? "bg-blue-600 text-white" : ""}`}>{day.getDate()}</span>
             <div className="mt-1 flex flex-wrap justify-center gap-1 sm:hidden">{events?.tasks.length ? <i className="h-2 w-2 rounded-full bg-amber-400" /> : null}{events?.reminders.length ? <i className="h-2 w-2 rounded-full bg-blue-500" /> : null}{events?.calibrations.length ? <i className="h-2 w-2 rounded-full bg-emerald-500" /> : null}{events?.suppliers.length ? <i className="h-2 w-2 rounded-full bg-violet-500" /> : null}{events?.followups.length ? <i className="h-2 w-2 rounded-full bg-red-500" /> : null}{eventCount > 2 ? <span className="text-[9px] font-bold text-slate-500">+{eventCount}</span> : null}</div>
-            <div className="mt-2 hidden space-y-1 sm:block">{events?.tasks.slice(0, 1).map((task) => <div key={task.id} className="truncate rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{task.title}</div>)}{events?.reminders.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">{item.title}</div>)}{events?.calibrations.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-900">כיול: {item.equipment_name}</div>)}{events?.suppliers.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-violet-100 px-2 py-1 text-xs font-bold text-violet-900">תוקף ספק: {item.supplier_name}</div>)}{events?.followups.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-900">התראה: {item.reference_number}</div>)}</div>
+            <div className="mt-2 hidden space-y-1 sm:block">{events?.tasks.slice(0, 1).map((task) => <div key={task.id} title={taskLabel(task)} className="truncate rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{taskLabel(task)}</div>)}{events?.reminders.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">{item.title}</div>)}{events?.calibrations.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-900">כיול: {item.equipment_name}</div>)}{events?.suppliers.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-violet-100 px-2 py-1 text-xs font-bold text-violet-900">תוקף ספק: {item.supplier_name}</div>)}{events?.followups.slice(0, 1).map((item) => <div key={item.id} className="truncate rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-900">התראה: {item.reference_number}</div>)}</div>
           </button>;
         })}</div>
       </section>
@@ -119,7 +125,7 @@ export function CalendarView({ initialMonth, tasks, reminders, calibrations, fol
         <section className="order-1 rounded-2xl border bg-white p-5 shadow-sm xl:order-2">
           <h3 className="mb-4 flex items-center gap-2 text-lg font-extrabold"><CalendarDays className="h-5 w-5" /> {new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${selectedDate}T12:00:00`))}</h3>
           <div className="space-y-3">
-            {selectedEvents.tasks.map((task) => <Link key={task.id} href={`/tasks/${task.id}/edit`} className="block rounded-xl border-r-4 border-amber-400 bg-amber-50 p-3 hover:bg-amber-100"><span className="flex items-center gap-2 font-bold"><ClipboardList className="h-4 w-4" />{task.title}</span><span className="mt-1 block text-xs text-slate-500">דדליין של משימה</span></Link>)}
+            {selectedEvents.tasks.map((task) => <Link key={task.id} href={`/tasks/${task.id}/edit`} className="block rounded-xl border-r-4 border-amber-400 bg-amber-50 p-3 hover:bg-amber-100"><span className="flex items-center gap-2 font-bold"><ClipboardList className="h-4 w-4" />{taskLabel(task)}</span><span className="mt-1 block text-xs text-slate-500">דדליין של משימה</span></Link>)}
             {selectedEvents.reminders.map((item) => <div key={item.id} className="rounded-xl border-r-4 border-blue-500 bg-blue-50 p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-bold">{item.title}</p>{item.notes && <p className="mt-1 text-sm text-slate-600">{item.notes}</p>}</div><form action={deleteReminder.bind(null, item.id)}><button aria-label="מחק תזכורת" className="rounded p-1 text-slate-400 hover:bg-white hover:text-red-600"><Trash2 className="h-4 w-4" /></button></form></div></div>)}
             {selectedEvents.calibrations.map((item) => <Link key={item.id} href="/calibrations" className="block rounded-xl border-r-4 border-emerald-500 bg-emerald-50 p-3"><p className="flex items-center gap-2 font-bold"><Gauge className="h-4 w-4" />כיול: {item.equipment_name}</p><p className="mt-1 text-xs text-slate-500">{[item.equipment_code, item.location].filter(Boolean).join(" • ") || "מועד כיול"}</p></Link>)}
             {selectedEvents.suppliers.map((item) => <Link key={item.id} href="/suppliers" className="block rounded-xl border-r-4 border-violet-500 bg-violet-50 p-3"><p className="flex items-center gap-2 font-bold"><Truck className="h-4 w-4" />תוקף ספק: {item.supplier_name}</p><p className="mt-1 text-xs text-slate-500">{[item.product_service, item.certification_type].filter(Boolean).join(" • ") || "תוקף הסמכת ספק"}</p></Link>)}
