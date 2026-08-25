@@ -11,7 +11,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const supabase = await createClient();
   const { data, error, count } = await supabase
     .from("tasks")
-    .select("id, task_number, title, description, assignees, status, priority, due_date, updated_at", { count: "exact" })
+    .select("id, task_number, title, description, status_note, assignees, status, priority, due_date, updated_at", { count: "exact" })
     .neq("status", "completed")
     .order("created_at", { ascending: false })
     .range(from, to);

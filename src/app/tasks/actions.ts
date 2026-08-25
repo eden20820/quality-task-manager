@@ -65,6 +65,57 @@ export async function completeTask(taskId: string): Promise<{ success: boolean; 
   return { success: true, message: "המשימה הושלמה" };
 }
 
+export async function updateTaskStatusInline(
+  taskId: string,
+  statusNote: string,
+  status: string,
+): Promise<{ success: boolean; message: string }> {
+  const allowedStatuses = new Set(["new", "in_progress", "waiting", "completed", "cancelled"]);
+  const note = statusNote.trim();
+
+  if (!taskId || !allowedStatuses.has(status)) {
+    return { success: false, message: "פרטי עדכון הסטטוס אינם תקינים" };
+  }
+
+  if (note.length > 1000) {
+    return { success: false, message: "עדכון הסטטוס ארוך מדי" };
+  }
+
+  const { supabase, user } = await getAuthorizedClient();
+  const { data: task, error: loadError } = await supabase
+    .from("tasks")
+    .select("status")
+    .eq("id", taskId)
+    .single();
+
+  if (loadError || !task) {
+    return { success: false, message: "המשימה לא נמצאה" };
+  }
+
+  const completing = status === "completed" && task.status !== "completed";
+  const { error } = await supabase
+    .from("tasks")
+    .update({
+      status,
+      status_note: note,
+      previous_status: completing ? task.status : null,
+      completed_by: completing ? user.id : null,
+    })
+    .eq("id", taskId);
+
+  if (error) {
+    console.error("Inline task status update error:", error);
+    return { success: false, message: "שמירת עדכון הסטטוס נכשלה" };
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/tasks/completed");
+  revalidatePath("/calendar");
+  revalidatePath("/");
+
+  return { success: true, message: "עדכון הסטטוס נשמר" };
+}
+
 export async function restoreTask(taskId: string): Promise<void> {
   if (!taskId) throw new Error("Missing task ID");
 
