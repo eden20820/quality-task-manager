@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Save, Trash2 } from "lucide-react";
+import { Pencil, Save, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { completeTask, deleteActiveTask, updateTaskStatusInline } from "@/app/tasks/actions";
@@ -56,6 +56,7 @@ function InlineTaskStatus({
 }) {
   const [statusNote, setStatusNote] = useState(task.status_note ?? "");
   const [status, setStatus] = useState(task.status);
+  const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -63,9 +64,29 @@ function InlineTaskStatus({
     setMessage("");
     startTransition(async () => {
       const result = await updateTaskStatusInline(task.id, statusNote, status);
-      if (result.success) onSaved(statusNote.trim(), status);
+      if (result.success) {
+        onSaved(statusNote.trim(), status);
+        setEditing(false);
+      }
       setMessage(result.message);
     });
+  }
+
+  function cancel() {
+    setStatusNote(task.status_note ?? "");
+    setStatus(task.status);
+    setMessage("");
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return <div onDoubleClick={() => setEditing(true)} className="group flex min-w-0 items-start justify-between gap-2 rounded-lg border border-transparent p-2 transition hover:border-slate-200 hover:bg-slate-50" title="לחיצה כפולה לעריכת עדכון הסטטוס">
+      <div className="min-w-0">
+        <p className={`line-clamp-2 whitespace-pre-wrap break-words text-sm ${task.status_note ? "font-semibold text-slate-700" : "text-slate-400"}`}>{task.status_note || "אין עדכון סטטוס"}</p>
+        <p className="mt-1 hidden text-[11px] font-medium text-slate-400 sm:block">לחיצה כפולה לעריכה</p>
+      </div>
+      <button type="button" onClick={() => setEditing(true)} aria-label={`עריכת עדכון הסטטוס של ${task.title}`} className="shrink-0 rounded-md p-1.5 text-slate-400 transition hover:bg-white hover:text-blue-700"><Pencil className="h-4 w-4" /></button>
+    </div>;
   }
 
   return <div className="min-w-0 space-y-2">
@@ -74,7 +95,7 @@ function InlineTaskStatus({
       <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label={`מצב המשימה ${task.title}`} className="h-9 w-full rounded-lg border bg-white px-2 text-sm font-bold">
         <option value="new">חדשה</option><option value="in_progress">בטיפול</option><option value="waiting">ממתינה</option><option value="completed">הושלמה</option><option value="cancelled">בוטלה</option>
       </select>
-      <button type="button" onClick={save} disabled={pending} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-sm font-bold text-white disabled:opacity-60"><Save className="h-4 w-4" />{pending ? "שומר..." : "שמירה"}</button>
+      <div className="flex gap-1"><button type="button" onClick={save} disabled={pending} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-sm font-bold text-white disabled:opacity-60"><Save className="h-4 w-4" />{pending ? "שומר..." : "שמירה"}</button><button type="button" onClick={cancel} disabled={pending} aria-label="ביטול עריכת עדכון סטטוס" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border text-slate-500 disabled:opacity-60"><X className="h-4 w-4" /></button></div>
     </div>
     {message ? <p role="status" className={`text-xs font-bold ${message.includes("נשמר") ? "text-emerald-700" : "text-red-600"}`}>{message}</p> : null}
   </div>;
