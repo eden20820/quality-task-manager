@@ -100,6 +100,7 @@ export default async function HomePage() {
       task_number,
       title,
       description,
+      status_note,
       assignees,
       status,
       priority,
@@ -454,6 +455,11 @@ export default async function HomePage() {
                       {task.description ? (
                         <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm leading-5 text-slate-600" title={task.description}>
                           {task.description}
+                        </p>
+                      ) : null}
+                      {task.status_note ? (
+                        <p className="mt-2 line-clamp-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold leading-5 text-blue-900" title={task.status_note}>
+                          <span className="font-extrabold">עדכון סטטוס:</span> {task.status_note}
                         </p>
                       ) : null}
                       <p className="mt-1 text-xs font-bold text-blue-700">
