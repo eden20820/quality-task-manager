@@ -70,7 +70,7 @@ export function AppShell({
 
             <div className="text-center">
               <h1 className="truncate text-lg font-black leading-tight tracking-tight min-[380px]:text-xl sm:text-2xl lg:text-[42px]">
-                Caeli Quality Hub
+                QMS
               </h1>
             </div>
 
@@ -86,7 +86,7 @@ export function AppShell({
         </header>
 
         <main className="min-w-0 px-3 py-5 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
-          <div className="mx-auto min-w-0 w-full max-w-[1800px]">
+          <div className="page-enter mx-auto min-w-0 w-full max-w-[1800px]">
             <Suspense fallback={<ContentSkeleton />}>
               <AuthGate>{children}</AuthGate>
             </Suspense>
