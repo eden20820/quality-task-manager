@@ -1,6 +1,6 @@
 ﻿
 import Link from "next/link";
-import { Bell, CalendarDays, ClipboardList, Gauge, ListChecks, Truck } from "lucide-react";
+import { Bell, CalendarClock, CalendarDays, ClipboardList, Gauge, ListChecks, Truck } from "lucide-react";
 
 import { clearDashboardTasks } from "@/app/tasks/actions";
 import { ClearDashboardButton } from "@/components/clear-dashboard-button";
@@ -132,6 +132,7 @@ export default async function HomePage() {
     { data: weeklyCalibrations, error: weeklyCalibrationsError },
     { data: weeklySuppliers, error: weeklySuppliersError },
     { data: weeklyFollowups, error: weeklyFollowupsError },
+    { data: weeklyExpiryItems, error: weeklyExpiryItemsError },
   ] = await Promise.all([
     recentTasksQuery,
     newTasksQuery,
@@ -195,6 +196,13 @@ export default async function HomePage() {
       .eq("alerts_enabled", true)
       .lte("created_at", `${weekEndString}T23:59:59.999Z`)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("expiry_items")
+      .select("id, material_name, location, expiry_date")
+      .eq("is_active", true)
+      .gte("expiry_date", weekStartString)
+      .lte("expiry_date", weekEndString)
+      .order("expiry_date", { ascending: true }),
   ]);
   if (recentTasksError) console.error("Load recent dashboard tasks error:", recentTasksError);
   if (newTasksError) console.error("Count new dashboard tasks error:", newTasksError);
@@ -207,6 +215,7 @@ export default async function HomePage() {
   if (weeklyCalibrationsError) console.error("Load weekly calibrations error:", weeklyCalibrationsError);
   if (weeklySuppliersError) console.error("Load weekly suppliers error:", weeklySuppliersError);
   if (weeklyFollowupsError) console.error("Load weekly followup alerts error:", weeklyFollowupsError);
+  if (weeklyExpiryItemsError) console.error("Load weekly expiry items error:", weeklyExpiryItemsError);
 
   const visibleRecentTasks = recentTasks ?? [];
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
@@ -229,6 +238,7 @@ export default async function HomePage() {
       suppliers: supplierAlertsEnabled
         ? (weeklySuppliers ?? []).filter((item) => item.expiration_date === dateString)
         : [],
+      expiryItems: (weeklyExpiryItems ?? []).filter((item) => item.expiry_date === dateString),
       followups: (weeklyFollowups ?? []).filter((item) => {
         const created = new Date(item.created_at);
         const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
@@ -238,7 +248,7 @@ export default async function HomePage() {
     };
   });
   const weeklyEventCount = weekDays.reduce(
-    (total, day) => total + day.tasks.length + day.reminders.length + day.calibrations.length + day.suppliers.length + day.followups.length,
+    (total, day) => total + day.tasks.length + day.reminders.length + day.calibrations.length + day.suppliers.length + day.expiryItems.length + day.followups.length,
     0
   );
   const calibrationNames = calibrationAlertsEnabled ? (upcomingCalibrations ?? []).map((item) => item.equipment_name) : [];
@@ -271,12 +281,6 @@ export default async function HomePage() {
   return (
     <>
       <div className="flex flex-col gap-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-extrabold sm:text-4xl">
-            לוח בקרה
-          </h2>
-        </div>
-
         <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-4">
           <Card className="min-h-40 h-full justify-center">
             <CardHeader className="pb-2">
@@ -372,6 +376,12 @@ export default async function HomePage() {
                             <span className="line-clamp-2">{day.suppliers.length === 1 ? `תוקף ספק: ${day.suppliers[0].supplier_name}` : `תוקף ספקים — ${day.suppliers.length} התראות`}</span>
                           </Link>
                         ) : null}
+                        {day.expiryItems.length > 0 ? (
+                          <Link href="/expiry" title={day.expiryItems.map((item) => `${item.material_name}${item.location ? ` — ${item.location}` : ""}`).join(" • ")} className="flex items-start gap-1.5 rounded-md bg-cyan-100 px-2 py-1.5 text-xs font-bold text-cyan-900 hover:bg-cyan-200">
+                            <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span className="line-clamp-2">{day.expiryItems.length === 1 ? `פג תוקף: ${day.expiryItems[0].material_name}` : `פגי תוקף — ${day.expiryItems.length} התראות`}</span>
+                          </Link>
+                        ) : null}
                         {followupGroups.map((group) => {
                           const label = group.category === "pka" ? 'פק״ע' : group.category === "eco" ? "ECO" : "אי התאמה";
                           return <Link key={group.category} href="/followups" title={group.items.map((item) => `${item.reference_number}${item.name ? ` — ${item.name}` : ""}`).join(" • ")} className="flex items-start gap-1.5 rounded-md bg-red-100 px-2 py-1.5 text-xs font-bold text-red-900 hover:bg-red-200">
@@ -379,7 +389,7 @@ export default async function HomePage() {
                             <span className="line-clamp-2">{group.items.length === 1 ? `התראת ${label}: ${group.items[0].reference_number}${group.items[0].name ? ` — ${group.items[0].name}` : ""}` : `התראת ${label} — ${group.items.length} התראות`}</span>
                           </Link>;
                         })}
-                        {!day.tasks.length && !day.reminders.length && !day.calibrations.length && !day.suppliers.length && !day.followups.length && (
+                        {!day.tasks.length && !day.reminders.length && !day.calibrations.length && !day.suppliers.length && !day.expiryItems.length && !day.followups.length && (
                           <p className="pt-2 text-center text-xs text-slate-400">אין אירועים</p>
                         )}
                       </div>
@@ -392,6 +402,7 @@ export default async function HomePage() {
                 <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-blue-300" />תזכורת ידנית</span>
                 <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-emerald-300" />כיול</span>
                 <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-violet-300" />תוקף ספק</span>
+                <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-cyan-300" />פג תוקף</span>
                 <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-red-300" />התראת מעקב</span>
               </div>
             </CardContent>
