@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Bell, BellOff, Building2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { createSupplier, deleteSupplier, setSupplierAlertsEnabled, updateSupplier, type SupplierActionResult } from "@/app/suppliers/actions";
@@ -68,13 +67,11 @@ function SupplierFields({ row }: { row?: SupplierRow }) {
 }
 
 export function SuppliersManager({ rows, alertsEnabled }: { rows: SupplierRow[]; alertsEnabled: boolean }) {
-  const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [createState, createAction, creating] = useActionState(async (previousState: SupplierActionResult, formData: FormData) => {
     const result = await createSupplier(previousState, formData);
     if (result.success) {
       setAdding(false);
-      router.refresh();
     }
     return result;
   }, initialState);
@@ -110,7 +107,7 @@ export function SuppliersManager({ rows, alertsEnabled }: { rows: SupplierRow[];
     startEdit(async () => {
       const result = await updateSupplier(formData);
       setEditMessage(result.message);
-      if (result.success) { setEditing(null); router.refresh(); }
+      if (result.success) setEditing(null);
     });
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -28,7 +27,6 @@ type ImportResult = {
 };
 
 export function UploadDialog() {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [preview, setPreview] =
@@ -108,8 +106,6 @@ export function UploadDialog() {
 
         setResult(importResult);
         setPreview(null);
-
-        router.refresh();
 
         if (inputRef.current) {
           inputRef.current.value = "";

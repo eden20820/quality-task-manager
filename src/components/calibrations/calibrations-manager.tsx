@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Bell, BellOff, CalendarCheck2, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { createCalibration, deleteCalibration, importCalibrations, setCalibrationAlertsEnabled, updateCalibration } from "@/app/calibrations/actions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,7 +30,7 @@ function dateStatus(value: string | null) {
 }
 
 export function CalibrationsManager({ rows, alertsEnabled }: { rows: CalibrationRow[]; alertsEnabled: boolean }) {
-  const router = useRouter(); const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [state, action, pending] = useActionState(createCalibration, initial);
   const [uploading, startUpload] = useTransition(); const [uploadMessage, setUploadMessage] = useState("");
   const [search, setSearch] = useState(""); const [filter, setFilter] = useState<Filter>("all");
@@ -58,11 +57,11 @@ export function CalibrationsManager({ rows, alertsEnabled }: { rows: Calibration
   }), [rows, search, filter]);
   function upload(file?: File) {
     if (!file) return; const data = new FormData(); data.set("file", file); setUploadMessage("");
-    startUpload(async () => { const result = await importCalibrations(data); setUploadMessage(result.message); if (result.success) router.refresh(); if (fileRef.current) fileRef.current.value = ""; });
+    startUpload(async () => { const result = await importCalibrations(data); setUploadMessage(result.message); if (fileRef.current) fileRef.current.value = ""; });
   }
   function saveEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); const formData = new FormData(event.currentTarget); setEditMessage("");
-    startEdit(async () => { const result = await updateCalibration(formData); setEditMessage(result.message); if (result.success) { setEditing(null); router.refresh(); } });
+    startEdit(async () => { const result = await updateCalibration(formData); setEditMessage(result.message); if (result.success) setEditing(null); });
   }
   const cards: Array<[Filter, string, number, string]> = [["all", "כלים פעילים", counts.all, "text-slate-950"], ["expired", "כיול באיחור", counts.expired, "text-red-600"], ["upcoming", "כיול עד 90 יום", counts.upcoming, "text-orange-600"], ["missing", "חסר מועד", counts.missing, "text-slate-500"]];
   return <div className="space-y-7">

@@ -37,20 +37,21 @@ export default async function CalendarPage({
     : currentMonthKey();
   const { start, end } = calendarRange(monthKey);
   const supabase = await createClient();
-  const [{ data: tasks, error: tasksError }, { data: oneTimeReminders, error: oneTimeRemindersError }, { data: recurringReminders, error: recurringRemindersError }, { data: calibrations }, { data: followups }, { data: suppliers }, { data: expiryItems, error: expiryItemsError }, { data: alertSettings }] = await Promise.all([
-    supabase.from("tasks").select("id, title, due_date, priority, assignees").not("status", "in", "(completed,cancelled)").gte("due_date", start).lte("due_date", end).order("due_date"),
-    supabase.from("reminders").select("id, title, reminder_date, notes, repeat_unit, repeat_interval").is("repeat_unit", null).gte("reminder_date", start).lte("reminder_date", end).order("reminder_date"),
-    supabase.from("reminders").select("id, title, reminder_date, notes, repeat_unit, repeat_interval").not("repeat_unit", "is", null).lte("reminder_date", end).order("reminder_date"),
-    supabase.from("calibration_items").select("id, equipment_name, equipment_code, location, next_calibration_date").eq("is_active", true).gte("next_calibration_date", start).lte("next_calibration_date", end).order("next_calibration_date"),
-    supabase.from("quality_followups").select("id, category, reference_number, name, quantity, opened_at, created_at").in("status", ["open", "waiting"]).eq("alerts_enabled", true).lte("created_at", `${end}T23:59:59.999Z`).order("created_at"),
-    supabase.from("suppliers").select("id, supplier_name, product_service, certification_type, expiration_date").gte("expiration_date", start).lte("expiration_date", end).order("expiration_date"),
-    supabase.from("expiry_items").select("id, material_name, location, expiry_date").eq("is_active", true).gte("expiry_date", start).lte("expiry_date", end).order("expiry_date"),
-    supabase.from("portal_settings").select("calibration_alerts_enabled, supplier_alerts_enabled").eq("id", "global").maybeSingle(),
-  ]);
-  if (tasksError) console.error("Load calendar tasks error:", tasksError);
-  if (oneTimeRemindersError) console.error("Load one-time reminders error:", oneTimeRemindersError);
-  if (recurringRemindersError) console.error("Load recurring reminders error:", recurringRemindersError);
-  if (expiryItemsError) console.error("Load calendar expiry items error:", expiryItemsError);
+  const { data, error } = await supabase.rpc("get_calendar_data", {
+    p_start: start,
+    p_end: end,
+  });
+  if (error) console.error("Load calendar data error:", error);
+
+  const calendarData = (data ?? {}) as Record<string, unknown>;
+  const tasks = (calendarData.tasks ?? []) as CalendarTask[];
+  const oneTimeReminders = (calendarData.one_time_reminders ?? []) as Reminder[];
+  const recurringReminders = (calendarData.recurring_reminders ?? []) as Reminder[];
+  const calibrations = (calendarData.calibrations ?? []) as CalendarCalibration[];
+  const followups = (calendarData.followups ?? []) as CalendarFollowup[];
+  const suppliers = (calendarData.suppliers ?? []) as CalendarSupplier[];
+  const expiryItems = (calendarData.expiry_items ?? []) as CalendarExpiryItem[];
+  const alertSettings = (calendarData.alert_settings ?? {}) as { calibration_alerts_enabled?: boolean; supplier_alerts_enabled?: boolean };
   const reminders = [...(oneTimeReminders ?? []), ...(recurringReminders ?? [])];
-  return <CalendarView key={monthKey} initialMonth={monthKey} tasks={(tasks ?? []) as CalendarTask[]} reminders={reminders as Reminder[]} calibrations={(alertSettings?.calibration_alerts_enabled === false ? [] : (calibrations ?? [])) as CalendarCalibration[]} followups={(followups ?? []) as CalendarFollowup[]} suppliers={(alertSettings?.supplier_alerts_enabled === false ? [] : (suppliers ?? [])) as CalendarSupplier[]} expiryItems={(expiryItems ?? []) as CalendarExpiryItem[]} />;
+  return <CalendarView key={monthKey} initialMonth={monthKey} tasks={tasks} reminders={reminders} calibrations={alertSettings.calibration_alerts_enabled === false ? [] : calibrations} followups={followups} suppliers={alertSettings.supplier_alerts_enabled === false ? [] : suppliers} expiryItems={expiryItems} />;
 }
