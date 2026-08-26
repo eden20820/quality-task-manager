@@ -93,129 +93,39 @@ export default async function HomePage() {
   const weekStartString = formatDateForDatabase(weekStart);
   const weekEndString = formatDateForDatabase(weekEnd);
 
-  let recentTasksQuery = supabase
-    .from("tasks")
-    .select(`
-      id,
-      task_number,
-      title,
-      description,
-      status_note,
-      assignees,
-      status,
-      priority,
-      due_date,
-      created_at
-    `)
-    .order("created_at", { ascending: false })
-    .limit(5);
+  const { data, error } = await supabase.rpc("get_dashboard_data", {
+    p_today: todayString,
+    p_thirty_days: inThirtyDaysString,
+    p_week_start: weekStartString,
+    p_week_end: weekEndString,
+    p_dashboard_cleared_at: dashboardClearedAt,
+  });
+  if (error) console.error("Load dashboard data error:", error);
 
-  let newTasksQuery = supabase
-    .from("tasks")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "new");
-
-  if (dashboardClearedAt) {
-    recentTasksQuery = recentTasksQuery.gt("created_at", dashboardClearedAt);
-    newTasksQuery = newTasksQuery.gt("created_at", dashboardClearedAt);
-  }
-
-  const [
-    { data: recentTasks, error: recentTasksError },
-    { count: newTasks, error: newTasksError },
-    { data: expiringItems, error: expiryError },
-    { data: weeklyReminders, error: remindersError },
-    { data: weeklyDeadlineTasks, error: deadlineTasksError },
-    { data: upcomingCalibrations, error: calibrationsError },
-    { data: upcomingSuppliers, error: suppliersError },
-    { data: alertSettings, error: alertSettingsError },
-    { data: weeklyCalibrations, error: weeklyCalibrationsError },
-    { data: weeklySuppliers, error: weeklySuppliersError },
-    { data: weeklyFollowups, error: weeklyFollowupsError },
-    { data: weeklyExpiryItems, error: weeklyExpiryItemsError },
-  ] = await Promise.all([
-    recentTasksQuery,
-    newTasksQuery,
-    supabase
-      .from("expiry_items")
-      .select("id, material_name, expiry_date")
-      .eq("is_active", true)
-      .not("expiry_date", "is", null)
-      .gte("expiry_date", todayString)
-      .lte("expiry_date", inThirtyDaysString)
-      .order("expiry_date", { ascending: true }),
-    supabase
-      .from("reminders")
-      .select("id, title, reminder_date, repeat_unit, repeat_interval")
-      .lte("reminder_date", weekEndString)
-      .order("reminder_date", { ascending: true }),
-    supabase
-      .from("tasks")
-      .select("id, title, due_date")
-      .not("status", "in", "(completed,cancelled)")
-      .gte("due_date", weekStartString)
-      .lte("due_date", weekEndString)
-      .order("due_date", { ascending: true }),
-    supabase
-      .from("calibration_items")
-      .select("id, equipment_name, next_calibration_date")
-      .eq("is_active", true)
-      .not("next_calibration_date", "is", null)
-      .gte("next_calibration_date", todayString)
-      .lte("next_calibration_date", inThirtyDaysString)
-      .order("next_calibration_date", { ascending: true }),
-    supabase
-      .from("suppliers")
-      .select("id, supplier_name, expiration_date")
-      .not("expiration_date", "is", null)
-      .gte("expiration_date", todayString)
-      .lte("expiration_date", inThirtyDaysString)
-      .order("expiration_date", { ascending: true }),
-    supabase
-      .from("portal_settings")
-      .select("calibration_alerts_enabled, supplier_alerts_enabled")
-      .eq("id", "global")
-      .maybeSingle(),
-    supabase
-      .from("calibration_items")
-      .select("id, equipment_name, next_calibration_date")
-      .eq("is_active", true)
-      .gte("next_calibration_date", weekStartString)
-      .lte("next_calibration_date", weekEndString)
-      .order("next_calibration_date", { ascending: true }),
-    supabase
-      .from("suppliers")
-      .select("id, supplier_name, expiration_date")
-      .gte("expiration_date", weekStartString)
-      .lte("expiration_date", weekEndString)
-      .order("expiration_date", { ascending: true }),
-    supabase
-      .from("quality_followups")
-      .select("id, category, reference_number, name, created_at")
-      .in("status", ["open", "waiting"])
-      .eq("alerts_enabled", true)
-      .lte("created_at", `${weekEndString}T23:59:59.999Z`)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("expiry_items")
-      .select("id, material_name, location, expiry_date")
-      .eq("is_active", true)
-      .gte("expiry_date", weekStartString)
-      .lte("expiry_date", weekEndString)
-      .order("expiry_date", { ascending: true }),
-  ]);
-  if (recentTasksError) console.error("Load recent dashboard tasks error:", recentTasksError);
-  if (newTasksError) console.error("Count new dashboard tasks error:", newTasksError);
-  if (expiryError) console.error("Load dashboard expiry error:", expiryError);
-  if (remindersError) console.error("Load dashboard reminders error:", remindersError);
-  if (deadlineTasksError) console.error("Load dashboard deadline tasks error:", deadlineTasksError);
-  if (calibrationsError) console.error("Load dashboard calibrations error:", calibrationsError);
-  if (suppliersError) console.error("Load dashboard suppliers error:", suppliersError);
-  if (alertSettingsError) console.error("Load dashboard alert settings error:", alertSettingsError);
-  if (weeklyCalibrationsError) console.error("Load weekly calibrations error:", weeklyCalibrationsError);
-  if (weeklySuppliersError) console.error("Load weekly suppliers error:", weeklySuppliersError);
-  if (weeklyFollowupsError) console.error("Load weekly followup alerts error:", weeklyFollowupsError);
-  if (weeklyExpiryItemsError) console.error("Load weekly expiry items error:", weeklyExpiryItemsError);
+  const dashboardData = (data ?? {}) as Record<string, unknown>;
+  const recentTasks = (dashboardData.recent_tasks ?? []) as Array<{
+    id: string;
+    task_number: number;
+    title: string;
+    description: string | null;
+    status_note: string | null;
+    assignees: string[];
+    status: string;
+    priority: string;
+    due_date: string | null;
+    created_at: string;
+  }>;
+  const newTasks = Number(dashboardData.new_tasks ?? 0);
+  const expiringItems = (dashboardData.expiring_items ?? []) as Array<{ id: string; material_name: string; expiry_date: string }>;
+  const weeklyReminders = (dashboardData.weekly_reminders ?? []) as Array<{ id: string; title: string; reminder_date: string; repeat_unit: "day" | "month" | null; repeat_interval: number | null }>;
+  const weeklyDeadlineTasks = (dashboardData.weekly_deadline_tasks ?? []) as Array<{ id: string; title: string; due_date: string }>;
+  const upcomingCalibrations = (dashboardData.upcoming_calibrations ?? []) as Array<{ id: string; equipment_name: string; next_calibration_date: string }>;
+  const upcomingSuppliers = (dashboardData.upcoming_suppliers ?? []) as Array<{ id: string; supplier_name: string; expiration_date: string }>;
+  const alertSettings = (dashboardData.alert_settings ?? {}) as { calibration_alerts_enabled?: boolean; supplier_alerts_enabled?: boolean };
+  const weeklyCalibrations = (dashboardData.weekly_calibrations ?? []) as Array<{ id: string; equipment_name: string; next_calibration_date: string }>;
+  const weeklySuppliers = (dashboardData.weekly_suppliers ?? []) as Array<{ id: string; supplier_name: string; expiration_date: string }>;
+  const weeklyFollowups = (dashboardData.weekly_followups ?? []) as Array<{ id: string; category: string; reference_number: string; name: string | null; created_at: string }>;
+  const weeklyExpiryItems = (dashboardData.weekly_expiry_items ?? []) as Array<{ id: string; material_name: string; location: string | null; expiry_date: string }>;
 
   const visibleRecentTasks = recentTasks ?? [];
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
