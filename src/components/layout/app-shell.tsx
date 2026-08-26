@@ -41,7 +41,7 @@ export function AppShell({
   children: React.ReactNode;
 }>) {
   return (
-    <div dir="rtl" className="min-h-screen min-w-0 overflow-x-hidden bg-slate-100 text-slate-950">
+    <div dir="rtl" className="min-h-screen min-w-0 overflow-x-hidden bg-slate-50 text-slate-950">
       <aside className="fixed right-0 top-0 z-20 hidden h-screen w-[260px] flex-col border-l border-slate-200 bg-white lg:flex">
         <nav className="flex-1 space-y-2 p-4 pt-6">
           {navigationItems.map((item) => {
