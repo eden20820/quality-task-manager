@@ -12,7 +12,6 @@ import {
   Gauge,
   ListChecks,
   Truck,
-  Mail,
 } from "lucide-react";
 
 import { getPortalUser } from "@/lib/auth/portal-user";
@@ -29,7 +28,6 @@ const navigationItems = [
   { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
   { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
-  { title: "הודעות", href: "/messages", icon: Mail },
 ];
 
 /*
