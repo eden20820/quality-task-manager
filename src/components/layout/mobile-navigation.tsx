@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Menu,
   Truck,
-  Mail,
   X,
 } from "lucide-react";
 
@@ -28,7 +27,6 @@ const navigationItems = [
   { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
   { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
-  { title: "הודעות", href: "/messages", icon: Mail },
 ];
 
 export function MobileNavigation() {
