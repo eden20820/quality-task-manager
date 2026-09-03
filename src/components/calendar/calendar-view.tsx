@@ -81,7 +81,7 @@ export function CalendarView({ initialMonth, tasks, reminders, calibrations, fol
 
   return <div className="space-y-7">
     <div className="flex flex-wrap items-end justify-between gap-4">
-      <div><h2 className="text-3xl font-extrabold sm:text-4xl">יומן ותזכורות</h2><p className="mt-2 text-base text-slate-500 sm:text-lg">משימות עם דדליין ותזכורות שהוספת ידנית</p></div>
+      <div><h2 className="text-3xl font-extrabold sm:text-4xl">יומן</h2><p className="mt-2 text-base text-slate-500 sm:text-lg">משימות עם דדליין ותזכורות שהוספת ידנית</p></div>
       <Link href="/calendar" className="rounded-lg border bg-white px-4 py-2 font-bold hover:bg-slate-50">חזרה להיום</Link>
     </div>
 

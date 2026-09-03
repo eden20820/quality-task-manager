@@ -64,16 +64,21 @@ export async function importCalibrations(formData: FormData): Promise<Result> {
     const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true });
     const rowsToUpsert: Array<Record<string, unknown>> = [];
     const { supabase, user } = await authorized();
-    const { data: existingWithoutSerial, error: existingError } = await supabase
+    const { data: existingItems, error: existingError } = await supabase
       .from("calibration_items")
-      .select("equipment_name,row_key,created_at")
-      .is("serial_number", null)
+      .select("equipment_name,serial_number,row_key,created_at")
       .not("row_key", "is", null)
       .order("created_at", { ascending: true })
       .order("row_key", { ascending: true });
     if (existingError) throw existingError;
+    const existingKeyBySerial = new Map<string, string>();
     const existingKeysByName = new Map<string, string[]>();
-    for (const item of existingWithoutSerial ?? []) {
+    for (const item of existingItems ?? []) {
+      const serial = usableSerial(item.serial_number);
+      if (serial && item.row_key) {
+        existingKeyBySerial.set(normalizedKeyPart(serial), item.row_key);
+        continue;
+      }
       const name = normalizedKeyPart(item.equipment_name);
       if (!name || !item.row_key) continue;
       const keys = existingKeysByName.get(name) ?? [];
@@ -97,7 +102,8 @@ export async function importCalibrations(formData: FormData): Promise<Result> {
         const normalizedName = normalizedKeyPart(equipmentName);
         let rowKey: string;
         if (serialNumber) {
-          rowKey = `${normalizedName}|${normalizedKeyPart(serialNumber)}`;
+          const normalizedSerial = normalizedKeyPart(serialNumber);
+          rowKey = existingKeyBySerial.get(normalizedSerial) ?? `serial|${normalizedSerial}`;
         } else {
           const occurrence = missingSerialOccurrences.get(normalizedName) ?? 0;
           missingSerialOccurrences.set(normalizedName, occurrence + 1);
