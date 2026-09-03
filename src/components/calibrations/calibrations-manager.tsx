@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState, useTransition } from "react";
-import { Bell, BellOff, CalendarCheck2, FileSpreadsheet, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
-import { createCalibration, deleteCalibration, importCalibrations, setCalibrationAlertsEnabled, updateCalibration } from "@/app/calibrations/actions";
+import { useActionState, useMemo, useState, useTransition } from "react";
+import { Bell, BellOff, CalendarCheck2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { createCalibration, deleteCalibration, previewCalibrationImport, confirmCalibrationImport, setCalibrationAlertsEnabled, updateCalibration } from "@/app/calibrations/actions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ExcelImportPreview } from "@/components/imports/excel-import-preview";
 
 export type CalibrationRow = {
   id: string; equipment_name: string; serial_number: string | null; model: string | null; location: string | null;
@@ -30,9 +31,7 @@ function dateStatus(value: string | null) {
 }
 
 export function CalibrationsManager({ rows, alertsEnabled }: { rows: CalibrationRow[]; alertsEnabled: boolean }) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const [state, action, pending] = useActionState(createCalibration, initial);
-  const [uploading, startUpload] = useTransition(); const [uploadMessage, setUploadMessage] = useState("");
   const [search, setSearch] = useState(""); const [filter, setFilter] = useState<Filter>("all");
   const [editing, setEditing] = useState<CalibrationRow | null>(null);
   const [editMessage, setEditMessage] = useState("");
@@ -55,10 +54,6 @@ export function CalibrationsManager({ rows, alertsEnabled }: { rows: Calibration
     if (filter === "missing") return d === null;
     return true;
   }), [rows, search, filter]);
-  function upload(file?: File) {
-    if (!file) return; const data = new FormData(); data.set("file", file); setUploadMessage("");
-    startUpload(async () => { const result = await importCalibrations(data); setUploadMessage(result.message); if (fileRef.current) fileRef.current.value = ""; });
-  }
   function saveEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); const formData = new FormData(event.currentTarget); setEditMessage("");
     startEdit(async () => { const result = await updateCalibration(formData); setEditMessage(result.message); if (result.success) setEditing(null); });
@@ -76,7 +71,7 @@ export function CalibrationsManager({ rows, alertsEnabled }: { rows: Calibration
     </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards.map(([key, title, value, color]) => <button key={key} onClick={() => setFilter(key)} className={`rounded-2xl border bg-white p-5 text-center shadow-sm transition hover:-translate-y-0.5 ${filter === key ? "ring-2 ring-slate-900" : ""}`}><p className="text-sm font-bold text-slate-500">{title}</p><p className={`mt-2 text-4xl font-extrabold ${color}`}>{value}</p></button>)}</div>
     <section className="grid gap-5 lg:grid-cols-2">
-      <div className="rounded-2xl border bg-white p-6 shadow-sm"><h2 className="flex items-center gap-2 text-xl font-extrabold"><FileSpreadsheet className="text-emerald-600" /> סנכרון קובץ בקרת כיולים</h2><p className="mt-2 text-sm text-slate-500">המערכת קוראת את גיליון הציוד הפעיל ואת גיליון “כלים שהוסרו”, ומעדכנת את הרשימה לפי המספר הסידורי.</p><input ref={fileRef} hidden type="file" accept=".xlsx,.xls" onChange={(event) => upload(event.target.files?.[0])} /><button type="button" disabled={uploading} onClick={() => fileRef.current?.click()} className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 font-bold text-white disabled:opacity-50"><Upload className="h-5 w-5" />{uploading ? "מסנכרן..." : "בחירת קובץ Excel"}</button>{uploadMessage && <p className="mt-3 text-sm font-bold text-slate-700">{uploadMessage}</p>}</div>
+      <ExcelImportPreview title="סנכרון קובץ בקרת כיולים" description="לפני השמירה יוצגו כלים חדשים וכל שינוי בתאריכים ובפרטים. מספר סידורי זהה מעדכן את הכלי הקיים." previewAction={previewCalibrationImport} confirmAction={confirmCalibrationImport} />
       <form action={action} className="rounded-2xl border bg-white p-6 shadow-sm"><h2 className="flex items-center gap-2 text-xl font-extrabold"><Plus /> הוספת מכשיר ידנית</h2><div className="mt-4 grid gap-3 sm:grid-cols-2"><input required name="equipment_name" placeholder="שם המכשיר" className="h-11 rounded-lg border px-3" /><input name="serial_number" placeholder="מספר סידורי / משקל" className="h-11 rounded-lg border px-3" /><input name="location" placeholder="מיקום" className="h-11 rounded-lg border px-3" /><input name="model" placeholder="דגם מכשיר" className="h-11 rounded-lg border px-3" /><label className="text-xs font-bold text-slate-500">כיול אחרון<input name="last_calibration_date" type="date" className="mt-1 h-11 w-full rounded-lg border px-3" /></label><label className="text-xs font-bold text-slate-500">כיול הבא<input name="next_calibration_date" type="date" className="mt-1 h-11 w-full rounded-lg border px-3" /></label><input name="certificate_number" placeholder="מספר תעודת כיול" className="h-11 rounded-lg border px-3" /><input name="calibration_lab" placeholder="מעבדה מכיילת" className="h-11 rounded-lg border px-3" /><input name="notes" placeholder="הערות" className="h-11 rounded-lg border px-3 sm:col-span-2" /></div><button disabled={pending} className="mt-4 h-11 rounded-lg bg-slate-950 px-5 font-bold text-white disabled:opacity-50">{pending ? "שומר..." : "הוסף מכשיר"}</button>{state.message && <span className="mr-3 text-sm font-bold">{state.message}</span>}</form>
     </section>
     <section className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between"><h2 className="flex items-center gap-2 text-xl font-extrabold"><CalendarCheck2 /> רשימת ציוד ({visible.length})</h2><div className="flex flex-wrap gap-2"><label className="relative"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש ציוד..." className="h-10 rounded-lg border pr-9 pl-3" /></label><select value={filter} onChange={(e) => setFilter(e.target.value as Filter)} className="h-10 rounded-lg border bg-white px-3"><option value="all">כל הפעילים</option><option value="expired">כיול באיחור</option><option value="upcoming">עד 90 יום</option><option value="valid">בתוקף</option><option value="missing">חסר מועד</option><option value="removed">כלים שהוסרו</option></select></div></div>
