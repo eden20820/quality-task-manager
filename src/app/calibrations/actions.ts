@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { ImportPreview, ImportPreviewRow } from "@/lib/import-preview";
 
 type Result = { success: boolean; message: string; imported?: number; removed?: number; missingDates?: number };
 
@@ -16,14 +17,6 @@ async function authorized() {
 }
 
 function clean(value: unknown) { return String(value ?? "").trim(); }
-function normalizedKeyPart(value: unknown) {
-  return clean(value).replace(/\s+/g, " ").toLowerCase();
-}
-function usableSerial(value: unknown) {
-  const serial = clean(value);
-  const normalized = normalizedKeyPart(serial).replace(/[.]/g, "");
-  return ["", "n/a", "na", "-", "--", "לא קיים", "לא ידוע", "אין"].includes(normalized) ? "" : serial;
-}
 function dateValue(value: unknown): string | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
@@ -56,6 +49,19 @@ function findHeader(row: unknown[], aliases: string[]) {
   return normalized.findIndex((value) => aliases.some((alias) => value === alias || value.includes(alias)));
 }
 
+function usableSerial(value: unknown) { const v = clean(value); return ["", "n/a", "na", "-", "--", "אין"].includes(v.toLowerCase()) ? "" : v; }
+
+async function parseCalibrationFile(file: File, userId: string) {
+  const XLSX = await import("xlsx"); const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true }); const parsed: Array<Record<string, unknown>> = [];
+  for (const sheetName of workbook.SheetNames) { const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, defval: "", raw: true, range: "A1:H1000" }); const hi = rows.findIndex((r) => findHeader(r, names) >= 0 && findHeader(r, nextDates) >= 0); if (hi < 0) continue; const h = rows[hi]; const ni = findHeader(h, names), si = findHeader(h, serials), mdi = findHeader(h, models), li = findHeader(h, locations), ldi = findHeader(h, lastDates), ndi = findHeader(h, nextDates), ci = findHeader(h, certificates), labi = findHeader(h, labs), noi = findHeader(h, notes), removed = sheetName.trim().includes("הוסרו");
+    for (const row of rows.slice(hi + 1)) { const name = clean(row[ni]); if (!name) continue; const serial = si >= 0 ? usableSerial(row[si]) : ""; parsed.push({ equipment_name: name, serial_number: serial || null, equipment_code: serial || null, model: mdi >= 0 ? clean(row[mdi]) || null : null, location: li >= 0 ? clean(row[li]) || null : null, last_calibration_date: ldi >= 0 ? dateValue(row[ldi]) : null, next_calibration_date: ndi >= 0 ? dateValue(row[ndi]) : null, certificate_number: ci >= 0 ? clean(row[ci]) || null : null, calibration_lab: labi >= 0 ? clean(row[labi]) || null : null, notes: noi >= 0 ? clean(row[noi]) || null : null, is_active: !removed, row_key: serial ? `serial|${serial.toLowerCase()}` : `${name.toLowerCase()}|no-serial`, created_by: userId, updated_at: new Date().toISOString() }); }
+  } return [...new Map(parsed.map((x) => [String(x.row_key), x])).values()];
+}
+
+export async function previewCalibrationImport(formData: FormData): Promise<ImportPreview> { const file = formData.get("file"); if (!(file instanceof File) || !file.size) throw new Error("יש לבחור קובץ Excel"); const { supabase, user } = await authorized(); const incoming = await parseCalibrationFile(file, user.id); if (!incoming.length) throw new Error("לא נמצאה טבלת כיולים תקינה"); const { data: existing, error } = await supabase.from("calibration_items").select("equipment_name,serial_number,row_key,model,location,last_calibration_date,next_calibration_date,certificate_number,calibration_lab,notes,is_active"); if (error) throw error; const bySerial = new Map((existing ?? []).filter((x) => usableSerial(x.serial_number)).map((x) => [usableSerial(x.serial_number).toLowerCase(), x])); const byKey = new Map((existing ?? []).map((x) => [x.row_key, x])); const fields: Array<[string, string]> = [["equipment_name", "שם"], ["model", "דגם"], ["location", "מיקום"], ["last_calibration_date", "כיול אחרון"], ["next_calibration_date", "כיול הבא"], ["certificate_number", "תעודה"], ["calibration_lab", "מעבדה"], ["notes", "הערות"], ["is_active", "מצב"]]; const rows: ImportPreviewRow[] = incoming.map((x) => { const serial = usableSerial(x.serial_number); const old = (serial ? bySerial.get(serial.toLowerCase()) : byKey.get(String(x.row_key))) as unknown as Record<string, unknown> | undefined; if (old?.row_key) x.row_key = old.row_key; const changes = old ? fields.flatMap(([f, l]) => clean(old[f]) === clean(x[f]) ? [] : [{ field: l, before: clean(old[f]), after: clean(x[f]) }]) : []; return { key: String(x.row_key), label: `${x.equipment_name}${serial ? ` • ${serial}` : ""}`, action: !old ? "new" : changes.length ? "update" : "unchanged", changes, data: x }; }); return { fileName: file.name, rows, newCount: rows.filter((x) => x.action === "new").length, updatedCount: rows.filter((x) => x.action === "update").length, unchangedCount: rows.filter((x) => x.action === "unchanged").length, invalidCount: 0 }; }
+
+export async function confirmCalibrationImport(rows: ImportPreviewRow[], fileName: string): Promise<Result> { try { const { supabase, user } = await authorized(); const values = rows.map((r) => ({ ...r.data, source_file_name: fileName.slice(0, 255), created_by: user.id, updated_at: new Date().toISOString() })); const { error } = await supabase.from("calibration_items").upsert(values, { onConflict: "row_key" }); if (error) throw error; revalidatePath("/calibrations"); revalidatePath("/"); revalidatePath("/calendar"); return { success: true, message: `נשמרו ${values.length} כלי כיול` }; } catch (error) { console.error(error); return { success: false, message: "שמירת הכיולים נכשלה" }; } }
+
 export async function importCalibrations(formData: FormData): Promise<Result> {
   try {
     const file = formData.get("file");
@@ -64,28 +70,6 @@ export async function importCalibrations(formData: FormData): Promise<Result> {
     const workbook = XLSX.read(await file.arrayBuffer(), { cellDates: true });
     const rowsToUpsert: Array<Record<string, unknown>> = [];
     const { supabase, user } = await authorized();
-    const { data: existingItems, error: existingError } = await supabase
-      .from("calibration_items")
-      .select("equipment_name,serial_number,row_key,created_at")
-      .not("row_key", "is", null)
-      .order("created_at", { ascending: true })
-      .order("row_key", { ascending: true });
-    if (existingError) throw existingError;
-    const existingKeyBySerial = new Map<string, string>();
-    const existingKeysByName = new Map<string, string[]>();
-    for (const item of existingItems ?? []) {
-      const serial = usableSerial(item.serial_number);
-      if (serial && item.row_key) {
-        existingKeyBySerial.set(normalizedKeyPart(serial), item.row_key);
-        continue;
-      }
-      const name = normalizedKeyPart(item.equipment_name);
-      if (!name || !item.row_key) continue;
-      const keys = existingKeysByName.get(name) ?? [];
-      keys.push(item.row_key);
-      existingKeysByName.set(name, keys);
-    }
-    const missingSerialOccurrences = new Map<string, number>();
     for (const sheetName of workbook.SheetNames) {
       const rows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, defval: "", raw: true, range: "A1:H1000" });
       const headerIndex = rows.findIndex((row) => findHeader(row, names) >= 0 && findHeader(row, nextDates) >= 0);
@@ -95,40 +79,22 @@ export async function importCalibrations(formData: FormData): Promise<Result> {
       const serialIndex = findHeader(header, serials); const modelIndex = findHeader(header, models); const locationIndex = findHeader(header, locations);
       const certificateIndex = findHeader(header, certificates); const labIndex = findHeader(header, labs); const notesIndex = findHeader(header, notes);
       const isRemovedSheet = sheetName.trim().includes("הוסרו");
-      for (const row of rows.slice(headerIndex + 1)) {
+      for (const [rowOffset, row] of rows.slice(headerIndex + 1).entries()) {
         const equipmentName = clean(row[nameIndex]);
         if (!equipmentName || /^(עודכן ע|תאריך:|תפקיד:)/.test(equipmentName)) continue;
-        const serialNumber = serialIndex >= 0 ? usableSerial(row[serialIndex]) : "";
-        const normalizedName = normalizedKeyPart(equipmentName);
-        let rowKey: string;
-        if (serialNumber) {
-          const normalizedSerial = normalizedKeyPart(serialNumber);
-          rowKey = existingKeyBySerial.get(normalizedSerial) ?? `serial|${normalizedSerial}`;
-        } else {
-          const occurrence = missingSerialOccurrences.get(normalizedName) ?? 0;
-          missingSerialOccurrences.set(normalizedName, occurrence + 1);
-          rowKey = existingKeysByName.get(normalizedName)?.[occurrence]
-            ?? `${normalizedName}|no-serial-${occurrence + 1}`;
-        }
+        const serialNumber = serialIndex >= 0 ? clean(row[serialIndex]) : "";
+        const rowKey = `${equipmentName.toLowerCase()}|${serialNumber.toLowerCase() || `no-serial-${headerIndex + rowOffset + 2}`}`;
         rowsToUpsert.push({ equipment_name: equipmentName, equipment_code: serialNumber || null, serial_number: serialNumber || null, model: modelIndex >= 0 ? clean(row[modelIndex]) || null : null, location: locationIndex >= 0 ? clean(row[locationIndex]) || null : null, last_calibration_date: lastDateIndex >= 0 ? dateValue(row[lastDateIndex]) : null, next_calibration_date: nextDateIndex >= 0 ? dateValue(row[nextDateIndex]) : null, certificate_number: certificateIndex >= 0 ? clean(row[certificateIndex]) || null : null, calibration_lab: labIndex >= 0 ? clean(row[labIndex]) || null : null, notes: notesIndex >= 0 ? clean(row[notesIndex]) || null : null, is_active: !isRemovedSheet, row_key: rowKey, source_file_name: file.name, created_by: user.id, updated_at: new Date().toISOString() });
       }
     }
     if (!rowsToUpsert.length) return { success: false, message: "לא נמצאה טבלת כיולים תקינה בקובץ" };
-    const uniqueRows = [...new Map(rowsToUpsert.map((row) => [String(row.row_key), row])).values()];
-    const { error } = await supabase.from("calibration_items").upsert(uniqueRows, { onConflict: "row_key" });
+    const { error } = await supabase.from("calibration_items").upsert(rowsToUpsert, { onConflict: "row_key" });
     if (error) throw error;
     revalidatePath("/calibrations"); revalidatePath("/"); revalidatePath("/calendar");
-    const removed = uniqueRows.filter((item) => item.is_active === false).length;
-    const missingDates = uniqueRows.filter((item) => item.is_active === true && !item.next_calibration_date).length;
-    return { success: true, message: `הסנכרון הושלם: ${uniqueRows.length - removed} כלים פעילים, ${removed} כלים שהוסרו ו־${missingDates} כלים ללא מועד כיול הבא`, imported: uniqueRows.length - removed, removed, missingDates };
-  } catch (error) {
-    console.error(error);
-    const code = error && typeof error === "object" && "code" in error ? clean(error.code) : "";
-    if (code === "21000") {
-      return { success: false, message: "הייבוא מכיל רשומות כפולות שלא ניתן לזהות ככלים נפרדים" };
-    }
-    return { success: false, message: "ייבוא הכיולים נכשל. יש לבדוק את מבנה הקובץ ולנסות שוב" };
-  }
+    const removed = rowsToUpsert.filter((item) => item.is_active === false).length;
+    const missingDates = rowsToUpsert.filter((item) => item.is_active === true && !item.next_calibration_date).length;
+    return { success: true, message: `הסנכרון הושלם: ${rowsToUpsert.length - removed} כלים פעילים, ${removed} כלים שהוסרו ו־${missingDates} כלים ללא מועד כיול הבא`, imported: rowsToUpsert.length - removed, removed, missingDates };
+  } catch (error) { console.error(error); return { success: false, message: "ייבוא הכיולים נכשל" }; }
 }
 
 export async function createCalibration(_: Result, formData: FormData): Promise<Result> {

@@ -12,10 +12,12 @@ import {
   Gauge,
   ListChecks,
   Truck,
+  Mail,
 } from "lucide-react";
 
 import { getPortalUser } from "@/lib/auth/portal-user";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
+import { GlobalSearch } from "@/components/layout/global-search";
 
 const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
@@ -27,6 +29,7 @@ const navigationItems = [
   { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
   { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
+  { title: "הודעות", href: "/messages", icon: Mail },
 ];
 
 /*
@@ -63,7 +66,7 @@ export function AppShell({
       </aside>
 
       <div className="min-h-screen min-w-0 lg:mr-[260px]">
-        <header className="flex min-h-20 items-center border-b border-slate-200 bg-white px-4 shadow-sm sm:px-6 lg:min-h-[130px] lg:px-10">
+        <header className="border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:px-10">
           <div className="grid min-w-0 w-full grid-cols-[44px_minmax(0,1fr)] items-center gap-3 lg:grid-cols-[180px_minmax(0,1fr)_180px] lg:gap-0">
             <MobileNavigation />
             <span aria-hidden="true" className="hidden lg:block" />
@@ -83,6 +86,7 @@ export function AppShell({
               className="hidden h-auto w-[105px] justify-self-start lg:block"
             />
           </div>
+          <div className="mt-3"><GlobalSearch /></div>
         </header>
 
         <main className="min-w-0 px-3 py-5 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
