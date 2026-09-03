@@ -21,7 +21,7 @@ const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
   { title: "משימות", href: "/tasks", icon: ClipboardList },
   { title: "משימות שהושלמו", href: "/tasks/completed", icon: CheckCircle2 },
-  { title: "יומן ותזכורות", href: "/calendar", icon: CalendarDays },
+  { title: "יומן", href: "/calendar", icon: CalendarDays },
   { title: "מעקב פגי תוקף", href: "/expiry", icon: CalendarClock },
   { title: "מעקב כיולים", href: "/calibrations", icon: Gauge },
   { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
