@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Bell, CalendarClock, CalendarDays, ClipboardList, Gauge, ListChecks, Truck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { DashboardCompleteCheckbox } from "@/components/tasks/dashboard-complete-checkbox";
 import {
   Card,
   CardContent,
@@ -337,9 +338,10 @@ export default async function HomePage() {
                 {visibleActiveTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-start gap-3 px-4 py-4 sm:grid-cols-[40px_minmax(0,1fr)_auto] lg:grid-cols-[60px_minmax(0,1fr)_130px_110px_130px] lg:items-center lg:gap-4 lg:px-5"
+                    className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] items-start gap-3 px-4 py-4 sm:grid-cols-[70px_minmax(0,1fr)_auto] lg:grid-cols-[80px_minmax(0,1fr)_130px_110px_130px] lg:items-center lg:gap-4 lg:px-5"
                   >
-                    <div className="flex justify-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <DashboardCompleteCheckbox taskId={task.id} taskTitle={task.title} />
                       <span
                         className={`inline-block h-3.5 w-3.5 rounded-full ${
                           task.status === "new"

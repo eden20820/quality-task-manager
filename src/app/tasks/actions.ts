@@ -62,6 +62,10 @@ export async function completeTask(taskId: string): Promise<{ success: boolean; 
     console.error("Complete task error:", error);
     return { success: false, message: "השלמת המשימה נכשלה. נסה שוב." };
   }
+  revalidatePath("/tasks");
+  revalidatePath("/tasks/completed");
+  revalidatePath("/calendar");
+  revalidatePath("/");
   return { success: true, message: "המשימה הושלמה" };
 }
 
