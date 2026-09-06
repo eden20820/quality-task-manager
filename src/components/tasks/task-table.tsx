@@ -82,7 +82,7 @@ function InlineTaskStatus({
   if (!editing) {
     return <div onDoubleClick={() => setEditing(true)} className="group flex min-w-0 items-start justify-between gap-2 rounded-lg border border-transparent p-2 transition hover:border-slate-200 hover:bg-slate-50" title="לחיצה כפולה לעריכת עדכון הסטטוס">
       <div className="min-w-0">
-        <p className={`line-clamp-2 whitespace-pre-wrap break-words text-sm ${task.status_note ? "font-semibold text-slate-700" : "text-slate-400"}`}>{task.status_note || "אין עדכון סטטוס"}</p>
+        <p className={`whitespace-pre-wrap break-words text-sm ${task.status_note ? "font-semibold text-slate-700" : "text-slate-400"}`}>{task.status_note || "אין עדכון סטטוס"}</p>
         <p className="mt-1 hidden text-[11px] font-medium text-slate-400 sm:block">לחיצה כפולה לעריכה</p>
       </div>
       <button type="button" onClick={() => setEditing(true)} aria-label={`עריכת עדכון הסטטוס של ${task.title}`} className="shrink-0 rounded-md p-1.5 text-slate-400 transition hover:bg-white hover:text-blue-700"><Pencil className="h-4 w-4" /></button>

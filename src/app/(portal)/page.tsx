@@ -2,8 +2,6 @@
 import Link from "next/link";
 import { Bell, CalendarClock, CalendarDays, ClipboardList, Gauge, ListChecks, Truck } from "lucide-react";
 
-import { clearDashboardTasks } from "@/app/tasks/actions";
-import { ClearDashboardButton } from "@/components/clear-dashboard-button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -12,7 +10,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import { getPortalUser } from "@/lib/auth/portal-user";
 import { reminderOccursOn } from "@/lib/reminders/recurrence";
 
 const statusLabels: Record<string, string> = {
@@ -75,9 +72,6 @@ function getIsraelToday() {
 export default async function HomePage() {
   const supabase = await createClient();
 
-  const portalUser = await getPortalUser();
-  const dashboardClearedAt = portalUser?.profile.dashboard_cleared_at ?? null;
-
   const today = getIsraelToday();
 
   const todayString = formatDateForDatabase(today);
@@ -98,12 +92,12 @@ export default async function HomePage() {
     p_thirty_days: inThirtyDaysString,
     p_week_start: weekStartString,
     p_week_end: weekEndString,
-    p_dashboard_cleared_at: dashboardClearedAt,
+    p_dashboard_cleared_at: null,
   });
   if (error) console.error("Load dashboard data error:", error);
 
   const dashboardData = (data ?? {}) as Record<string, unknown>;
-  const recentTasks = (dashboardData.recent_tasks ?? []) as Array<{
+  const activeTasks = (dashboardData.active_tasks ?? []) as Array<{
     id: string;
     task_number: number;
     title: string;
@@ -127,7 +121,7 @@ export default async function HomePage() {
   const weeklyFollowups = (dashboardData.weekly_followups ?? []) as Array<{ id: string; category: string; reference_number: string; name: string | null; created_at: string }>;
   const weeklyExpiryItems = (dashboardData.weekly_expiry_items ?? []) as Array<{ id: string; material_name: string; location: string | null; expiry_date: string }>;
 
-  const visibleRecentTasks = recentTasks ?? [];
+  const visibleActiveTasks = activeTasks ?? [];
   const expiringNames = (expiringItems ?? []).map((item) => item.material_name);
   const calibrationAlertsEnabled = alertSettings?.calibration_alerts_enabled ?? true;
   const supplierAlertsEnabled = alertSettings?.supplier_alerts_enabled ?? true;
@@ -322,16 +316,10 @@ export default async function HomePage() {
           <CardHeader>
             <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <CardTitle className="text-2xl">
-                משימות אחרונות
+                משימות פעילות
               </CardTitle>
 
               <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:justify-start sm:gap-4">
-                {visibleRecentTasks.length > 0 && (
-                  <form action={clearDashboardTasks}>
-                    <ClearDashboardButton />
-                  </form>
-                )}
-
                 <Link
                   href="/tasks"
                   className="text-sm font-bold text-slate-600 hover:text-slate-950"
@@ -343,10 +331,10 @@ export default async function HomePage() {
           </CardHeader>
 
           <CardContent>
-            {visibleRecentTasks.length > 0 ? (
+            {visibleActiveTasks.length > 0 ? (
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <div className="divide-y divide-slate-200">
-                {visibleRecentTasks.map((task) => (
+                {visibleActiveTasks.map((task) => (
                   <div
                     key={task.id}
                     className="grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-start gap-3 px-4 py-4 sm:grid-cols-[40px_minmax(0,1fr)_auto] lg:grid-cols-[60px_minmax(0,1fr)_130px_110px_130px] lg:items-center lg:gap-4 lg:px-5"
@@ -379,7 +367,7 @@ export default async function HomePage() {
                         </p>
                       ) : null}
                       {task.status_note ? (
-                        <p className="mt-2 line-clamp-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold leading-5 text-blue-900" title={task.status_note}>
+                        <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold leading-5 text-blue-900" title={task.status_note}>
                           <span className="font-extrabold">עדכון סטטוס:</span> {task.status_note}
                         </p>
                       ) : null}
@@ -410,11 +398,11 @@ export default async function HomePage() {
             ) : (
               <div className="flex h-52 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-slate-500">
                 <p className="font-semibold">
-                  אין משימות אחרונות להצגה
+                  אין משימות פעילות להצגה
                 </p>
 
                 <p className="text-sm">
-                  משימות חדשות שייווצרו יופיעו כאן
+                  משימות חדשות שייווצרו יופיעו כאן עד להשלמתן
                 </p>
               </div>
             )}
