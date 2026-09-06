@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, BellOff, Building2, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { createSupplier, deleteSupplier, setSupplierAlertsEnabled, updateSupplier, type SupplierActionResult } from "@/app/suppliers/actions";
@@ -66,7 +67,8 @@ function SupplierFields({ row }: { row?: SupplierRow }) {
   </div>;
 }
 
-export function SuppliersManager({ rows, alertsEnabled }: { rows: SupplierRow[]; alertsEnabled: boolean }) {
+export function SuppliersManager({ rows, alertsEnabled, total, counts, initialSearch, initialFilter }: { rows: SupplierRow[]; alertsEnabled: boolean; total: number; counts: { all: number; expired: number; upcoming: number; missing: number }; initialSearch: string; initialFilter: string }) {
+  const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [createState, createAction, creating] = useActionState(async (previousState: SupplierActionResult, formData: FormData) => {
     const result = await createSupplier(previousState, formData);
@@ -75,30 +77,29 @@ export function SuppliersManager({ rows, alertsEnabled }: { rows: SupplierRow[];
     }
     return result;
   }, initialState);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState(initialSearch);
+  const [filter, setFilter] = useState<Filter>(initialFilter as Filter);
+  const firstSearchRender = useRef(true);
   const [editing, setEditing] = useState<SupplierRow | null>(null);
   const [editMessage, setEditMessage] = useState("");
   const [savingEdit, startEdit] = useTransition();
 
-  const counts = useMemo(() => ({
-    all: rows.length,
-    expired: rows.filter((row) => { const days = daysLeft(row.expiration_date); return days !== null && days < 0; }).length,
-    upcoming: rows.filter((row) => { const days = daysLeft(row.expiration_date); return days !== null && days >= 0 && days <= 90; }).length,
-    missing: rows.filter((row) => !row.expiration_date).length,
-  }), [rows]);
+  useEffect(() => {
+    if (firstSearchRender.current) {
+      firstSearchRender.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams();
+      const normalizedSearch = search.trim();
+      if (normalizedSearch) params.set("q", normalizedSearch);
+      if (filter !== "all") params.set("filter", filter);
+      router.replace(params.size ? `/suppliers?${params}` : "/suppliers");
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search, filter, router]);
 
-  const visible = useMemo(() => rows.filter((row) => {
-    const query = search.trim().toLowerCase();
-    const matches = !query || [row.supplier_number, row.supplier_name, row.product_service, row.certification_type, row.notes].some((value) => value?.toLowerCase().includes(query));
-    if (!matches) return false;
-    const days = daysLeft(row.expiration_date);
-    if (filter === "expired") return days !== null && days < 0;
-    if (filter === "upcoming") return days !== null && days >= 0 && days <= 90;
-    if (filter === "valid") return days !== null && days > 90;
-    if (filter === "missing") return days === null;
-    return true;
-  }), [rows, search, filter]);
+  const visible = rows;
 
   function saveEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,7 +137,7 @@ export function SuppliersManager({ rows, alertsEnabled }: { rows: SupplierRow[];
     <section className="responsive-table-shell overflow-hidden rounded-2xl border bg-white shadow-sm">
       <div className="flex flex-col gap-4 border-b p-5 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="flex items-center gap-2 text-xl font-extrabold"><Building2 />רשימת ספקים ({visible.length})</h2>
+          <h2 className="flex items-center gap-2 text-xl font-extrabold"><Building2 />רשימת ספקים ({total})</h2>
           <p className="mt-1 text-xs text-slate-500">ניתן לערוך באמצעות כפתור העריכה או בלחיצה כפולה על שורת הספק</p>
         </div>
         <div className="flex flex-wrap gap-2"><label className="relative"><Search className="absolute right-3 top-3 h-4 w-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש ספק..." className="h-10 rounded-lg border pr-9 pl-3" /></label><select value={filter} onChange={(event) => setFilter(event.target.value as Filter)} className="h-10 rounded-lg border bg-white px-3"><option value="all">כל הספקים</option><option value="expired">תוקף פג</option><option value="upcoming">עד 90 יום</option><option value="valid">בתוקף</option><option value="missing">ללא תאריך</option></select></div>
