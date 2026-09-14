@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { buildEcoPreview, packLegacyEcoNotes, packLegacyOpenerNotes, parseEcoWorkbook, repackLegacyEcoNotes, unpackLegacyEcoNotes, unpackLegacyOpenerNotes, type EcoImportPreview, type EcoImportRow, type ExistingEco } from "@/lib/eco-import";
 import { buildNonconformityPreview, packNonconformityNotes, parseNonconformityWorkbook, unpackNonconformityNotes, type ExistingNonconformity, type NonconformityImportPreview, type NonconformityImportRow } from "@/lib/nonconformity-import";
+import { buildPkaPreview, packPkaNotes, parsePkaWorkbook, unpackPkaNotes, type ExistingPka, type PkaImportPreview, type PkaImportRow } from "@/lib/pka-import";
 
 export type FollowupResult = { success: boolean; message: string };
 export type EcoImportResult = FollowupResult & { added?: number; updated?: number; skipped?: number; failed?: number };
@@ -115,7 +116,8 @@ export async function updateFollowupNotes(id: string, formData: FormData): Promi
     const eco = unpackLegacyEcoNotes(current.data.notes);
     const generic = unpackLegacyOpenerNotes(current.data.notes);
     const nonconformity = unpackNonconformityNotes(current.data.notes);
-    const storedNotes = eco ? repackLegacyEcoNotes({ ...eco, comments: notes || null }) : nonconformity ? packNonconformityNotes(nonconformity, notes || null, nonconformity.opened_by_name ?? null) : generic ? packLegacyOpenerNotes(generic.openedByName, notes || null) : notes || null;
+    const pka = unpackPkaNotes(current.data.notes);
+    const storedNotes = eco ? repackLegacyEcoNotes({ ...eco, comments: notes || null }) : nonconformity ? packNonconformityNotes(nonconformity, notes || null, nonconformity.opened_by_name ?? null) : pka ? packPkaNotes({ ...pka, notes: notes || null }) : generic ? packLegacyOpenerNotes(generic.openedByName, notes || null) : notes || null;
     const { error } = await supabase
       .from("quality_followups")
       .update({ notes: storedNotes, updated_at: new Date().toISOString() })
@@ -351,4 +353,45 @@ export async function confirmNonconformityImport(rows: NonconformityImportRow[],
     revalidatePath("/followups"); revalidatePath("/"); revalidatePath("/calendar");
     return { success: true, message: `הייבוא הושלם: ${newRows.length} נוספו, ${updatedRows.length} עודכנו, ${skipped} דולגו`, added: newRows.length, updated: updatedRows.length, skipped, failed: 0 };
   } catch (error) { console.error("Nonconformity import error:", error); return { success: false, message: ecoImportFailureMessage(error).replace("ECO", "אי ההתאמות"), failed: 1 }; }
+}
+
+export type PkaPreviewResult = { success: true; preview: PkaImportPreview } | { success: false; message: string };
+
+export async function previewPkaImport(formData: FormData): Promise<PkaPreviewResult> {
+  try {
+    const file = formData.get("file");
+    if (!(file instanceof File) || !file.size) return { success: false, message: "יש לבחור קובץ Excel" };
+    if (!/\.xlsx?$/i.test(file.name)) return { success: false, message: "יש לבחור קובץ Excel מסוג XLSX או XLS" };
+    if (file.size > 10 * 1024 * 1024) return { success: false, message: "הקובץ גדול מדי. הגודל המרבי הוא 10MB" };
+    const { supabase } = await authorized();
+    const parsed = parsePkaWorkbook(await file.arrayBuffer());
+    const result = await supabase.from("quality_followups").select("id,reference_number,name,quantity,opened_at,status,closed_at,notes").eq("category", "pka");
+    if (result.error) throw result.error;
+    const existing = (result.data ?? []).map((row) => {
+      const packed = unpackPkaNotes(row.notes);
+      return packed ? { id: row.id, ...packed } : { id: row.id, reference_number: row.reference_number, opened_at: row.opened_at, customer_order: null, part_number: null, revision: null, product_name: row.name ?? "", assembly_description: null, assembly_name: null, final_product: null, required_quantity: row.quantity ?? 0, produced_quantity: null, status: row.status, due_date: null, closed_at: row.closed_at, notes: row.notes } as ExistingPka;
+    });
+    return { success: true, preview: buildPkaPreview(file.name, parsed, existing) };
+  } catch (error) { console.error("PKA preview error:", error); return { success: false, message: error instanceof Error ? error.message : "קריאת קובץ הפק״עות נכשלה" }; }
+}
+
+export async function confirmPkaImport(rows: PkaImportRow[]): Promise<EcoImportResult> {
+  try {
+    const { supabase, user } = await authorized();
+    const selected = rows.filter((row) => (row.action === "new" || row.action === "update") && row.resolution === "import" && row.data);
+    if (!selected.length) return { success: true, message: "לא נבחרו שינויים לשמירה", added: 0, updated: 0, skipped: rows.length, failed: 0 };
+    const newRows = selected.filter((row) => row.action === "new");
+    const updatedRows = selected.filter((row) => row.action === "update");
+    if (newRows.length) {
+      const inserted = await supabase.from("quality_followups").insert(newRows.map((row) => ({ category: "pka", reference_number: row.data!.reference_number, name: row.data!.product_name, quantity: row.data!.required_quantity, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.status === "closed" ? row.data!.closed_at : null, alerts_enabled: row.data!.status !== "closed", notes: packPkaNotes(row.data!), created_by: user.id })));
+      if (inserted.error) throw inserted.error;
+    }
+    for (const row of updatedRows) {
+      const updated = await supabase.from("quality_followups").update({ name: row.data!.product_name, quantity: row.data!.required_quantity, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.status === "closed" ? row.data!.closed_at : null, alerts_enabled: row.data!.status !== "closed", notes: packPkaNotes(row.data!), updated_at: new Date().toISOString() }).eq("id", row.existingId!);
+      if (updated.error) throw updated.error;
+    }
+    const skipped = rows.length - selected.length;
+    revalidatePath("/followups"); revalidatePath("/"); revalidatePath("/calendar");
+    return { success: true, message: `הייבוא הושלם: ${newRows.length} נוספו, ${updatedRows.length} עודכנו, ${skipped} דולגו`, added: newRows.length, updated: updatedRows.length, skipped, failed: 0 };
+  } catch (error) { console.error("PKA import error:", error); return { success: false, message: ecoImportFailureMessage(error).replace("ECO", "הפק״עות"), failed: 1 }; }
 }

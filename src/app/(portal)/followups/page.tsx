@@ -3,6 +3,7 @@ import { PaginationControls } from "@/components/pagination-controls";
 import { pageRange, parsePage } from "@/lib/pagination";
 import { unpackLegacyEcoNotes, unpackLegacyOpenerNotes } from "@/lib/eco-import";
 import { unpackNonconformityNotes } from "@/lib/nonconformity-import";
+import { unpackPkaNotes } from "@/lib/pka-import";
 import { createClient } from "@/lib/supabase/server";
 
 type Category = "pka" | "nonconformity" | "eco";
@@ -85,9 +86,10 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
     const ecoImport = row.category === "eco" ? unpackLegacyEcoNotes(row.notes) : null;
     const nonconformityImport = row.category === "nonconformity" ? unpackNonconformityNotes(row.notes) : null;
     const legacyOpener = unpackLegacyOpenerNotes(row.notes);
+    const pkaImport = row.category === "pka" ? unpackPkaNotes(row.notes) : null;
     return {
       ...row,
-      notes: ecoImport ? ecoImport.comments : nonconformityImport ? nonconformityImport.notes : legacyOpener ? legacyOpener.notes : row.notes,
+      notes: ecoImport ? ecoImport.comments : nonconformityImport ? nonconformityImport.notes : pkaImport ? pkaImport.notes : legacyOpener ? legacyOpener.notes : row.notes,
     };
   });
 
