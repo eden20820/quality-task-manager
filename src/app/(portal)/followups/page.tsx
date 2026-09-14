@@ -1,6 +1,7 @@
 import { FollowupsBoard, type Followup } from "@/components/followups/followups-board";
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
+import { unpackLegacyEcoNotes } from "@/lib/eco-import";
 import { createClient } from "@/lib/supabase/server";
 
 type Category = "pka" | "nonconformity" | "eco";
@@ -53,7 +54,10 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
     else if (status !== "all") legacyQuery = legacyQuery.eq("status", status);
     if (safeQuery) legacyQuery = legacyQuery.or(`reference_number.ilike.%${safeQuery}%,name.ilike.%${safeQuery}%,notes.ilike.%${safeQuery}%`);
     const legacyResult = await legacyQuery.order("reference_number", { ascending: true }).order("created_at", { ascending: false }).range(from, to);
-    rows = (legacyResult.data ?? []).map((row) => ({ ...row, closed_at: null, eco_project: null, eco_owner_name: null, eco_description: null })) as Followup[];
+    rows = (legacyResult.data ?? []).map((row) => {
+      const packed = category === "eco" ? unpackLegacyEcoNotes(row.notes) : null;
+      return { ...row, closed_at: null, eco_project: packed?.project ?? null, eco_owner_name: row.name, eco_description: packed?.description ?? null, notes: packed?.comments ?? row.notes };
+    }) as Followup[];
     rowsError = legacyResult.error;
     total = legacyResult.count ?? 0;
   }

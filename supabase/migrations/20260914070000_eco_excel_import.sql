@@ -35,7 +35,7 @@ begin
         eco_description, opened_at, status, closed_at, notes,
         source_file_name, created_by, updated_at
       ) values (
-        'eco', trim(item->>'reference_number'), trim(item->>'description'),
+        'eco', trim(item->>'reference_number'), trim(item->>'owner_name'),
         nullif(trim(item->>'project'), ''), nullif(trim(item->>'owner_name'), ''),
         trim(item->>'description'), (item->>'opened_at')::date,
         item->>'status', nullif(item->>'closed_at', '')::date,
@@ -50,7 +50,7 @@ begin
     elsif item->>'action' = 'update' and nullif(item->>'existing_id', '') is not null then
       update public.quality_followups
       set
-        name = trim(item->>'description'),
+        name = trim(item->>'owner_name'),
         eco_project = nullif(trim(item->>'project'), ''),
         eco_owner_name = nullif(trim(item->>'owner_name'), ''),
         eco_description = trim(item->>'description'),
