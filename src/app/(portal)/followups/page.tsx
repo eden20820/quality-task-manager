@@ -20,7 +20,7 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
 
   let rowsQuery = supabase
     .from("quality_followups")
-    .select("id, category, reference_number, name, quantity, status, alerts_enabled, assignee_key, opened_at, created_at, notes", { count: "exact" })
+    .select("id, category, reference_number, name, quantity, status, alerts_enabled, assignee_key, opened_at, closed_at, created_at, notes, eco_project, eco_owner_name, eco_description", { count: "exact" })
     .eq("category", category);
 
   if (status === "active") rowsQuery = rowsQuery.neq("status", "closed");
