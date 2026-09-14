@@ -79,6 +79,18 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
     total = legacyResult.count ?? 0;
   }
 
+  // Imported records may keep structured metadata in the notes column for
+  // backward compatibility. Only the human-written note belongs in the UI.
+  rows = (rows ?? []).map((row) => {
+    const ecoImport = row.category === "eco" ? unpackLegacyEcoNotes(row.notes) : null;
+    const nonconformityImport = row.category === "nonconformity" ? unpackNonconformityNotes(row.notes) : null;
+    const legacyOpener = unpackLegacyOpenerNotes(row.notes);
+    return {
+      ...row,
+      notes: ecoImport ? ecoImport.comments : nonconformityImport ? nonconformityImport.notes : legacyOpener ? legacyOpener.notes : row.notes,
+    };
+  });
+
   if (rowsError) console.error("Load quality followups error:", rowsError);
   return <div className="space-y-5">
     <FollowupsBoard
