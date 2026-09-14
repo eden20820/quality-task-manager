@@ -31,23 +31,43 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
     rowsQuery = rowsQuery.or(`reference_number.ilike.%${safeQuery}%,name.ilike.%${safeQuery}%,notes.ilike.%${safeQuery}%`);
   }
 
-  const [{ data, error, count }, pkaCount, nonconformityCount, ecoCount] = await Promise.all([
+  const [rowsResult, pkaCount, nonconformityCount, ecoCount] = await Promise.all([
     rowsQuery.order("reference_number", { ascending: true }).order("created_at", { ascending: false }).range(from, to),
     supabase.from("quality_followups").select("id", { count: "exact", head: true }).eq("category", "pka").neq("status", "closed"),
     supabase.from("quality_followups").select("id", { count: "exact", head: true }).eq("category", "nonconformity").neq("status", "closed"),
     supabase.from("quality_followups").select("id", { count: "exact", head: true }).eq("category", "eco").neq("status", "closed"),
   ]);
 
-  if (error) console.error("Load quality followups error:", error);
+  let rows = rowsResult.data as Followup[] | null;
+  let rowsError = rowsResult.error;
+  let total = rowsResult.count ?? 0;
+
+  // Keep the existing register usable while a new optional-column migration is
+  // still propagating to Supabase/PostgREST.
+  if (rowsError && /eco_(project|owner_name|description)/i.test(rowsError.message)) {
+    let legacyQuery = supabase
+      .from("quality_followups")
+      .select("id, category, reference_number, name, quantity, status, alerts_enabled, assignee_key, opened_at, created_at, notes", { count: "exact" })
+      .eq("category", category);
+    if (status === "active") legacyQuery = legacyQuery.neq("status", "closed");
+    else if (status !== "all") legacyQuery = legacyQuery.eq("status", status);
+    if (safeQuery) legacyQuery = legacyQuery.or(`reference_number.ilike.%${safeQuery}%,name.ilike.%${safeQuery}%,notes.ilike.%${safeQuery}%`);
+    const legacyResult = await legacyQuery.order("reference_number", { ascending: true }).order("created_at", { ascending: false }).range(from, to);
+    rows = (legacyResult.data ?? []).map((row) => ({ ...row, closed_at: null, eco_project: null, eco_owner_name: null, eco_description: null })) as Followup[];
+    rowsError = legacyResult.error;
+    total = legacyResult.count ?? 0;
+  }
+
+  if (rowsError) console.error("Load quality followups error:", rowsError);
   return <div className="space-y-5">
     <FollowupsBoard
-      rows={(data ?? []) as Followup[]}
+      rows={rows ?? []}
       activeCategory={category}
       statusFilter={status}
       query={query}
-      total={count ?? 0}
+      total={total}
       counts={{ pka: pkaCount.count ?? 0, nonconformity: nonconformityCount.count ?? 0, eco: ecoCount.count ?? 0 }}
     />
-    <PaginationControls basePath="/followups" page={page} pageSize={PAGE_SIZE} total={count ?? 0} query={{ category, status, q: query || undefined }} />
+    <PaginationControls basePath="/followups" page={page} pageSize={PAGE_SIZE} total={total} query={{ category, status, q: query || undefined }} />
   </div>;
 }
