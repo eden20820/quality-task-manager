@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { buildEcoPreview, parseEcoWorkbook, type EcoImportPreview, type EcoImportRow, type ExistingEco } from "@/lib/eco-import";
 
 export type FollowupResult = { success: boolean; message: string };
+export type EcoImportResult = FollowupResult & { added?: number; updated?: number; skipped?: number; failed?: number };
 const categories = new Set(["pka", "nonconformity", "eco"]);
 const assignees = new Set(["eden", "sergey", "quality_manager"]);
 
@@ -98,4 +100,79 @@ export async function deleteFollowup(id: string) {
   const { supabase } = await authorized();
   await supabase.from("quality_followups").delete().eq("id", id);
   revalidatePath("/followups"); revalidatePath("/calendar");
+}
+
+export async function previewEcoImport(formData: FormData): Promise<EcoImportPreview> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || !file.size) throw new Error("יש לבחור קובץ Excel");
+  if (!/\.xlsx?$/i.test(file.name)) throw new Error("יש לבחור קובץ Excel מסוג XLSX או XLS");
+  if (file.size > 10 * 1024 * 1024) throw new Error("הקובץ גדול מדי. הגודל המרבי הוא 10MB");
+
+  const { supabase } = await authorized();
+  const parsed = parseEcoWorkbook(await file.arrayBuffer());
+  const { data, error } = await supabase
+    .from("quality_followups")
+    .select("id,reference_number,eco_project,eco_owner_name,eco_description,name,opened_at,status,closed_at,notes")
+    .eq("category", "eco");
+  if (error) throw new Error("טעינת רשומות ה-ECO הקיימות נכשלה");
+
+  return buildEcoPreview(file.name, parsed, (data ?? []) as ExistingEco[]);
+}
+
+function validImportRow(row: EcoImportRow) {
+  const data = row.data;
+  return Boolean(
+    data &&
+    /^[A-Z0-9]+(?:-[A-Z0-9]+)+$/.test(data.reference_number) &&
+    data.eco_project?.trim() &&
+    data.eco_owner_name?.trim() &&
+    data.eco_description.trim() &&
+    /^\d{4}-\d{2}-\d{2}$/.test(data.opened_at) &&
+    (data.status === "open" || data.status === "closed") &&
+    (data.status !== "closed" || Boolean(data.closed_at && /^\d{4}-\d{2}-\d{2}$/.test(data.closed_at)))
+  );
+}
+
+export async function confirmEcoImport(rows: EcoImportRow[], fileName: string): Promise<EcoImportResult> {
+  try {
+    const { supabase } = await authorized();
+    const selected = rows.filter((row) => (row.action === "new" || row.action === "update") && row.resolution === "import");
+    const invalidSelection = selected.filter((row) => !validImportRow(row));
+    if (invalidSelection.length) return { success: false, message: "חלק מנתוני הייבוא אינם תקינים. יש לסרוק מחדש את הקובץ.", failed: invalidSelection.length };
+    if (!selected.length) {
+      return { success: true, message: "לא נבחרו שינויים לשמירה", added: 0, updated: 0, skipped: rows.length, failed: 0 };
+    }
+
+    const operations = selected.map((row) => ({
+      action: row.action,
+      existing_id: row.existingId ?? null,
+      reference_number: row.data!.reference_number,
+      project: row.data!.eco_project,
+      owner_name: row.data!.eco_owner_name,
+      description: row.data!.eco_description,
+      opened_at: row.data!.opened_at,
+      status: row.data!.status,
+      closed_at: row.data!.closed_at,
+      notes: row.data!.notes,
+      source_file_name: fileName.slice(0, 255),
+    }));
+    const { data, error } = await supabase.rpc("merge_eco_import", { p_rows: operations });
+    if (error) throw error;
+    const result = (data ?? {}) as { added?: number; updated?: number; skipped?: number };
+    const skipped = (result.skipped ?? 0) + rows.length - selected.length;
+    revalidatePath("/followups");
+    revalidatePath("/");
+    revalidatePath("/calendar");
+    return {
+      success: true,
+      message: `הייבוא הושלם: ${result.added ?? 0} נוספו, ${result.updated ?? 0} עודכנו, ${skipped} דולגו`,
+      added: result.added ?? 0,
+      updated: result.updated ?? 0,
+      skipped,
+      failed: 0,
+    };
+  } catch (error) {
+    console.error("ECO import error:", error);
+    return { success: false, message: "שמירת ייבוא ה-ECO נכשלה. לא נשמרו שינויים.", failed: 1 };
+  }
 }
