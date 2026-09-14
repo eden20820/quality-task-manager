@@ -178,7 +178,7 @@ export function parseEcoWorkbook(buffer: ArrayBuffer | Uint8Array): { candidates
           eco_project: project,
           eco_owner_name: owner,
           eco_description: description,
-          name: description,
+          name: owner,
           opened_at: opened,
           status,
           closed_at: status === "closed" ? closed : null,
@@ -192,6 +192,21 @@ export function parseEcoWorkbook(buffer: ArrayBuffer | Uint8Array): { candidates
     throw new Error(`מבנה הקובץ אינו תקין. נדרשות העמודות: ${REQUIRED_HEADERS.map((key) => HEADER_ALIASES[key][0]).join(", ")}`);
   }
   return { candidates, ignoredCount };
+}
+
+const LEGACY_PREFIX = "ECO_IMPORT_JSON:";
+
+export function packLegacyEcoNotes(data: EcoImportData) {
+  return `${LEGACY_PREFIX}${JSON.stringify({ project: data.eco_project, description: data.eco_description, comments: data.notes })}`;
+}
+
+export function unpackLegacyEcoNotes(notes: string | null) {
+  if (!notes?.startsWith(LEGACY_PREFIX)) return null;
+  try {
+    return JSON.parse(notes.slice(LEGACY_PREFIX.length)) as { project: string | null; description: string; comments: string | null };
+  } catch {
+    return null;
+  }
 }
 
 export function buildEcoPreview(fileName: string, parsed: ReturnType<typeof parseEcoWorkbook>, existing: ExistingEco[]): EcoImportPreview {

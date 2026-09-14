@@ -56,7 +56,9 @@ export function EcoImportDialog() {
     try {
       const formData = new FormData();
       formData.set("file", file);
-      setPreview(await previewEcoImport(formData));
+      const result = await previewEcoImport(formData);
+      if (result.success) setPreview(result.preview);
+      else setError(result.message);
     } catch (cause) {
       setPreview(null);
       setError(cause instanceof Error ? cause.message : "קריאת הקובץ נכשלה");
