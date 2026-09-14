@@ -96,9 +96,9 @@ export function EcoImportDialog() {
   return <>
     <button type="button" onClick={() => setOpen(true)} className="flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 font-bold text-slate-800 shadow-sm hover:bg-slate-50"><Upload className="h-4 w-4" />ייבוא ECO מ-Excel</button>
     {message ? <p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700"><CheckCircle2 className="ml-2 inline h-4 w-4" />{message}</p> : null}
-    {open ? <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="eco-import-title">
+    {open ? <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="eco-import-title">
       <button type="button" aria-label="סגירת חלון הייבוא" className="absolute inset-0 bg-slate-950/60" onClick={close} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="relative z-10 flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
         <div className="flex items-start justify-between gap-4 border-b p-5">
           <div><h2 id="eco-import-title" className="text-2xl font-extrabold">ייבוא מעקב ECO</h2><p className="mt-1 text-sm text-slate-500">הקובץ נסרק ומושווה לרשומות הקיימות לפני כל שמירה.</p></div>
           <button type="button" onClick={close} disabled={saving} aria-label="סגירה" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50"><X className="h-5 w-5" /></button>
