@@ -133,6 +133,19 @@ export async function deleteFollowup(id: string) {
 
 export type EcoPreviewResult = { success: true; preview: EcoImportPreview } | { success: false; message: string };
 
+function ecoRpcUnavailable(error: { code?: string; message: string }) {
+  return ["PGRST202", "PGRST204", "42703", "42883"].includes(error.code ?? "")
+    || /(merge_eco_import|schema cache|could not find the function|column .* does not exist)/i.test(error.message);
+}
+
+function ecoImportFailureMessage(error: unknown) {
+  const databaseError = error as { code?: string; message?: string };
+  if (databaseError.code === "23505") return "קיים כבר ECO עם אחד המספרים שבקובץ. יש לסרוק מחדש ולנסות שוב.";
+  if (databaseError.code === "42501") return "אין הרשאה לשמור רשומות ECO. יש להתחבר מחדש או לפנות למנהל המערכת.";
+  if (databaseError.code === "23514" || databaseError.code === "23502") return "אחת הרשומות אינה עומדת בדרישות מסד הנתונים. יש לבדוק את הנתונים ולנסות שוב.";
+  return `שמירת ייבוא ה-ECO נכשלה${databaseError.code ? ` (קוד ${databaseError.code})` : ""}. לא נשמרו שינויים.`;
+}
+
 export async function previewEcoImport(formData: FormData): Promise<EcoPreviewResult> {
   try {
     const file = formData.get("file");
@@ -197,11 +210,36 @@ export async function confirmEcoImport(rows: EcoImportRow[], fileName: string): 
       source_file_name: fileName.slice(0, 255),
     }));
     let { data, error } = await supabase.rpc("merge_eco_import", { p_rows: operations });
-    if (error && /(merge_eco_import|schema cache|could not find the function)/i.test(error.message)) {
-      const legacyValues = selected.map((row) => ({ id: row.existingId || undefined, category: "eco", reference_number: row.data!.reference_number, name: row.data!.eco_description, quantity: null, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.closed_at, notes: packLegacyEcoNotes(row.data!), created_by: user.id, updated_at: new Date().toISOString() }));
-      const legacy = await supabase.from("quality_followups").upsert(legacyValues, { onConflict: "category,reference_number" });
-      error = legacy.error;
-      data = error ? null : { added: selected.filter((row) => row.action === "new").length, updated: selected.filter((row) => row.action === "update").length, skipped: 0 };
+    if (error && ecoRpcUnavailable(error)) {
+      const newRows = selected.filter((row) => row.action === "new");
+      const updatedRows = selected.filter((row) => row.action === "update");
+      if (newRows.length) {
+        const inserted = await supabase.from("quality_followups").insert(newRows.map((row) => ({
+          category: "eco",
+          reference_number: row.data!.reference_number,
+          name: row.data!.eco_description,
+          quantity: null,
+          opened_at: row.data!.opened_at,
+          status: row.data!.status,
+          closed_at: row.data!.closed_at,
+          notes: packLegacyEcoNotes(row.data!),
+          created_by: user.id,
+        })));
+        if (inserted.error) throw inserted.error;
+      }
+      for (const row of updatedRows) {
+        const updated = await supabase.from("quality_followups").update({
+          name: row.data!.eco_description,
+          opened_at: row.data!.opened_at,
+          status: row.data!.status,
+          closed_at: row.data!.closed_at,
+          notes: packLegacyEcoNotes(row.data!),
+          updated_at: new Date().toISOString(),
+        }).eq("id", row.existingId!);
+        if (updated.error) throw updated.error;
+      }
+      error = null;
+      data = { added: newRows.length, updated: updatedRows.length, skipped: 0 };
     }
     if (error) throw error;
     const result = (data ?? {}) as { added?: number; updated?: number; skipped?: number };
@@ -219,6 +257,6 @@ export async function confirmEcoImport(rows: EcoImportRow[], fileName: string): 
     };
   } catch (error) {
     console.error("ECO import error:", error);
-    return { success: false, message: "שמירת ייבוא ה-ECO נכשלה. לא נשמרו שינויים.", failed: 1 };
+    return { success: false, message: ecoImportFailureMessage(error), failed: 1 };
   }
 }
