@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+﻿import { PrefetchLink } from "@/components/layout/prefetch-link";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { Suspense } from "react";
@@ -49,14 +49,14 @@ export function AppShell({
             const Icon = item.icon;
 
             return (
-              <Link
+              <PrefetchLink
                 key={item.href}
                 href={item.href}
                 className="flex min-h-[52px] items-center gap-4 rounded-xl px-4 text-[17px] font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
               >
                 <Icon className="h-6 w-6" />
                 <span>{item.title}</span>
-              </Link>
+              </PrefetchLink>
             );
           })}
         </nav>
