@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
@@ -16,6 +15,8 @@ import {
   Truck,
   X,
 } from "lucide-react";
+
+import { PrefetchLink } from "@/components/layout/prefetch-link";
 
 const navigationItems = [
   { title: "לוח בקרה", href: "/", icon: LayoutDashboard },
@@ -70,7 +71,7 @@ export function MobileNavigation() {
                 const Icon = item.icon;
                 const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                 return (
-                  <Link
+                  <PrefetchLink
                     key={item.href}
                     href={item.href}
                     onClick={() => setOpen(false)}
@@ -78,7 +79,7 @@ export function MobileNavigation() {
                   >
                     <Icon className="h-5 w-5" />
                     {item.title}
-                  </Link>
+                  </PrefetchLink>
                 );
               })}
             </nav>
