@@ -2,6 +2,7 @@ import { FollowupsBoard, type Followup } from "@/components/followups/followups-
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
 import { unpackLegacyEcoNotes, unpackLegacyOpenerNotes } from "@/lib/eco-import";
+import { unpackNonconformityNotes } from "@/lib/nonconformity-import";
 import { createClient } from "@/lib/supabase/server";
 
 type Category = "pka" | "nonconformity" | "eco";
@@ -21,7 +22,7 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
 
   let rowsQuery = supabase
     .from("quality_followups")
-    .select("id, category, reference_number, name, opened_by_name, quantity, status, alerts_enabled, assignee_key, opened_at, closed_at, created_at, notes, eco_project, eco_owner_name, eco_description", { count: "exact" })
+    .select("id, category, reference_number, name, opened_by_name, quantity, status, alerts_enabled, assignee_key, opened_at, closed_at, created_at, notes, eco_project, eco_owner_name, eco_description, supplier_complaint, customer_complaint, effectiveness_due, effectiveness_actual", { count: "exact" })
     .eq("category", category);
 
   if (status === "active") rowsQuery = rowsQuery.neq("status", "closed");
@@ -45,10 +46,10 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
 
   // Keep the existing register usable while a new optional-column migration is
   // still propagating to Supabase/PostgREST.
-  if (rowsError && /(eco_(project|owner_name|description)|opened_by_name)/i.test(rowsError.message)) {
+  if (rowsError && /(eco_(project|owner_name|description)|opened_by_name|supplier_complaint|customer_complaint|effectiveness_)/i.test(rowsError.message)) {
     let legacyQuery = supabase
       .from("quality_followups")
-      .select("id, category, reference_number, name, quantity, status, alerts_enabled, assignee_key, opened_at, created_at, notes", { count: "exact" })
+      .select("id, category, reference_number, name, quantity, status, alerts_enabled, assignee_key, opened_at, closed_at, created_at, notes", { count: "exact" })
       .eq("category", category);
     if (status === "active") legacyQuery = legacyQuery.neq("status", "closed");
     else if (status !== "all") legacyQuery = legacyQuery.eq("status", status);
@@ -57,15 +58,20 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
     rows = (legacyResult.data ?? []).map((row) => {
       const packedEco = category === "eco" ? unpackLegacyEcoNotes(row.notes) : null;
       const packedOpener = unpackLegacyOpenerNotes(row.notes);
+      const packedNonconformity = category === "nonconformity" ? unpackNonconformityNotes(row.notes) : null;
       return {
         ...row,
         name: packedEco?.description ?? row.name,
-        opened_by_name: packedEco?.owner ?? packedOpener?.openedByName ?? null,
-        closed_at: null,
+        opened_by_name: packedEco?.owner ?? packedNonconformity?.opened_by_name ?? packedOpener?.openedByName ?? null,
+        closed_at: row.closed_at,
         eco_project: packedEco?.project ?? null,
         eco_owner_name: packedEco?.owner ?? null,
         eco_description: packedEco?.description ?? null,
-        notes: packedEco?.comments ?? packedOpener?.notes ?? row.notes,
+        supplier_complaint: packedNonconformity?.supplier_complaint ?? null,
+        customer_complaint: packedNonconformity?.customer_complaint ?? null,
+        effectiveness_due: packedNonconformity?.effectiveness_due ?? null,
+        effectiveness_actual: packedNonconformity?.effectiveness_actual ?? null,
+        notes: packedEco?.comments ?? packedNonconformity?.notes ?? packedOpener?.notes ?? row.notes,
       };
     }) as Followup[];
     rowsError = legacyResult.error;

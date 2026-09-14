@@ -32,6 +32,7 @@ describe("ECO Excel import", () => {
     expect(preview.invalidCount).toBe(0);
     expect(preview.ignoredCount).toBe(3);
     expect(preview.rows[0].data?.reference_number).toBe("001-2026");
+    expect(preview.rows[0].data?.opened_at).toBe("2026-05-04");
     expect(preview.rows.at(-1)?.data?.reference_number).toBe("024-2026");
   });
 
