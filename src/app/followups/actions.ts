@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { buildEcoPreview, packLegacyEcoNotes, parseEcoWorkbook, unpackLegacyEcoNotes, type EcoImportPreview, type EcoImportRow, type ExistingEco } from "@/lib/eco-import";
+import { buildEcoPreview, packLegacyEcoNotes, packLegacyOpenerNotes, parseEcoWorkbook, repackLegacyEcoNotes, unpackLegacyEcoNotes, unpackLegacyOpenerNotes, type EcoImportPreview, type EcoImportRow, type ExistingEco } from "@/lib/eco-import";
 
 export type FollowupResult = { success: boolean; message: string };
 export type EcoImportResult = FollowupResult & { added?: number; updated?: number; skipped?: number; failed?: number };
@@ -29,11 +29,18 @@ export async function createFollowup(_: FollowupResult, formData: FormData): Pro
     const quantityValue = String(formData.get("quantity") ?? "").trim();
     const openedAt = String(formData.get("opened_at") ?? "");
     const status = String(formData.get("status") ?? "open");
+    const openedByName = String(formData.get("opened_by_name") ?? "").trim() || null;
+    const notes = String(formData.get("notes") ?? "").trim() || null;
     const quantity = quantityValue === "" ? null : Number(quantityValue);
     if (!categories.has(category) || !referenceNumber || !name || !/^\d{4}-\d{2}-\d{2}$/.test(openedAt) || !validStatus(category, status)) return { success: false, message: "יש להזין מספר, שם, תאריך ומצב תקינים" };
     if (category === "pka" && (!Number.isInteger(quantity) || (quantity ?? -1) < 0)) return { success: false, message: "יש להזין כמות תקינה לפק״ע" };
     const { supabase, user } = await authorized();
-    const { error } = await supabase.from("quality_followups").insert({ category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, assignee_key: null, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes: String(formData.get("notes") ?? "").trim() || null, created_by: user.id });
+    const values = { category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, assignee_key: null, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes, opened_by_name: openedByName, created_by: user.id };
+    let { error } = await supabase.from("quality_followups").insert(values);
+    if (error && /opened_by_name/i.test(error.message)) {
+      const legacy = await supabase.from("quality_followups").insert({ category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, assignee_key: null, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes: packLegacyOpenerNotes(openedByName, notes), created_by: user.id });
+      error = legacy.error;
+    }
     if (error?.code === "23505") return { success: false, message: "מספר זה כבר קיים בקטגוריה" };
     if (error) throw error;
     revalidatePath("/followups"); revalidatePath("/calendar");
@@ -72,14 +79,42 @@ export async function updateFollowupName(id: string, formData: FormData): Promis
   }
 }
 
+export async function updateFollowupOpenedBy(id: string, formData: FormData): Promise<FollowupResult> {
+  try {
+    const openedByName = String(formData.get("opened_by_name") ?? "").trim() || null;
+    if ((openedByName?.length ?? 0) > 200) return { success: false, message: "שם הפותח ארוך מדי" };
+    const { supabase } = await authorized();
+    let { error } = await supabase.from("quality_followups").update({ opened_by_name: openedByName, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error && /opened_by_name/i.test(error.message)) {
+      const current = await supabase.from("quality_followups").select("notes").eq("id", id).single();
+      if (current.error) throw current.error;
+      const eco = unpackLegacyEcoNotes(current.data.notes);
+      const generic = unpackLegacyOpenerNotes(current.data.notes);
+      const notes = eco ? repackLegacyEcoNotes({ ...eco, owner: openedByName }) : packLegacyOpenerNotes(openedByName, generic?.notes ?? current.data.notes);
+      error = (await supabase.from("quality_followups").update({ notes, updated_at: new Date().toISOString() }).eq("id", id)).error;
+    }
+    if (error) throw error;
+    revalidatePath("/followups");
+    return { success: true, message: "שם הפותח נשמר" };
+  } catch (error) {
+    console.error("Update followup opener error:", error);
+    return { success: false, message: "שמירת שם הפותח נכשלה" };
+  }
+}
+
 export async function updateFollowupNotes(id: string, formData: FormData): Promise<FollowupResult> {
   try {
     const notes = String(formData.get("notes") ?? "").trim();
     if (notes.length > 2000) return { success: false, message: "ההערה ארוכה מדי" };
     const { supabase } = await authorized();
+    const current = await supabase.from("quality_followups").select("notes").eq("id", id).single();
+    if (current.error) throw current.error;
+    const eco = unpackLegacyEcoNotes(current.data.notes);
+    const generic = unpackLegacyOpenerNotes(current.data.notes);
+    const storedNotes = eco ? repackLegacyEcoNotes({ ...eco, comments: notes || null }) : generic ? packLegacyOpenerNotes(generic.openedByName, notes || null) : notes || null;
     const { error } = await supabase
       .from("quality_followups")
-      .update({ notes: notes || null, updated_at: new Date().toISOString() })
+      .update({ notes: storedNotes, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw error;
     revalidatePath("/followups");
@@ -106,15 +141,15 @@ export async function previewEcoImport(formData: FormData): Promise<EcoPreviewRe
     if (file.size > 10 * 1024 * 1024) return { success: false, message: "הקובץ גדול מדי. הגודל המרבי הוא 10MB" };
     const { supabase } = await authorized();
     const parsed = parseEcoWorkbook(await file.arrayBuffer());
-    const modern = await supabase.from("quality_followups").select("id,reference_number,eco_project,eco_owner_name,eco_description,name,opened_at,status,closed_at,notes").eq("category", "eco");
+    const modern = await supabase.from("quality_followups").select("id,reference_number,eco_project,eco_owner_name,eco_description,name,opened_at,status,closed_at,notes,opened_by_name").eq("category", "eco");
     let existing: ExistingEco[];
     if (!modern.error) existing = (modern.data ?? []) as ExistingEco[];
-    else if (/eco_(project|owner_name|description)/i.test(modern.error.message)) {
+    else if (/(eco_(project|owner_name|description)|opened_by_name)/i.test(modern.error.message)) {
       const legacy = await supabase.from("quality_followups").select("id,reference_number,name,opened_at,status,closed_at,notes").eq("category", "eco");
       if (legacy.error) throw legacy.error;
       existing = (legacy.data ?? []).map((row) => {
         const packed = unpackLegacyEcoNotes(row.notes);
-        return { ...row, eco_project: packed?.project ?? null, eco_owner_name: row.name, eco_description: packed?.description ?? row.name ?? "", notes: packed?.comments ?? row.notes } as ExistingEco;
+        return { ...row, name: packed?.description ?? row.name, opened_by_name: packed?.owner ?? null, eco_project: packed?.project ?? null, eco_owner_name: packed?.owner ?? null, eco_description: packed?.description ?? row.name ?? "", notes: packed?.comments ?? row.notes } as ExistingEco;
       });
     } else throw modern.error;
     return { success: true, preview: buildEcoPreview(file.name, parsed, existing) };
@@ -163,7 +198,7 @@ export async function confirmEcoImport(rows: EcoImportRow[], fileName: string): 
     }));
     let { data, error } = await supabase.rpc("merge_eco_import", { p_rows: operations });
     if (error && /(merge_eco_import|schema cache|could not find the function)/i.test(error.message)) {
-      const legacyValues = selected.map((row) => ({ id: row.existingId || undefined, category: "eco", reference_number: row.data!.reference_number, name: row.data!.eco_owner_name, quantity: null, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.closed_at, notes: packLegacyEcoNotes(row.data!), created_by: user.id, updated_at: new Date().toISOString() }));
+      const legacyValues = selected.map((row) => ({ id: row.existingId || undefined, category: "eco", reference_number: row.data!.reference_number, name: row.data!.eco_description, quantity: null, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.closed_at, notes: packLegacyEcoNotes(row.data!), created_by: user.id, updated_at: new Date().toISOString() }));
       const legacy = await supabase.from("quality_followups").upsert(legacyValues, { onConflict: "category,reference_number" });
       error = legacy.error;
       data = error ? null : { added: selected.filter((row) => row.action === "new").length, updated: selected.filter((row) => row.action === "update").length, skipped: 0 };

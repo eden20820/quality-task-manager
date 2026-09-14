@@ -178,7 +178,7 @@ export function parseEcoWorkbook(buffer: ArrayBuffer | Uint8Array): { candidates
           eco_project: project,
           eco_owner_name: owner,
           eco_description: description,
-          name: owner,
+          name: description,
           opened_at: opened,
           status,
           closed_at: status === "closed" ? closed : null,
@@ -197,13 +197,34 @@ export function parseEcoWorkbook(buffer: ArrayBuffer | Uint8Array): { candidates
 const LEGACY_PREFIX = "ECO_IMPORT_JSON:";
 
 export function packLegacyEcoNotes(data: EcoImportData) {
-  return `${LEGACY_PREFIX}${JSON.stringify({ project: data.eco_project, description: data.eco_description, comments: data.notes })}`;
+  return `${LEGACY_PREFIX}${JSON.stringify({ project: data.eco_project, description: data.eco_description, owner: data.eco_owner_name, comments: data.notes })}`;
 }
 
 export function unpackLegacyEcoNotes(notes: string | null) {
   if (!notes?.startsWith(LEGACY_PREFIX)) return null;
   try {
-    return JSON.parse(notes.slice(LEGACY_PREFIX.length)) as { project: string | null; description: string; comments: string | null };
+    return JSON.parse(notes.slice(LEGACY_PREFIX.length)) as { project: string | null; description: string; owner?: string | null; comments: string | null };
+  } catch {
+    return null;
+  }
+}
+
+export function repackLegacyEcoNotes(
+  data: NonNullable<ReturnType<typeof unpackLegacyEcoNotes>>,
+) {
+  return `${LEGACY_PREFIX}${JSON.stringify(data)}`;
+}
+
+const OPENER_PREFIX = "FOLLOWUP_META_JSON:";
+
+export function packLegacyOpenerNotes(openedByName: string | null, notes: string | null) {
+  return `${OPENER_PREFIX}${JSON.stringify({ openedByName, notes })}`;
+}
+
+export function unpackLegacyOpenerNotes(notes: string | null) {
+  if (!notes?.startsWith(OPENER_PREFIX)) return null;
+  try {
+    return JSON.parse(notes.slice(OPENER_PREFIX.length)) as { openedByName: string | null; notes: string | null };
   } catch {
     return null;
   }

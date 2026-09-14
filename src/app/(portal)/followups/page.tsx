@@ -1,7 +1,7 @@
 import { FollowupsBoard, type Followup } from "@/components/followups/followups-board";
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
-import { unpackLegacyEcoNotes } from "@/lib/eco-import";
+import { unpackLegacyEcoNotes, unpackLegacyOpenerNotes } from "@/lib/eco-import";
 import { createClient } from "@/lib/supabase/server";
 
 type Category = "pka" | "nonconformity" | "eco";
@@ -21,7 +21,7 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
 
   let rowsQuery = supabase
     .from("quality_followups")
-    .select("id, category, reference_number, name, quantity, status, alerts_enabled, assignee_key, opened_at, closed_at, created_at, notes, eco_project, eco_owner_name, eco_description", { count: "exact" })
+    .select("id, category, reference_number, name, opened_by_name, quantity, status, alerts_enabled, assignee_key, opened_at, closed_at, created_at, notes, eco_project, eco_owner_name, eco_description", { count: "exact" })
     .eq("category", category);
 
   if (status === "active") rowsQuery = rowsQuery.neq("status", "closed");
@@ -45,7 +45,7 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
 
   // Keep the existing register usable while a new optional-column migration is
   // still propagating to Supabase/PostgREST.
-  if (rowsError && /eco_(project|owner_name|description)/i.test(rowsError.message)) {
+  if (rowsError && /(eco_(project|owner_name|description)|opened_by_name)/i.test(rowsError.message)) {
     let legacyQuery = supabase
       .from("quality_followups")
       .select("id, category, reference_number, name, quantity, status, alerts_enabled, assignee_key, opened_at, created_at, notes", { count: "exact" })
@@ -55,8 +55,18 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
     if (safeQuery) legacyQuery = legacyQuery.or(`reference_number.ilike.%${safeQuery}%,name.ilike.%${safeQuery}%,notes.ilike.%${safeQuery}%`);
     const legacyResult = await legacyQuery.order("reference_number", { ascending: true }).order("created_at", { ascending: false }).range(from, to);
     rows = (legacyResult.data ?? []).map((row) => {
-      const packed = category === "eco" ? unpackLegacyEcoNotes(row.notes) : null;
-      return { ...row, closed_at: null, eco_project: packed?.project ?? null, eco_owner_name: row.name, eco_description: packed?.description ?? null, notes: packed?.comments ?? row.notes };
+      const packedEco = category === "eco" ? unpackLegacyEcoNotes(row.notes) : null;
+      const packedOpener = unpackLegacyOpenerNotes(row.notes);
+      return {
+        ...row,
+        name: packedEco?.description ?? row.name,
+        opened_by_name: packedEco?.owner ?? packedOpener?.openedByName ?? null,
+        closed_at: null,
+        eco_project: packedEco?.project ?? null,
+        eco_owner_name: packedEco?.owner ?? null,
+        eco_description: packedEco?.description ?? null,
+        notes: packedEco?.comments ?? packedOpener?.notes ?? row.notes,
+      };
     }) as Followup[];
     rowsError = legacyResult.error;
     total = legacyResult.count ?? 0;

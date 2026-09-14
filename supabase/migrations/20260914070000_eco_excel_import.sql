@@ -2,6 +2,7 @@ alter table public.quality_followups
   add column if not exists eco_project text,
   add column if not exists eco_owner_name text,
   add column if not exists eco_description text,
+  add column if not exists opened_by_name text,
   add column if not exists source_file_name text;
 
 create or replace function public.merge_eco_import(p_rows jsonb)
@@ -31,12 +32,12 @@ begin
   loop
     if item->>'action' = 'new' then
       insert into public.quality_followups (
-        category, reference_number, name, eco_project, eco_owner_name,
+        category, reference_number, name, eco_project, eco_owner_name, opened_by_name,
         eco_description, opened_at, status, closed_at, notes,
         source_file_name, created_by, updated_at
       ) values (
-        'eco', trim(item->>'reference_number'), trim(item->>'owner_name'),
-        nullif(trim(item->>'project'), ''), nullif(trim(item->>'owner_name'), ''),
+        'eco', trim(item->>'reference_number'), trim(item->>'description'),
+        nullif(trim(item->>'project'), ''), nullif(trim(item->>'owner_name'), ''), nullif(trim(item->>'owner_name'), ''),
         trim(item->>'description'), (item->>'opened_at')::date,
         item->>'status', nullif(item->>'closed_at', '')::date,
         nullif(trim(item->>'notes'), ''), nullif(trim(item->>'source_file_name'), ''),
@@ -50,9 +51,10 @@ begin
     elsif item->>'action' = 'update' and nullif(item->>'existing_id', '') is not null then
       update public.quality_followups
       set
-        name = trim(item->>'owner_name'),
+        name = trim(item->>'description'),
         eco_project = nullif(trim(item->>'project'), ''),
         eco_owner_name = nullif(trim(item->>'owner_name'), ''),
+        opened_by_name = nullif(trim(item->>'owner_name'), ''),
         eco_description = trim(item->>'description'),
         opened_at = (item->>'opened_at')::date,
         status = item->>'status',

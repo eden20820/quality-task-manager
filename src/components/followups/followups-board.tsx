@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Bell, BellOff, Check, CheckCircle2, CircleDot, Pencil, Plus, Search, Trash2, X } from "lucide-react";
-import { createFollowup, deleteFollowup, toggleFollowup, toggleFollowupAlerts, updateFollowupName, updateFollowupNotes, type FollowupResult } from "@/app/followups/actions";
+import { createFollowup, deleteFollowup, toggleFollowup, toggleFollowupAlerts, updateFollowupNotes, updateFollowupOpenedBy, type FollowupResult } from "@/app/followups/actions";
 import { EcoImportDialog } from "@/components/followups/eco-import-dialog";
 
-export type Followup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; quantity: number | null; status: "open" | "waiting" | "closed"; alerts_enabled: boolean; assignee_key: "eden" | "sergey" | "quality_manager" | null; opened_at: string; closed_at: string | null; created_at: string; notes: string | null; eco_project: string | null; eco_owner_name: string | null; eco_description: string | null };
+export type Followup = { id: string; category: "pka" | "nonconformity" | "eco"; reference_number: string; name: string | null; opened_by_name: string | null; quantity: number | null; status: "open" | "waiting" | "closed"; alerts_enabled: boolean; assignee_key: "eden" | "sergey" | "quality_manager" | null; opened_at: string; closed_at: string | null; created_at: string; notes: string | null; eco_project: string | null; eco_owner_name: string | null; eco_description: string | null };
 type Category = Followup["category"];
 type StatusFilter = "all" | "active" | Followup["status"];
 
@@ -32,7 +32,8 @@ function AddFollowupForm({ category, onClose }: { category: Category; onClose: (
     <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-extrabold">הוספת {labels[category]}</h2><p className="text-xs text-slate-500">ההתראות נספרות ממועד ההוספה למערכת</p></div><button type="button" onClick={onClose} aria-label="סגירת טופס ההוספה" className="rounded-lg p-2 text-slate-500 hover:bg-slate-200"><X className="h-4 w-4" /></button></div>
     <div className={`grid gap-3 ${category === "pka" ? "lg:grid-cols-8" : "lg:grid-cols-7"}`}>
       <input required name="reference_number" placeholder={`מספר ${labels[category]}`} className="h-10 rounded-lg border bg-white px-3" />
-      <input required name="name" placeholder="שם" className="h-10 rounded-lg border bg-white px-3 lg:col-span-2" />
+      <input required name="name" placeholder="שם הטופס" className="h-10 rounded-lg border bg-white px-3 lg:col-span-2" />
+      <input name="opened_by_name" placeholder="שם הפותח (לא חובה)" className="h-10 rounded-lg border bg-white px-3" />
       {category === "pka" ? <input required name="quantity" type="number" min="0" step="1" placeholder="כמות" className="h-10 rounded-lg border bg-white px-3" /> : null}
       <input required name="opened_at" type="date" defaultValue={today()} aria-label="תאריך הרשומה" className="h-10 rounded-lg border bg-white px-3" />
       <select name="status" defaultValue="open" aria-label="מצב הרשומה" className="h-10 rounded-lg border bg-white px-3 font-bold"><option value="open">נפתח</option>{category === "nonconformity" ? <option value="waiting">ממתין</option> : null}<option value="closed">נסגר</option></select>
@@ -42,19 +43,19 @@ function AddFollowupForm({ category, onClose }: { category: Category; onClose: (
   </form>;
 }
 
-function NameEditor({ row }: { row: Followup }) {
-  const [value, setValue] = useState(row.name ?? "");
+function OpenedByEditor({ row }: { row: Followup }) {
+  const [value, setValue] = useState(row.opened_by_name ?? "");
   const [pending, setPending] = useState(false);
   async function save() {
-    const name = value.trim();
-    if (!name || name === row.name) return;
+    const openedByName = value.trim();
+    if (openedByName === (row.opened_by_name ?? "")) return;
     setPending(true);
     const formData = new FormData();
-    formData.set("name", name);
-    await updateFollowupName(row.id, formData);
+    formData.set("opened_by_name", openedByName);
+    await updateFollowupOpenedBy(row.id, formData);
     setPending(false);
   }
-  return <input value={value} onChange={(event) => setValue(event.target.value)} onBlur={save} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} disabled={pending} aria-label={`שם עבור ${row.reference_number}`} className="h-9 min-w-36 rounded-lg border bg-white px-2 text-sm font-semibold disabled:opacity-60" />;
+  return <input value={value} onChange={(event) => setValue(event.target.value)} onBlur={save} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} disabled={pending} placeholder="שם הפותח" aria-label={`שם הפותח עבור ${row.reference_number}`} className="h-9 min-w-36 rounded-lg border bg-white px-2 text-sm font-semibold disabled:opacity-60" />;
 }
 
 function NotesEditor({ row }: { row: Followup }) {
@@ -79,9 +80,9 @@ function NotesEditor({ row }: { row: Followup }) {
 function FollowupsTable({ category, rows }: { category: Category; rows: Followup[] }) {
   if (!rows.length) return <div className="rounded-2xl border border-dashed bg-white py-16 text-center text-sm text-slate-500">אין רשומות מתאימות להצגה</div>;
   return <div className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="max-h-[65vh] overflow-auto"><table className={`w-full border-collapse text-right text-sm ${category === "eco" ? "min-w-[1380px]" : "min-w-[1020px]"}`}>
-    <thead className="sticky top-0 z-10 bg-slate-100 text-xs text-slate-600 shadow-[0_1px_0_0_#e2e8f0]"><tr><th className="px-4 py-3">מספר</th>{category === "eco" ? <th className="px-4 py-3">פרויקט</th> : null}{category === "eco" ? <th className="px-4 py-3">תיאור</th> : null}{category === "pka" ? <th className="px-4 py-3">כמות</th> : null}<th className="px-4 py-3">שם</th><th className="px-4 py-3">תאריך הרשומה</th><th className="px-4 py-3">מצב</th>{category === "eco" ? <th className="px-4 py-3">תאריך סגירה / ביטול</th> : null}<th className="px-4 py-3">התראה הבאה</th><th className="px-4 py-3">הערות</th><th className="px-4 py-3 text-center">פעולות</th></tr></thead>
+    <thead className="sticky top-0 z-10 bg-slate-100 text-xs text-slate-600 shadow-[0_1px_0_0_#e2e8f0]"><tr><th className="px-4 py-3">מספר</th>{category === "eco" ? <th className="px-4 py-3">פרויקט</th> : null}<th className="px-4 py-3">{category === "eco" ? "תיאור הטופס" : "שם הטופס"}</th>{category === "pka" ? <th className="px-4 py-3">כמות</th> : null}<th className="px-4 py-3">שם הפותח</th><th className="px-4 py-3">תאריך הרשומה</th><th className="px-4 py-3">מצב</th>{category === "eco" ? <th className="px-4 py-3">תאריך סגירה / ביטול</th> : null}<th className="px-4 py-3">התראה הבאה</th><th className="px-4 py-3">הערות</th><th className="px-4 py-3 text-center">פעולות</th></tr></thead>
     <tbody className="divide-y divide-slate-100">{rows.map((row) => { const alertDate = dueDate(row.created_at); const overdue = row.alerts_enabled && row.status !== "closed" && alertDate < new Date(); return <tr key={row.id} className={`transition-colors hover:bg-slate-50 ${overdue ? "bg-red-50/70" : ""}`}>
-      <td className="whitespace-nowrap px-4 py-3 font-extrabold">{row.reference_number}</td>{category === "eco" ? <td className="max-w-44 px-4 py-3 text-slate-600"><span className="line-clamp-2">{row.eco_project || "—"}</span></td> : null}{category === "eco" ? <td className="max-w-64 px-4 py-3 font-semibold text-slate-700"><span className="line-clamp-2">{row.eco_description || "—"}</span></td> : null}{category === "pka" ? <td className="whitespace-nowrap px-4 py-3">{row.quantity ?? "—"}</td> : null}<td className="whitespace-nowrap px-4 py-3"><NameEditor row={row} /></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDate(row.opened_at)}</td>
+      <td className="whitespace-nowrap px-4 py-3 font-extrabold">{row.reference_number}</td>{category === "eco" ? <td className="max-w-44 px-4 py-3 text-slate-600"><span className="line-clamp-2">{row.eco_project || "—"}</span></td> : null}<td className="max-w-64 px-4 py-3 font-semibold text-slate-700"><span className="line-clamp-2">{category === "eco" ? row.eco_description || row.name || "—" : row.name || "—"}</span></td>{category === "pka" ? <td className="whitespace-nowrap px-4 py-3">{row.quantity ?? "—"}</td> : null}<td className="whitespace-nowrap px-4 py-3"><OpenedByEditor row={row} /></td><td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDate(row.opened_at)}</td>
       <td className="whitespace-nowrap px-4 py-3"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${row.status === "open" ? "bg-amber-100 text-amber-800" : row.status === "waiting" ? "bg-sky-100 text-sky-800" : "bg-emerald-100 text-emerald-700"}`}>{row.status === "closed" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <CircleDot className="h-3.5 w-3.5" />}{row.status === "open" ? "פתוחה" : row.status === "waiting" ? "ממתין" : "סגורה"}</span></td>{category === "eco" ? <td className="whitespace-nowrap px-4 py-3 text-slate-600">{row.closed_at ? formatDate(row.closed_at) : "—"}</td> : null}
       <td className="whitespace-nowrap px-4 py-3">{row.status === "closed" ? <span className="text-slate-400">—</span> : !row.alerts_enabled ? <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-400"><BellOff className="h-3.5 w-3.5" />כבויה</span> : <span className={`text-xs font-bold ${overdue ? "text-red-600" : "text-slate-600"}`}>{formatDate(alertDate.toISOString())}</span>}</td>
       <td className="max-w-72 px-4 py-3"><NotesEditor row={row} /></td>
