@@ -1,6 +1,6 @@
 import { FollowupsBoard, type Followup } from "@/components/followups/followups-board";
 import { PaginationControls } from "@/components/pagination-controls";
-import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
+import { pageRange, parsePage } from "@/lib/pagination";
 import { unpackLegacyEcoNotes, unpackLegacyOpenerNotes } from "@/lib/eco-import";
 import { unpackNonconformityNotes } from "@/lib/nonconformity-import";
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +10,7 @@ type StatusFilter = "all" | "active" | "open" | "waiting" | "closed";
 
 const categories: Category[] = ["pka", "nonconformity", "eco"];
 const statuses: StatusFilter[] = ["all", "active", "open", "waiting", "closed"];
+const FOLLOWUPS_PAGE_SIZE = 100;
 
 export default async function FollowupsPage({ searchParams }: { searchParams: Promise<{ page?: string; category?: string; status?: string; q?: string }> }) {
   const params = await searchParams;
@@ -17,7 +18,7 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
   const category: Category = categories.includes(params.category as Category) ? params.category as Category : "pka";
   const status: StatusFilter = statuses.includes(params.status as StatusFilter) ? params.status as StatusFilter : "active";
   const query = (params.q ?? "").trim().slice(0, 100);
-  const { from, to } = pageRange(page);
+  const { from, to } = pageRange(page, FOLLOWUPS_PAGE_SIZE);
   const supabase = await createClient();
 
   let rowsQuery = supabase
@@ -88,6 +89,6 @@ export default async function FollowupsPage({ searchParams }: { searchParams: Pr
       total={total}
       counts={{ pka: pkaCount.count ?? 0, nonconformity: nonconformityCount.count ?? 0, eco: ecoCount.count ?? 0 }}
     />
-    <PaginationControls basePath="/followups" page={page} pageSize={PAGE_SIZE} total={total} query={{ category, status, q: query || undefined }} />
+    <PaginationControls basePath="/followups" page={page} pageSize={FOLLOWUPS_PAGE_SIZE} total={total} query={{ category, status, q: query || undefined }} />
   </div>;
 }
