@@ -125,7 +125,7 @@ function display(value: unknown) {
 type ParsedCandidate = { rowNumber: number; data?: EcoImportData; error?: string; ignored?: boolean };
 
 export function parseEcoWorkbook(buffer: ArrayBuffer | Uint8Array): { candidates: ParsedCandidate[]; ignoredCount: number } {
-  const workbook = XLSX.read(buffer, { cellDates: true });
+  const workbook = XLSX.read(buffer, { cellDates: false });
   const candidates: ParsedCandidate[] = [];
   let ignoredCount = 0;
   let foundTable = false;

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { buildEcoPreview, packLegacyEcoNotes, packLegacyOpenerNotes, parseEcoWorkbook, repackLegacyEcoNotes, unpackLegacyEcoNotes, unpackLegacyOpenerNotes, type EcoImportPreview, type EcoImportRow, type ExistingEco } from "@/lib/eco-import";
+import { buildNonconformityPreview, packNonconformityNotes, parseNonconformityWorkbook, unpackNonconformityNotes, type ExistingNonconformity, type NonconformityImportPreview, type NonconformityImportRow } from "@/lib/nonconformity-import";
 
 export type FollowupResult = { success: boolean; message: string };
 export type EcoImportResult = FollowupResult & { added?: number; updated?: number; skipped?: number; failed?: number };
@@ -35,10 +36,10 @@ export async function createFollowup(_: FollowupResult, formData: FormData): Pro
     if (!categories.has(category) || !referenceNumber || !name || !/^\d{4}-\d{2}-\d{2}$/.test(openedAt) || !validStatus(category, status)) return { success: false, message: "יש להזין מספר, שם, תאריך ומצב תקינים" };
     if (category === "pka" && (!Number.isInteger(quantity) || (quantity ?? -1) < 0)) return { success: false, message: "יש להזין כמות תקינה לפק״ע" };
     const { supabase, user } = await authorized();
-    const values = { category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, assignee_key: null, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes, opened_by_name: openedByName, created_by: user.id };
+    const values = { category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, alerts_enabled: status !== "closed", assignee_key: null, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes, opened_by_name: openedByName, created_by: user.id };
     let { error } = await supabase.from("quality_followups").insert(values);
     if (error && /opened_by_name/i.test(error.message)) {
-      const legacy = await supabase.from("quality_followups").insert({ category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, assignee_key: null, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes: packLegacyOpenerNotes(openedByName, notes), created_by: user.id });
+      const legacy = await supabase.from("quality_followups").insert({ category, reference_number: referenceNumber, name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, status, alerts_enabled: status !== "closed", assignee_key: null, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, notes: packLegacyOpenerNotes(openedByName, notes), created_by: user.id });
       error = legacy.error;
     }
     if (error?.code === "23505") return { success: false, message: "מספר זה כבר קיים בקטגוריה" };
@@ -50,7 +51,7 @@ export async function createFollowup(_: FollowupResult, formData: FormData): Pro
 
 export async function toggleFollowup(id: string, status: "open" | "closed") {
   const { supabase } = await authorized();
-  await supabase.from("quality_followups").update({ status, closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, updated_at: new Date().toISOString() }).eq("id", id);
+  await supabase.from("quality_followups").update({ status, alerts_enabled: status !== "closed", closed_at: status === "closed" ? new Date().toISOString().slice(0, 10) : null, updated_at: new Date().toISOString() }).eq("id", id);
   revalidatePath("/followups"); revalidatePath("/calendar");
 }
 
@@ -59,7 +60,8 @@ export async function toggleFollowupAlerts(id: string, alertsEnabled: boolean) {
   const { error } = await supabase
     .from("quality_followups")
     .update({ alerts_enabled: alertsEnabled, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .neq("status", alertsEnabled ? "closed" : "__never__");
   if (error) throw error;
   revalidatePath("/followups"); revalidatePath("/calendar");
 }
@@ -90,7 +92,8 @@ export async function updateFollowupOpenedBy(id: string, formData: FormData): Pr
       if (current.error) throw current.error;
       const eco = unpackLegacyEcoNotes(current.data.notes);
       const generic = unpackLegacyOpenerNotes(current.data.notes);
-      const notes = eco ? repackLegacyEcoNotes({ ...eco, owner: openedByName }) : packLegacyOpenerNotes(openedByName, generic?.notes ?? current.data.notes);
+      const nonconformity = unpackNonconformityNotes(current.data.notes);
+      const notes = eco ? repackLegacyEcoNotes({ ...eco, owner: openedByName }) : nonconformity ? packNonconformityNotes(nonconformity, nonconformity.notes, openedByName) : packLegacyOpenerNotes(openedByName, generic?.notes ?? current.data.notes);
       error = (await supabase.from("quality_followups").update({ notes, updated_at: new Date().toISOString() }).eq("id", id)).error;
     }
     if (error) throw error;
@@ -111,7 +114,8 @@ export async function updateFollowupNotes(id: string, formData: FormData): Promi
     if (current.error) throw current.error;
     const eco = unpackLegacyEcoNotes(current.data.notes);
     const generic = unpackLegacyOpenerNotes(current.data.notes);
-    const storedNotes = eco ? repackLegacyEcoNotes({ ...eco, comments: notes || null }) : generic ? packLegacyOpenerNotes(generic.openedByName, notes || null) : notes || null;
+    const nonconformity = unpackNonconformityNotes(current.data.notes);
+    const storedNotes = eco ? repackLegacyEcoNotes({ ...eco, comments: notes || null }) : nonconformity ? packNonconformityNotes(nonconformity, notes || null, nonconformity.opened_by_name ?? null) : generic ? packLegacyOpenerNotes(generic.openedByName, notes || null) : notes || null;
     const { error } = await supabase
       .from("quality_followups")
       .update({ notes: storedNotes, updated_at: new Date().toISOString() })
@@ -123,6 +127,45 @@ export async function updateFollowupNotes(id: string, formData: FormData): Promi
     console.error("Update followup notes error:", error);
     return { success: false, message: "שמירת ההערה נכשלה" };
   }
+}
+
+export async function updateFollowup(id: string, formData: FormData): Promise<FollowupResult> {
+  try {
+    const category = String(formData.get("category") ?? "");
+    const referenceNumber = String(formData.get("reference_number") ?? "").trim();
+    const name = String(formData.get("name") ?? "").trim();
+    const openedByName = String(formData.get("opened_by_name") ?? "").trim() || null;
+    const quantityText = String(formData.get("quantity") ?? "").trim();
+    const quantity = quantityText ? Number(quantityText) : null;
+    const openedAt = String(formData.get("opened_at") ?? "");
+    const closedAt = String(formData.get("closed_at") ?? "") || null;
+    const status = String(formData.get("status") ?? "open");
+    const notes = String(formData.get("notes") ?? "").trim() || null;
+    const ecoProject = String(formData.get("eco_project") ?? "").trim() || null;
+    const ecoOwner = String(formData.get("eco_owner_name") ?? "").trim() || null;
+    const ecoDescription = String(formData.get("eco_description") ?? "").trim() || name;
+    const supplierComplaint = String(formData.get("supplier_complaint") ?? "").trim() || null;
+    const customerComplaint = String(formData.get("customer_complaint") ?? "").trim() || null;
+    const effectivenessDue = String(formData.get("effectiveness_due") ?? "").trim() || null;
+    const effectivenessActual = String(formData.get("effectiveness_actual") ?? "").trim() || null;
+    if (!categories.has(category) || !referenceNumber || !name || !/^\d{4}-\d{2}-\d{2}$/.test(openedAt) || !validStatus(category, status)) return { success: false, message: "יש להזין מספר, שם, תאריך ומצב תקינים" };
+    if (category === "pka" && (!Number.isInteger(quantity) || (quantity ?? -1) < 0)) return { success: false, message: "יש להזין כמות תקינה לפק״ע" };
+    const { supabase } = await authorized();
+    const modernValues = { reference_number: referenceNumber, name: category === "eco" ? ecoDescription : name, opened_by_name: openedByName, quantity: category === "pka" ? quantity : null, opened_at: openedAt, closed_at: status === "closed" ? closedAt : null, status, alerts_enabled: status !== "closed", notes, eco_project: category === "eco" ? ecoProject : null, eco_owner_name: category === "eco" ? ecoOwner : null, eco_description: category === "eco" ? ecoDescription : null, supplier_complaint: category === "nonconformity" ? supplierComplaint : null, customer_complaint: category === "nonconformity" ? customerComplaint : null, effectiveness_due: category === "nonconformity" ? effectivenessDue : null, effectiveness_actual: category === "nonconformity" ? effectivenessActual : null, updated_at: new Date().toISOString() };
+    let { error } = await supabase.from("quality_followups").update(modernValues).eq("id", id);
+    if (error && /column|schema cache|opened_by_name|eco_|supplier_complaint|effectiveness_/i.test(error.message)) {
+      const packedNotes = category === "eco"
+        ? packLegacyEcoNotes({ reference_number: referenceNumber, name: ecoDescription, eco_project: ecoProject, eco_owner_name: ecoOwner, eco_description: ecoDescription, opened_at: openedAt, status: status as "open" | "closed", closed_at: status === "closed" ? closedAt : null, notes })
+        : category === "nonconformity"
+          ? packNonconformityNotes({ supplier_complaint: supplierComplaint, customer_complaint: customerComplaint, effectiveness_due: effectivenessDue, effectiveness_actual: effectivenessActual }, notes, openedByName)
+          : packLegacyOpenerNotes(openedByName, notes);
+      error = (await supabase.from("quality_followups").update({ reference_number: referenceNumber, name: category === "eco" ? ecoDescription : name, quantity: category === "pka" ? quantity : null, opened_at: openedAt, closed_at: status === "closed" ? closedAt : null, status, alerts_enabled: status !== "closed", notes: packedNotes, updated_at: new Date().toISOString() }).eq("id", id)).error;
+    }
+    if (error?.code === "23505") return { success: false, message: "מספר זה כבר קיים בקטגוריה" };
+    if (error) throw error;
+    revalidatePath("/followups"); revalidatePath("/calendar");
+    return { success: true, message: "הרשומה עודכנה" };
+  } catch (error) { console.error("Update followup error:", error); return { success: false, message: "עדכון הרשומה נכשל" }; }
 }
 
 export async function deleteFollowup(id: string) {
@@ -222,6 +265,7 @@ export async function confirmEcoImport(rows: EcoImportRow[], fileName: string): 
           opened_at: row.data!.opened_at,
           status: row.data!.status,
           closed_at: row.data!.closed_at,
+          alerts_enabled: row.data!.status !== "closed",
           notes: packLegacyEcoNotes(row.data!),
           created_by: user.id,
         })));
@@ -233,6 +277,7 @@ export async function confirmEcoImport(rows: EcoImportRow[], fileName: string): 
           opened_at: row.data!.opened_at,
           status: row.data!.status,
           closed_at: row.data!.closed_at,
+          alerts_enabled: row.data!.status !== "closed",
           notes: packLegacyEcoNotes(row.data!),
           updated_at: new Date().toISOString(),
         }).eq("id", row.existingId!);
@@ -259,4 +304,51 @@ export async function confirmEcoImport(rows: EcoImportRow[], fileName: string): 
     console.error("ECO import error:", error);
     return { success: false, message: ecoImportFailureMessage(error), failed: 1 };
   }
+}
+
+export type NonconformityPreviewResult = { success: true; preview: NonconformityImportPreview } | { success: false; message: string };
+
+export async function previewNonconformityImport(formData: FormData): Promise<NonconformityPreviewResult> {
+  try {
+    const file = formData.get("file");
+    if (!(file instanceof File) || !file.size) return { success: false, message: "יש לבחור קובץ Excel" };
+    if (!/\.xlsx?$/i.test(file.name)) return { success: false, message: "יש לבחור קובץ Excel מסוג XLSX או XLS" };
+    if (file.size > 10 * 1024 * 1024) return { success: false, message: "הקובץ גדול מדי. הגודל המרבי הוא 10MB" };
+    const { supabase } = await authorized();
+    const parsed = parseNonconformityWorkbook(await file.arrayBuffer());
+    const modern = await supabase.from("quality_followups").select("id,reference_number,name,opened_at,status,closed_at,notes,supplier_complaint,customer_complaint,effectiveness_due,effectiveness_actual").eq("category", "nonconformity");
+    let existing: ExistingNonconformity[];
+    if (!modern.error) existing = (modern.data ?? []) as ExistingNonconformity[];
+    else if (/column|schema cache|supplier_complaint|effectiveness_/i.test(modern.error.message)) {
+      const legacy = await supabase.from("quality_followups").select("id,reference_number,name,opened_at,status,closed_at,notes").eq("category", "nonconformity");
+      if (legacy.error) throw legacy.error;
+      existing = (legacy.data ?? []).map((row) => { const packed = unpackNonconformityNotes(row.notes); return { ...row, supplier_complaint: packed?.supplier_complaint ?? null, customer_complaint: packed?.customer_complaint ?? null, effectiveness_due: packed?.effectiveness_due ?? null, effectiveness_actual: packed?.effectiveness_actual ?? null } as ExistingNonconformity; });
+    } else throw modern.error;
+    return { success: true, preview: buildNonconformityPreview(file.name, parsed, existing) };
+  } catch (error) { console.error("Nonconformity preview error:", error); return { success: false, message: error instanceof Error ? error.message : "קריאת קובץ אי ההתאמות נכשלה" }; }
+}
+
+export async function confirmNonconformityImport(rows: NonconformityImportRow[], fileName: string): Promise<EcoImportResult> {
+  try {
+    const { supabase, user } = await authorized();
+    const selected = rows.filter((row) => (row.action === "new" || row.action === "update") && row.resolution === "import" && row.data);
+    if (!selected.length) return { success: true, message: "לא נבחרו שינויים לשמירה", added: 0, updated: 0, skipped: rows.length, failed: 0 };
+    const newRows = selected.filter((row) => row.action === "new");
+    const updatedRows = selected.filter((row) => row.action === "update");
+    const modernValue = (row: NonconformityImportRow) => ({ category: "nonconformity", reference_number: row.data!.reference_number, name: row.data!.name, quantity: null, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.status === "closed" ? row.data!.closed_at : null, alerts_enabled: row.data!.status !== "closed", supplier_complaint: row.data!.supplier_complaint, customer_complaint: row.data!.customer_complaint, effectiveness_due: row.data!.effectiveness_due, effectiveness_actual: row.data!.effectiveness_actual, source_file_name: fileName.slice(0, 255), created_by: user.id, updated_at: new Date().toISOString() });
+    if (newRows.length) {
+      let inserted = await supabase.from("quality_followups").insert(newRows.map(modernValue));
+      if (inserted.error && /column|schema cache|supplier_complaint|effectiveness_|source_file_name/i.test(inserted.error.message)) inserted = await supabase.from("quality_followups").insert(newRows.map((row) => ({ category: "nonconformity", reference_number: row.data!.reference_number, name: row.data!.name, quantity: null, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.status === "closed" ? row.data!.closed_at : null, alerts_enabled: row.data!.status !== "closed", notes: packNonconformityNotes(row.data!), created_by: user.id })));
+      if (inserted.error) throw inserted.error;
+    }
+    for (const row of updatedRows) {
+      const values = modernValue(row); delete (values as Partial<typeof values>).created_by;
+      let updated = await supabase.from("quality_followups").update(values).eq("id", row.existingId!);
+      if (updated.error && /column|schema cache|supplier_complaint|effectiveness_|source_file_name/i.test(updated.error.message)) updated = await supabase.from("quality_followups").update({ name: row.data!.name, opened_at: row.data!.opened_at, status: row.data!.status, closed_at: row.data!.status === "closed" ? row.data!.closed_at : null, alerts_enabled: row.data!.status !== "closed", notes: packNonconformityNotes(row.data!), updated_at: new Date().toISOString() }).eq("id", row.existingId!);
+      if (updated.error) throw updated.error;
+    }
+    const skipped = rows.length - selected.length;
+    revalidatePath("/followups"); revalidatePath("/"); revalidatePath("/calendar");
+    return { success: true, message: `הייבוא הושלם: ${newRows.length} נוספו, ${updatedRows.length} עודכנו, ${skipped} דולגו`, added: newRows.length, updated: updatedRows.length, skipped, failed: 0 };
+  } catch (error) { console.error("Nonconformity import error:", error); return { success: false, message: ecoImportFailureMessage(error).replace("ECO", "אי ההתאמות"), failed: 1 }; }
 }

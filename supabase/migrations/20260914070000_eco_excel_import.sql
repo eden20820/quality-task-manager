@@ -33,13 +33,13 @@ begin
     if item->>'action' = 'new' then
       insert into public.quality_followups (
         category, reference_number, name, eco_project, eco_owner_name, opened_by_name,
-        eco_description, opened_at, status, closed_at, notes,
+        eco_description, opened_at, status, closed_at, alerts_enabled, notes,
         source_file_name, created_by, updated_at
       ) values (
         'eco', trim(item->>'reference_number'), trim(item->>'description'),
         nullif(trim(item->>'project'), ''), nullif(trim(item->>'owner_name'), ''), nullif(trim(item->>'owner_name'), ''),
         trim(item->>'description'), (item->>'opened_at')::date,
-        item->>'status', nullif(item->>'closed_at', '')::date,
+        item->>'status', nullif(item->>'closed_at', '')::date, item->>'status' <> 'closed',
         nullif(trim(item->>'notes'), ''), nullif(trim(item->>'source_file_name'), ''),
         auth.uid(), now()
       )
@@ -59,6 +59,7 @@ begin
         opened_at = (item->>'opened_at')::date,
         status = item->>'status',
         closed_at = nullif(item->>'closed_at', '')::date,
+        alerts_enabled = item->>'status' <> 'closed',
         notes = nullif(trim(item->>'notes'), ''),
         source_file_name = nullif(trim(item->>'source_file_name'), ''),
         updated_at = now()
