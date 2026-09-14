@@ -6,6 +6,7 @@ import { Bell, BellOff, Building2, Pencil, Plus, Search, Trash2 } from "lucide-r
 
 import { createSupplier, deleteSupplier, setSupplierAlertsEnabled, updateSupplier, type SupplierActionResult } from "@/app/suppliers/actions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SupplierImportDialog } from "@/components/suppliers/supplier-import-dialog";
 
 export type SupplierRow = {
   id: string;
@@ -123,6 +124,7 @@ export function SuppliersManager({ rows, alertsEnabled, total, counts, initialSe
     <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
       <div><h1 className="text-3xl font-extrabold sm:text-4xl">מעקב ספקים</h1><p className="mt-2 text-slate-500">ניהול ספקים, הערכת ביצועים ותוקף הסמכות</p></div>
       <div className="flex flex-wrap gap-3">
+        <SupplierImportDialog />
         <button type="button" onClick={() => setAdding(true)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 font-bold text-white"><Plus className="h-5 w-5" />הוספת ספק ידנית</button>
         <form action={setSupplierAlertsEnabled.bind(null, !alertsEnabled)}>
           <button type="submit" className={`inline-flex h-11 items-center gap-2 rounded-lg border px-5 font-bold transition ${alertsEnabled ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100" : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}>
