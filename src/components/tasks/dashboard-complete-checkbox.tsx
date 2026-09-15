@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 
 import { completeTask } from "@/app/tasks/actions";
 
-export function DashboardCompleteCheckbox({ taskId, taskTitle }: { taskId: string; taskTitle: string }) {
+export function DashboardCompleteCheckbox({ taskId, taskTitle, compact = false }: { taskId: string; taskTitle: string; compact?: boolean }) {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -24,7 +24,7 @@ export function DashboardCompleteCheckbox({ taskId, taskTitle }: { taskId: strin
   }
 
   return (
-    <label className="flex cursor-pointer flex-col items-center gap-1 text-[11px] font-bold text-slate-600">
+    <label className={`cursor-pointer font-bold text-slate-600 ${compact ? "inline-flex h-9 shrink-0 flex-row items-center gap-2 rounded-lg border bg-white px-3 text-xs hover:bg-emerald-50" : "flex flex-col items-center gap-1 text-[11px]"}`}>
       <input
         type="checkbox"
         checked={checked}
@@ -33,7 +33,7 @@ export function DashboardCompleteCheckbox({ taskId, taskTitle }: { taskId: strin
         aria-label={`סימון המשימה ${taskTitle} כבוצעה`}
         className="h-5 w-5 cursor-pointer accent-slate-950 disabled:cursor-wait"
       />
-      <span>{pending ? "שומר..." : "בוצעה"}</span>
+      <span>{pending ? "שומר..." : compact ? "סימון כבוצעה" : "בוצעה"}</span>
     </label>
   );
 }
