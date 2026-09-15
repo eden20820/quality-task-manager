@@ -1,0 +1,37 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+import { CalendarDays, Clock3, LayoutGrid, List, Pencil, Users } from "lucide-react";
+
+import { DashboardCompleteCheckbox } from "@/components/tasks/dashboard-complete-checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+export type DashboardTask = {
+  id: string; task_number: number; title: string; description: string | null; status_note: string | null;
+  assignees: string[]; status: string; priority: string; due_date: string | null; created_at: string;
+};
+
+const statusLabels: Record<string, string> = { new: "חדשה", in_progress: "בטיפול", waiting: "ממתינה", completed: "הושלמה", cancelled: "בוטלה" };
+const priorityLabels: Record<string, string> = { normal: "רגילה", high: "גבוהה", urgent: "דחופה" };
+const assigneeLabels: Record<string, string> = { eden: "עדן", sergey: "סרגיי", quality_manager: "עמית" };
+
+function formatAssignees(assignees: string[]) { return assignees.length ? assignees.map((value) => assigneeLabels[value] ?? value).join(", ") : "לא הוגדר"; }
+function formatDate(value: string | null) { return value ? new Intl.DateTimeFormat("he-IL").format(new Date(`${value.slice(0, 10)}T12:00:00`)) : "ללא תאריך"; }
+function taskSummary(task: DashboardTask) { return task.description || task.status_note || "ללא תיאור נוסף"; }
+
+export function DashboardTasks({ tasks }: { tasks: DashboardTask[] }) {
+  const [view, setView] = useState<"list" | "cards">("list");
+  const [selected, setSelected] = useState<DashboardTask | null>(null);
+
+  return <Card>
+    <CardHeader className="pb-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle className="text-2xl">משימות פתוחות</CardTitle><p className="mt-1 text-sm text-slate-500">{tasks.length} משימות פעילות</p></div><div className="flex items-center gap-2"><div className="flex rounded-lg border bg-slate-50 p-1" role="group" aria-label="תצוגת משימות"><button type="button" onClick={() => setView("list")} aria-pressed={view === "list"} className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-bold ${view === "list" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}><List className="h-4 w-4" />רשימה</button><button type="button" onClick={() => setView("cards")} aria-pressed={view === "cards"} className={`inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-bold ${view === "cards" ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}><LayoutGrid className="h-4 w-4" />כרטיסים</button></div><Link href="/tasks" className="hidden text-sm font-bold text-slate-600 hover:text-slate-950 sm:block">לכל המשימות</Link></div></div></CardHeader>
+    <CardContent>{tasks.length ? <div className={view === "cards" ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "divide-y overflow-hidden rounded-xl border"}>{tasks.map((task) => <button key={task.id} type="button" onClick={() => setSelected(task)} className={`min-w-0 text-right transition hover:bg-slate-50 ${view === "cards" ? "rounded-xl border bg-white p-4 shadow-sm hover:border-slate-300 hover:shadow-md" : "block w-full px-4 py-3"}`}>
+      <div className="flex min-w-0 items-start justify-between gap-3"><p className="min-w-0 break-words font-extrabold text-slate-950">{task.title}</p><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${task.priority === "urgent" ? "bg-red-500" : task.priority === "high" ? "bg-orange-400" : "bg-blue-400"}`} /></div><p className="mt-1 line-clamp-2 whitespace-pre-wrap break-words text-sm leading-5 text-slate-500">{taskSummary(task)}</p>
+    </button>)}</div> : <div className="flex h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed text-slate-500"><p className="font-semibold">אין משימות פתוחות</p></div>}<Link href="/tasks" className="mt-4 block text-center text-sm font-bold text-slate-600 sm:hidden">לכל המשימות</Link></CardContent>
+
+    <Dialog open={Boolean(selected)} onOpenChange={(open) => { if (!open) setSelected(null); }}><DialogContent dir="rtl" className="max-h-[92vh] overflow-y-auto sm:max-w-xl">{selected ? <><DialogHeader><DialogTitle className="pe-8 text-xl leading-7">{selected.title}</DialogTitle><DialogDescription>משימה #{selected.task_number}</DialogDescription></DialogHeader><div className="flex flex-wrap gap-2"><Badge variant="secondary">{statusLabels[selected.status] ?? selected.status}</Badge><Badge variant="outline">עדיפות: {priorityLabels[selected.priority] ?? selected.priority}</Badge></div><dl className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-slate-50 p-3"><dt className="flex items-center gap-1.5 text-xs font-bold text-slate-500"><Users className="h-3.5 w-3.5" />אחראים</dt><dd className="mt-1 font-semibold">{formatAssignees(selected.assignees)}</dd></div><div className="rounded-xl bg-slate-50 p-3"><dt className="flex items-center gap-1.5 text-xs font-bold text-slate-500"><CalendarDays className="h-3.5 w-3.5" />תאריך יעד</dt><dd className="mt-1 font-semibold">{formatDate(selected.due_date)}</dd></div><div className="rounded-xl bg-slate-50 p-3"><dt className="flex items-center gap-1.5 text-xs font-bold text-slate-500"><Clock3 className="h-3.5 w-3.5" />נוצרה</dt><dd className="mt-1 font-semibold">{formatDate(selected.created_at)}</dd></div></dl><div><h3 className="text-sm font-extrabold">תיאור</h3><p className="mt-1 whitespace-pre-wrap break-words rounded-xl border p-3 text-sm leading-6 text-slate-700">{selected.description || "אין תיאור"}</p></div><div><h3 className="text-sm font-extrabold">עדכון סטטוס</h3><p className="mt-1 whitespace-pre-wrap break-words rounded-xl border bg-blue-50 p-3 text-sm leading-6 text-blue-900">{selected.status_note || "אין עדכון סטטוס"}</p></div><div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between"><DashboardCompleteCheckbox taskId={selected.id} taskTitle={selected.title} /><Link href={`/tasks/${selected.id}/edit`} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 font-bold text-white"><Pencil className="h-4 w-4" />עריכת המשימה</Link></div></> : null}</DialogContent></Dialog>
+  </Card>;
+}
