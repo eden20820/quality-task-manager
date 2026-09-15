@@ -2,8 +2,8 @@
 import Link from "next/link";
 import { Bell, CalendarClock, CalendarDays, ClipboardList, Gauge, ListChecks, Truck } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { DashboardCompleteCheckbox } from "@/components/tasks/dashboard-complete-checkbox";
+import { DashboardTasks } from "@/components/dashboard/dashboard-tasks";
+import { ModularDashboard } from "@/components/dashboard/modular-dashboard";
 import {
   Card,
   CardContent,
@@ -12,42 +12,6 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { reminderOccursOn } from "@/lib/reminders/recurrence";
-
-const statusLabels: Record<string, string> = {
-  new: "חדשה",
-  in_progress: "בטיפול",
-  waiting: "ממתינה",
-  completed: "הושלמה",
-  cancelled: "בוטלה",
-};
-
-const priorityLabels: Record<string, string> = {
-  normal: "רגילה",
-  high: "גבוהה",
-  urgent: "דחופה",
-};
-
-const assigneeLabels: Record<string, string> = {
-  eden: "עדן",
-  sergey: "סרגיי",
-  quality_manager: "עמית",
-};
-
-function formatAssignees(assignees: string[]) {
-  return assignees.length > 0
-    ? assignees.map((assignee) => assigneeLabels[assignee] ?? assignee).join(", ")
-    : "לא הוגדר";
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "ללא תאריך";
-
-  return new Intl.DateTimeFormat("he-IL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(value));
-}
 
 function formatDateForDatabase(date: Date) {
   const year = date.getFullYear();
@@ -184,8 +148,8 @@ export default async function HomePage() {
   ];
 
   return (
-    <>
-      <div className="flex flex-col gap-8">
+    <ModularDashboard sections={[
+      { id: "overview", title: "מדדי לוח הבקרה", content: (
         <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-4">
           <Card className="min-h-40 h-full justify-center">
             <CardHeader className="pb-2">
@@ -218,8 +182,9 @@ export default async function HomePage() {
             </Link>
           ))}
         </div>
-
-          <Card className="order-last">
+      ) },
+      { id: "calendar", title: "השבוע שלי", content: (
+          <Card>
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -312,105 +277,8 @@ export default async function HomePage() {
               </div>
             </CardContent>
           </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-              <CardTitle className="text-2xl">
-                משימות פעילות
-              </CardTitle>
-
-              <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:justify-start sm:gap-4">
-                <Link
-                  href="/tasks"
-                  className="text-sm font-bold text-slate-600 hover:text-slate-950"
-                >
-                  לכל המשימות
-                </Link>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            {visibleActiveTasks.length > 0 ? (
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <div className="divide-y divide-slate-200">
-                {visibleActiveTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="grid min-w-0 grid-cols-[64px_minmax(0,1fr)] items-start gap-3 px-4 py-4 sm:grid-cols-[70px_minmax(0,1fr)_auto] lg:grid-cols-[80px_minmax(0,1fr)_130px_110px_130px] lg:items-center lg:gap-4 lg:px-5"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <DashboardCompleteCheckbox taskId={task.id} taskTitle={task.title} />
-                      <span
-                        className={`inline-block h-3.5 w-3.5 rounded-full ${
-                          task.status === "new"
-                            ? "bg-emerald-500"
-                            : task.status === "in_progress"
-                              ? "bg-amber-400"
-                              : task.status === "waiting"
-                                ? "bg-orange-500"
-                                : task.status === "cancelled"
-                                  ? "bg-slate-400"
-                                  : "bg-blue-500"
-                        }`}
-                        aria-label={statusLabels[task.status] ?? task.status}
-                        title={statusLabels[task.status] ?? task.status}
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-950">
-                        {task.title}
-                      </p>
-                      {task.description ? (
-                        <p className="mt-1 line-clamp-2 whitespace-pre-wrap text-sm leading-5 text-slate-600" title={task.description}>
-                          {task.description}
-                        </p>
-                      ) : null}
-                      {task.status_note ? (
-                        <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold leading-5 text-blue-900" title={task.status_note}>
-                          <span className="font-extrabold">עדכון סטטוס:</span> {task.status_note}
-                        </p>
-                      ) : null}
-                      <p className="mt-1 text-xs font-bold text-blue-700">
-                        אחראי: {formatAssignees(task.assignees ?? [])}
-                      </p>
-                    </div>
-
-                    <Badge
-                      variant="secondary"
-                      className="w-fit max-lg:justify-self-end"
-                    >
-                      {statusLabels[task.status] ?? task.status}
-                    </Badge>
-
-                    <div className="hidden lg:block">
-                      {priorityLabels[task.priority] ??
-                        task.priority}
-                    </div>
-
-                    <div className="col-start-2 text-xs text-slate-500 sm:col-start-3 lg:col-start-auto lg:text-sm">
-                      {formatDate(task.due_date)}
-                    </div>
-                  </div>
-                ))}
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-52 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-slate-500">
-                <p className="font-semibold">
-                  אין משימות פעילות להצגה
-                </p>
-
-                <p className="text-sm">
-                  משימות חדשות שייווצרו יופיעו כאן עד להשלמתן
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </>
+      ) },
+      { id: "tasks", title: "משימות פתוחות", content: <DashboardTasks tasks={visibleActiveTasks} /> },
+    ]} />
   );
 }
