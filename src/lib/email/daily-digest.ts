@@ -1,6 +1,14 @@
 import "server-only";
 
-import { ASSIGNEES } from "@/lib/email/task-notification";
+import { ASSIGNEES } from "./task-notification";
+import {
+  buildQualityAlertSections,
+  QUALITY_ALERT_RECIPIENTS,
+  type DailyQualityAlerts,
+  type DueCalibration,
+  type ExpiringMaterial,
+  type ExpiringSupplier,
+} from "./expiry-alert";
 
 export type DailyTask = {
   id: string;
@@ -24,6 +32,9 @@ export type DigestRecipient = {
   tasks: DailyTask[];
   reminders: DailyReminder[];
   followups: DailyFollowup[];
+  materials: ExpiringMaterial[];
+  suppliers: ExpiringSupplier[];
+  calibrations: DueCalibration[];
 };
 
 type SendResult =
@@ -85,8 +96,13 @@ function buildDigestHtml(recipient: DigestRecipient) {
     ? `<h2 style="margin:24px 0 12px;font-size:19px">תזכורות להיום</h2><ul style="margin:0;padding-right:22px">${buildReminderItems(recipient.reminders)}</ul>`
     : "";
   const followupsSection = recipient.followups.length ? `<h2 style="margin:24px 0 12px;font-size:19px">התראות מעקב פתוחות</h2><ul style="margin:0;padding-right:22px">${buildFollowupItems(recipient.followups)}</ul>` : "";
+  const qualitySections = buildQualityAlertSections({
+    materials: recipient.materials,
+    suppliers: recipient.suppliers,
+    calibrations: recipient.calibrations,
+  });
 
-  return `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#0f172a"><div style="background:#0f172a;color:white;padding:22px 26px;border-radius:12px 12px 0 0"><h1 style="margin:0;font-size:24px">משימות ותזכורות יומיות</h1><p style="margin:8px 0 0;color:#cbd5e1">Caeli Quality Hub</p></div><div style="border:1px solid #e2e8f0;border-top:0;padding:26px;border-radius:0 0 12px 12px"><p style="font-size:17px">בוקר טוב ${escapeHtml(recipient.name)},</p><p>אלו המשימות, התזכורות וההתראות להיום:</p>${tasksSection}${remindersSection}${followupsSection}${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:10px;background:#0f172a;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">פתיחת היומן</a>` : ""}</div></div>`;
+  return `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:700px;margin:auto;color:#0f172a"><div style="background:#0f172a;color:white;padding:22px 26px;border-radius:12px 12px 0 0"><h1 style="margin:0;font-size:24px">עדכון איכות יומי</h1><p style="margin:8px 0 0;color:#cbd5e1">Caeli Quality Hub</p></div><div style="border:1px solid #e2e8f0;border-top:0;padding:26px;border-radius:0 0 12px 12px"><p style="font-size:17px">בוקר טוב ${escapeHtml(recipient.name)},</p><p>אלו המשימות, התזכורות והתראות האיכות להיום:</p>${tasksSection}${remindersSection}${followupsSection}${qualitySections}${qualitySections ? `<p style="color:#9f1239;font-weight:bold">יש לבדוק ולטפל בפריטי האיכות בהתאם לנוהלי האיכות.</p>` : ""}${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:10px;background:#0f172a;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">פתיחת היומן</a>` : ""}</div></div>`;
 }
 
 export function groupDailyItems({
@@ -94,11 +110,13 @@ export function groupDailyItems({
   reminders,
   profiles,
   followups = [],
+  qualityAlerts = { materials: [], suppliers: [], calibrations: [] },
 }: {
   tasks: DailyTask[];
   reminders: DailyReminder[];
   profiles: Array<{ id: string; email: string | null; full_name: string | null; is_active: boolean }>;
   followups?: DailyFollowup[];
+  qualityAlerts?: DailyQualityAlerts;
 }) {
   const recipients = new Map<string, DigestRecipient>();
 
@@ -106,7 +124,7 @@ export function groupDailyItems({
     const key = email.toLowerCase();
     const existing = recipients.get(key);
     if (existing) return existing;
-    const recipient = { name, email, tasks: [], reminders: [], followups: [] };
+    const recipient: DigestRecipient = { name, email, tasks: [], reminders: [], followups: [], materials: [], suppliers: [], calibrations: [] };
     recipients.set(key, recipient);
     return recipient;
   };
@@ -134,6 +152,16 @@ export function groupDailyItems({
     }
   }
 
+  const hasQualityAlerts = qualityAlerts.materials.length > 0 || qualityAlerts.suppliers.length > 0 || qualityAlerts.calibrations.length > 0;
+  if (hasQualityAlerts) {
+    for (const qualityRecipient of QUALITY_ALERT_RECIPIENTS) {
+      const recipient = getRecipient(qualityRecipient.email, qualityRecipient.name);
+      recipient.materials.push(...qualityAlerts.materials);
+      recipient.suppliers.push(...qualityAlerts.suppliers);
+      recipient.calibrations.push(...qualityAlerts.calibrations);
+    }
+  }
+
   return [...recipients.values()];
 }
 
@@ -150,7 +178,7 @@ export async function sendDailyDigest(recipient: DigestRecipient): Promise<SendR
       body: JSON.stringify({
         sender: { name: fromName, email: fromEmail },
         to: [{ email: recipient.email, name: recipient.name }],
-        subject: "משימות ותזכורות יומיות",
+        subject: "עדכון איכות יומי",
         htmlContent: buildDigestHtml(recipient),
         tags: ["daily_digest"],
       }),
