@@ -32,10 +32,6 @@ export type DailyQualityAlerts = {
   calibrations: DueCalibration[];
 };
 
-type SendResult =
-  | { status: "sent"; messageId: string | null }
-  | { status: "failed"; error: string };
-
 export const QUALITY_ALERT_RECIPIENTS = [
   ASSIGNEES.eden,
   ASSIGNEES.sergey,
@@ -80,9 +76,7 @@ function buildCalibrationRows(calibrations: DueCalibration[]) {
   </tr>`).join("");
 }
 
-function buildQualityAlertsHtml(name: string, alerts: DailyQualityAlerts) {
-  const baseUrl = process.env.APP_URL?.replace(/\/$/, "");
-  const link = baseUrl ? `${baseUrl}/calendar` : "";
+export function buildQualityAlertSections(alerts: DailyQualityAlerts) {
   const materialsSection = alerts.materials.length ? `<h2 style="margin:24px 0 10px;font-size:19px">חומרים שפג תוקפם היום</h2>
       <table style="width:100%;border-collapse:collapse;margin:0 0 20px;text-align:right">
         <thead><tr style="background:#f1f5f9"><th style="padding:12px">שם החומר</th><th style="padding:12px">מיקום</th><th style="padding:12px">כמות</th><th style="padding:12px">תאריך תפוגה</th></tr></thead>
@@ -98,46 +92,5 @@ function buildQualityAlertsHtml(name: string, alerts: DailyQualityAlerts) {
         <thead><tr style="background:#f1f5f9"><th style="padding:12px">שם המכשיר</th><th style="padding:12px">מספר סידורי</th><th style="padding:12px">מיקום</th><th style="padding:12px">תאריך כיול</th></tr></thead>
         <tbody>${buildCalibrationRows(alerts.calibrations)}</tbody>
       </table>` : "";
-  return `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:700px;margin:auto;color:#0f172a">
-    <div style="background:#9f1239;color:white;padding:22px 26px;border-radius:12px 12px 0 0">
-      <h1 style="margin:0;font-size:24px">התראות איכות יומיות</h1>
-      <p style="margin:8px 0 0;color:#ffe4e6">מערכת ניהול משימות – מחלקת איכות</p>
-    </div>
-    <div style="border:1px solid #e2e8f0;border-top:0;padding:26px;border-radius:0 0 12px 12px">
-      <p style="font-size:17px">שלום ${escapeHtml(name)},</p>
-      <p>אלו פריטי האיכות שהגיעו היום למועד התפוגה או הכיול שלהם:</p>
-      ${materialsSection}${suppliersSection}${calibrationsSection}
-      <p style="color:#9f1239;font-weight:bold">יש לבדוק ולטפל בפריטים בהתאם לנוהלי האיכות.</p>
-      ${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:8px;background:#0f172a;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">פתיחת היומן</a>` : ""}
-    </div>
-  </div>`;
-}
-
-export async function sendQualityAlerts(
-  recipient: { name: string; email: string },
-  alerts: DailyQualityAlerts
-): Promise<SendResult> {
-  const apiKey = process.env.BREVO_API_KEY;
-  const fromEmail = process.env.BREVO_FROM_EMAIL;
-  const fromName = process.env.BREVO_FROM_NAME || "מערכת ניהול משימות";
-  if (!apiKey || !fromEmail) return { status: "failed", error: "Brevo environment variables are missing" };
-
-  try {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: { "api-key": apiKey, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({
-        sender: { name: fromName, email: fromEmail },
-        to: [{ email: recipient.email, name: recipient.name }],
-        subject: "התראות איכות יומיות – תפוגות, ספקים וכיולים",
-        htmlContent: buildQualityAlertsHtml(recipient.name, alerts),
-        tags: ["daily_quality_alerts"],
-      }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as { messageId?: string; message?: string; code?: string };
-    if (!response.ok) return { status: "failed", error: payload.message ?? payload.code ?? `Brevo returned ${response.status}` };
-    return { status: "sent", messageId: payload.messageId ?? null };
-  } catch (error) {
-    return { status: "failed", error: error instanceof Error ? error.message : "Unknown email error" };
-  }
+  return `${materialsSection}${suppliersSection}${calibrationsSection}`;
 }
