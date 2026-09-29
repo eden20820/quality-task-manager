@@ -17,6 +17,20 @@ const qualityAlerts = {
 };
 
 describe("unified daily email", () => {
+  it("creates one daily recipient even when that person has no updates", () => {
+    const recipients = groupDailyItems({
+      tasks: [],
+      reminders: [],
+      profiles: [],
+    });
+
+    expect(recipients.map((recipient) => recipient.email)).toEqual(expect.arrayContaining([
+      "eden@caeli.pro",
+      "sergey@caeli.pro",
+      "amit.a@caeli.pro",
+    ]));
+  });
+
   it("includes the quality manager and all quality alerts in the same recipient digest", () => {
     expect(QUALITY_ALERT_RECIPIENTS).toContainEqual({ name: "עמית", email: "amit.a@caeli.pro" });
 
