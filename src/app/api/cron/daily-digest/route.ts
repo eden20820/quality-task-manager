@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { groupDailyItems, sendDailyDigest, type DailyFollowup, type DailyReminder, type DailyTask } from "@/lib/email/daily-digest";
+import { canRetryDigestDelivery } from "@/lib/email/daily-digest-delivery";
 import {
   type DueCalibration,
   type ExpiringMaterial,
@@ -62,9 +63,20 @@ async function processDailyDigest(date: string) {
     supabase.from("calibration_items").select("id, equipment_name, serial_number, location, next_calibration_date").eq("next_calibration_date", date).eq("is_active", true).order("equipment_name"),
   ]);
 
-  const loadError = tasksResult.error ?? remindersResult.error ?? profilesResult.error ?? followupsResult.error ?? materialsResult.error ?? suppliersResult.error ?? calibrationsResult.error;
-  if (loadError) {
-    console.error("Daily digest load error:", loadError);
+  const queryResults = [
+    ["tasks", tasksResult],
+    ["reminders", remindersResult],
+    ["profiles", profilesResult],
+    ["followups", followupsResult],
+    ["materials", materialsResult],
+    ["suppliers", suppliersResult],
+    ["calibrations", calibrationsResult],
+  ] as const;
+  const failedQueries = queryResults.filter(([, result]) => result.error);
+  for (const [source, result] of failedQueries) {
+    console.error("[cron/daily-digest] source load failed", { date, source, error: result.error });
+  }
+  if (failedQueries.length === queryResults.length) {
     return NextResponse.json({ ok: false, error: "Failed to load daily items" }, { status: 500 });
   }
 
@@ -102,22 +114,46 @@ async function processDailyDigest(date: string) {
     calibrations: qualityAlerts.calibrations.length,
     recipients: recipients.length,
   });
-  if (recipients.length === 0) return NextResponse.json({ ok: true, date, sent: 0, message: "No daily items" });
-
   let sent = 0;
   let failed = 0;
   let skipped = 0;
 
   for (const recipient of recipients) {
-    const { data: claim, error: claimError } = await supabase
+    let { data: claim, error: claimError } = await supabase
       .from("daily_digest_notifications")
       .insert({ digest_date: date, recipient_email: recipient.email, status: "sending" })
       .select("id")
       .single();
 
     if (claimError?.code === "23505") {
-      skipped += 1;
-      continue;
+      const { data: existing, error: existingError } = await supabase
+        .from("daily_digest_notifications")
+        .select("id, status, updated_at")
+        .eq("digest_date", date)
+        .eq("recipient_email", recipient.email)
+        .single();
+
+      if (existingError || !existing || !canRetryDigestDelivery(existing)) {
+        if (existingError) console.error("Daily digest retry lookup error:", existingError);
+        skipped += 1;
+        continue;
+      }
+
+      const retryStartedAt = new Date().toISOString();
+      const retryResult = await supabase
+        .from("daily_digest_notifications")
+        .update({ status: "sending", provider_message_id: null, error_message: null, updated_at: retryStartedAt })
+        .eq("id", existing.id)
+        .eq("updated_at", existing.updated_at)
+        .neq("status", "sent")
+        .select("id")
+        .maybeSingle();
+      claim = retryResult.data;
+      claimError = retryResult.error;
+      if (!claim && !claimError) {
+        skipped += 1;
+        continue;
+      }
     }
     if (claimError || !claim) {
       console.error("Daily digest claim error:", claimError);
@@ -127,8 +163,8 @@ async function processDailyDigest(date: string) {
 
     const result = await sendDailyDigest(recipient);
     const update = result.status === "sent"
-      ? { status: "sent", provider_message_id: result.messageId, error_message: null }
-      : { status: "failed", provider_message_id: null, error_message: result.error };
+      ? { status: "sent", provider_message_id: result.messageId, error_message: null, updated_at: new Date().toISOString() }
+      : { status: "failed", provider_message_id: null, error_message: result.error, updated_at: new Date().toISOString() };
     const { error: updateError } = await supabase.from("daily_digest_notifications").update(update).eq("id", claim.id);
     if (updateError) console.error("Daily digest log update error:", updateError);
 

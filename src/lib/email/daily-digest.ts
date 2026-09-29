@@ -101,8 +101,17 @@ function buildDigestHtml(recipient: DigestRecipient) {
     suppliers: recipient.suppliers,
     calibrations: recipient.calibrations,
   });
+  const hasUpdates = recipient.tasks.length > 0
+    || recipient.reminders.length > 0
+    || recipient.followups.length > 0
+    || recipient.materials.length > 0
+    || recipient.suppliers.length > 0
+    || recipient.calibrations.length > 0;
+  const emptySection = hasUpdates
+    ? ""
+    : `<div style="margin:22px 0;padding:16px;border-radius:10px;background:#f8fafc;color:#475569">אין עדכונים או פריטי איכות לטיפול היום.</div>`;
 
-  return `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:700px;margin:auto;color:#0f172a"><div style="background:#0f172a;color:white;padding:22px 26px;border-radius:12px 12px 0 0"><h1 style="margin:0;font-size:24px">עדכון איכות יומי</h1><p style="margin:8px 0 0;color:#cbd5e1">Caeli Quality Hub</p></div><div style="border:1px solid #e2e8f0;border-top:0;padding:26px;border-radius:0 0 12px 12px"><p style="font-size:17px">בוקר טוב ${escapeHtml(recipient.name)},</p><p>אלו המשימות, התזכורות והתראות האיכות להיום:</p>${tasksSection}${remindersSection}${followupsSection}${qualitySections}${qualitySections ? `<p style="color:#9f1239;font-weight:bold">יש לבדוק ולטפל בפריטי האיכות בהתאם לנוהלי האיכות.</p>` : ""}${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:10px;background:#0f172a;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">פתיחת היומן</a>` : ""}</div></div>`;
+  return `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:700px;margin:auto;color:#0f172a"><div style="background:#0f172a;color:white;padding:22px 26px;border-radius:12px 12px 0 0"><h1 style="margin:0;font-size:24px">עדכון איכות יומי</h1><p style="margin:8px 0 0;color:#cbd5e1">Caeli Quality Hub</p></div><div style="border:1px solid #e2e8f0;border-top:0;padding:26px;border-radius:0 0 12px 12px"><p style="font-size:17px">בוקר טוב ${escapeHtml(recipient.name)},</p><p>אלו המשימות, התזכורות והתראות האיכות להיום:</p>${tasksSection}${remindersSection}${followupsSection}${qualitySections}${emptySection}${qualitySections ? `<p style="color:#9f1239;font-weight:bold">יש לבדוק ולטפל בפריטי האיכות בהתאם לנוהלי האיכות.</p>` : ""}${link ? `<a href="${escapeHtml(link)}" style="display:inline-block;margin-top:10px;background:#0f172a;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold">פתיחת היומן</a>` : ""}</div></div>`;
 }
 
 export function groupDailyItems({
@@ -128,6 +137,12 @@ export function groupDailyItems({
     recipients.set(key, recipient);
     return recipient;
   };
+
+  // The daily digest is intentionally sent to every configured team member,
+  // even on quiet days. Items below are still filtered per recipient.
+  for (const assignee of Object.values(ASSIGNEES)) {
+    getRecipient(assignee.email, assignee.name);
+  }
 
   for (const task of tasks) {
     for (const key of task.assignees ?? []) {
