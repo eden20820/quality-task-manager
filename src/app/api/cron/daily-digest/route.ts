@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { groupDailyItems, sendDailyDigest, type DailyFollowup, type DailyReminder, type DailyTask } from "@/lib/email/daily-digest";
 import { canRetryDigestDelivery } from "@/lib/email/daily-digest-delivery";
+import { getIsraelDigestSchedule } from "@/lib/email/daily-digest-schedule";
 import {
   type DueCalibration,
   type ExpiringMaterial,
@@ -12,19 +13,6 @@ import { reminderOccursOn } from "@/lib/reminders/recurrence";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function israelDateParts() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jerusalem",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date());
-  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
-  return { date: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
-}
 
 async function isAuthorizedCronRequest(request: Request) {
   const authorization = request.headers.get("authorization");
@@ -114,6 +102,9 @@ async function processDailyDigest(date: string) {
     calibrations: qualityAlerts.calibrations.length,
     recipients: recipients.length,
   });
+  if (recipients.length === 0) {
+    return NextResponse.json({ ok: true, date, sent: 0, skipped: true, reason: "No relevant daily items" });
+  }
   let sent = 0;
   let failed = 0;
   let skipped = 0;
@@ -190,8 +181,11 @@ export async function GET(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const { date, hour } = israelDateParts();
-  console.info("[cron/daily-digest] authorized request", { date, israelHour: hour });
+  const { date, hour, isWeekend } = getIsraelDigestSchedule();
+  console.info("[cron/daily-digest] authorized request", { date, israelHour: hour, isWeekend });
+  if (isWeekend) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Daily emails are disabled on Friday and Saturday" });
+  }
   if (hour >= 8) return processDailyDigest(date);
   return NextResponse.json({ ok: true, skipped: true, reason: "No scheduled email for this Israel hour" });
 }
