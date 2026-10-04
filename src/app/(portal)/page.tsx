@@ -74,7 +74,6 @@ export default async function HomePage() {
     due_date: string | null;
     created_at: string;
   }>;
-  const newTasks = Number(dashboardData.new_tasks ?? 0);
   const expiringItems = (dashboardData.expiring_items ?? []) as Array<{ id: string; material_name: string; expiry_date: string }>;
   const weeklyReminders = (dashboardData.weekly_reminders ?? []) as Array<{ id: string; title: string; reminder_date: string; repeat_unit: "day" | "month" | null; repeat_interval: number | null }>;
   const weeklyDeadlineTasks = (dashboardData.weekly_deadline_tasks ?? []) as Array<{ id: string; title: string; due_date: string }>;
@@ -151,14 +150,16 @@ export default async function HomePage() {
     <ModularDashboard sections={[
       { id: "overview", title: "מדדי לוח הבקרה", content: (
         <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="min-h-40 h-full justify-center">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-center text-lg font-bold">משימות חדשות</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center text-5xl font-extrabold">{newTasks ?? 0}</p>
-            </CardContent>
-          </Card>
+          <Link href="/tasks" className="group block">
+            <Card className="min-h-40 h-full justify-center transition group-hover:-translate-y-0.5 group-hover:border-slate-300 group-hover:shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-center text-lg font-bold">כל המשימות</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-center text-5xl font-extrabold">{visibleActiveTasks.length}</p>
+              </CardContent>
+            </Card>
+          </Link>
           {detailCards.map((card) => (
             <Link key={card.title} href={card.href} className="group block">
               <Card className="min-h-40 h-full justify-center transition group-hover:-translate-y-0.5 group-hover:border-slate-300 group-hover:shadow-md">
