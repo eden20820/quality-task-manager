@@ -83,3 +83,7 @@ export function buildPkaPreview(fileName: string, parsed: ReturnType<typeof pars
   });
   return { fileName, rows, newCount: rows.filter((row) => row.action === "new").length, updatedCount: rows.filter((row) => row.action === "update").length, duplicateCount: rows.filter((row) => row.action === "duplicate").length, unchangedCount: rows.filter((row) => row.action === "unchanged").length, invalidCount: rows.filter((row) => row.action === "invalid").length, ignoredCount: parsed.ignoredCount };
 }
+
+export function selectPkaRowsForAutomaticSync(rows: PkaImportRow[]) {
+  return rows.filter((row) => (row.action === "new" || row.action === "update") && row.data);
+}
