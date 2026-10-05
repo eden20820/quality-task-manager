@@ -10,6 +10,7 @@ import {
 } from "@/lib/email/expiry-alert";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { reminderOccursOn } from "@/lib/reminders/recurrence";
+import { syncPkaFromGoogleDrive } from "@/lib/pka-drive-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -183,9 +184,25 @@ export async function GET(request: Request) {
 
   const { date, hour, isWeekend } = getIsraelDigestSchedule();
   console.info("[cron/daily-digest] authorized request", { date, israelHour: hour, isWeekend });
+
+  // Supabase Cron invokes this route hourly. Reuse it for the daily PKA pull so
+  // the schedule follows Israel time and daylight saving time reliably.
+  let pkaSync: Awaited<ReturnType<typeof syncPkaFromGoogleDrive>> | null = null;
+  if (hour === 6) {
+    try {
+      pkaSync = await syncPkaFromGoogleDrive();
+      console.info("[cron/daily-digest] PKA workbook sync completed", pkaSync);
+    } catch (error) {
+      console.error("[cron/daily-digest] PKA workbook sync failed", {
+        message: error instanceof Error ? error.message : "Unknown sync error",
+      });
+      return NextResponse.json({ ok: false, error: "PKA workbook sync failed" }, { status: 500 });
+    }
+  }
+
   if (isWeekend) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "Daily emails are disabled on Friday and Saturday" });
+    return NextResponse.json({ ok: true, pkaSync, skipped: true, reason: "Daily emails are disabled on Friday and Saturday" });
   }
   if (hour >= 8) return processDailyDigest(date);
-  return NextResponse.json({ ok: true, skipped: true, reason: "No scheduled email for this Israel hour" });
+  return NextResponse.json({ ok: true, pkaSync, skipped: true, reason: "No scheduled email for this Israel hour" });
 }
