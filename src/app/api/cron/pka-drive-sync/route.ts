@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { syncPkaFromGoogleDrive } from "@/lib/pka-drive-sync";
+import { isIsraelSixAm } from "@/lib/israel-sync-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -22,6 +23,9 @@ async function isAuthorized(request: Request) {
 
 export async function GET(request: Request) {
   if (!(await isAuthorized(request))) return new NextResponse("Unauthorized", { status: 401 });
+  if (!isIsraelSixAm(new Date())) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Outside the 06:00 Israel sync window" });
+  }
   try {
     const result = await syncPkaFromGoogleDrive();
     console.info("[cron/pka-drive-sync] completed", result);
