@@ -30,10 +30,20 @@ export type ExpiryImportPreview = {
   inactiveCount: number;
   invalidCount: number;
   items: SerializableExpiryItem[];
+  rows: ExpiryImportPreviewRow[];
   errors: {
     row: number;
     message: string;
   }[];
+};
+
+export type ExpiryImportPreviewRow = {
+  key: string;
+  action: "new" | "update" | "unchanged" | "inactive" | "invalid";
+  label: string;
+  rowNumber: number | null;
+  changes: Array<{ field: string; before: string; after: string }>;
+  error?: string;
 };
 
 export type ManualExpiryActionResult = {
@@ -102,6 +112,19 @@ function deserializeItem(
     isRejected: item.isRejected,
     rowNumber: item.rowNumber,
   };
+}
+
+function displayExpiryDate(value: Date | string | null) {
+  if (!value) return "—";
+  const iso = value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
+  const [year, month, day] = iso.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : iso;
+}
+
+function displayValue(value: string | number | boolean | null | undefined) {
+  if (typeof value === "boolean") return value ? "כן" : "לא";
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
 }
 
 function parseManualExpiryItem(formData: FormData): {
@@ -201,6 +224,7 @@ export async function previewExpiryImport(
       expiry_date,
       quantity,
       location,
+      is_rejected,
       is_active
     `);
 
@@ -222,6 +246,87 @@ export async function previewExpiryImport(
     validExistingItems
   );
 
+  const errorsByRow = new Map<number, string[]>();
+  for (const validationError of validationErrors) {
+    const messages = errorsByRow.get(validationError.row) ?? [];
+    messages.push(validationError.message);
+    errorsByRow.set(validationError.row, messages);
+  }
+
+  const invalidRows = new Set(errorsByRow.keys());
+  const fieldChanges = (
+    current: ExistingExpiryItem,
+    incoming: ParsedExpiryItem
+  ) => [
+    current.quantity !== incoming.quantity
+      ? { field: "כמות", before: displayValue(current.quantity), after: displayValue(incoming.quantity) }
+      : null,
+    (current.location ?? "") !== incoming.location
+      ? { field: "מיקום", before: displayValue(current.location), after: displayValue(incoming.location) }
+      : null,
+    current.is_rejected !== incoming.isRejected
+      ? { field: "חומר שנפסל", before: displayValue(current.is_rejected), after: displayValue(incoming.isRejected) }
+      : null,
+    current.is_active !== true
+      ? { field: "מצב", before: "לא פעיל", after: "פעיל" }
+      : null,
+  ].filter((change): change is { field: string; before: string; after: string } => Boolean(change));
+
+  const rows: ExpiryImportPreviewRow[] = [
+    ...parsedItems
+      .filter((item) => invalidRows.has(item.rowNumber))
+      .map((item) => ({
+        key: `invalid-${item.rowNumber}`,
+        action: "invalid" as const,
+        label: item.materialName || "שורה ללא שם חומר",
+        rowNumber: item.rowNumber,
+        changes: [],
+        error: errorsByRow.get(item.rowNumber)?.join("; "),
+      })),
+    ...preview.newItems
+      .filter((item) => !invalidRows.has(item.rowNumber))
+      .map((item) => ({
+        key: `new-${item.rowNumber}`,
+        action: "new" as const,
+        label: item.materialName,
+        rowNumber: item.rowNumber,
+        changes: [
+          { field: "תאריך תפוגה", before: "—", after: displayExpiryDate(item.expiryDate) },
+          { field: "כמות", before: "—", after: displayValue(item.quantity) },
+          { field: "מיקום", before: "—", after: displayValue(item.location) },
+          { field: "חומר שנפסל", before: "—", after: displayValue(item.isRejected) },
+        ],
+      })),
+    ...preview.updatedItems
+      .filter(({ incoming }) => !invalidRows.has(incoming.rowNumber))
+      .map(({ current, incoming }) => ({
+        key: `update-${current.id}`,
+        action: "update" as const,
+        label: incoming.materialName,
+        rowNumber: incoming.rowNumber,
+        changes: fieldChanges(current, incoming),
+      })),
+    ...preview.unchangedItems
+      .filter((item) => !invalidRows.has(item.rowNumber))
+      .map((item) => ({
+        key: `unchanged-${item.rowNumber}`,
+        action: "unchanged" as const,
+        label: item.materialName,
+        rowNumber: item.rowNumber,
+        changes: [],
+      })),
+    ...preview.inactiveItems.map((item) => ({
+      key: `inactive-${item.id}`,
+      action: "inactive" as const,
+      label: item.material_name,
+      rowNumber: null,
+      changes: [
+        { field: "מצב", before: "פעיל", after: "לא פעיל — לא נמצא בקובץ" },
+        { field: "תאריך תפוגה", before: displayExpiryDate(item.expiry_date), after: "—" },
+      ],
+    })),
+  ];
+
   return {
     fileName: file.name,
     newCount: preview.newItems.length,
@@ -230,6 +335,7 @@ export async function previewExpiryImport(
     inactiveCount: preview.inactiveItems.length,
     invalidCount: validationErrors.length,
     items: parsedItems.map(serializeItem),
+    rows,
     errors: validationErrors,
   };
 }
