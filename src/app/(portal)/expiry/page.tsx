@@ -1,4 +1,4 @@
-import { ExpiryDashboard } from "@/components/expiry/expiry-dashboard";
+import { ExpiryDashboard, type ExpiryFilter } from "@/components/expiry/expiry-dashboard";
 import {
   ExpiryTable,
   type ExpiryRow,
@@ -38,8 +38,12 @@ function databaseDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export default async function ExpiryPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const page = parsePage((await searchParams).page);
+export default async function ExpiryPage({ searchParams }: { searchParams: Promise<{ page?: string; filter?: string }> }) {
+  const params = await searchParams;
+  const page = parsePage(params.page);
+  const filter: ExpiryFilter = ["expired", "next30", "next90", "invalid"].includes(params.filter ?? "")
+    ? params.filter as ExpiryFilter
+    : "all";
   const { from, to } = pageRange(page);
   const supabase = await createClient();
 
@@ -53,27 +57,36 @@ export default async function ExpiryPage({ searchParams }: { searchParams: Promi
   const inThirtyDaysString = databaseDate(inThirtyDays);
   const inNinetyDaysString = databaseDate(inNinetyDays);
 
+  let itemsQuery = supabase
+    .from("expiry_items")
+    .select(`
+      id,
+      material_name,
+      expiry_date,
+      quantity,
+      location,
+      invalid_expiry_text,
+      is_rejected
+    `, { count: "exact" })
+    .eq("is_active", true);
+
+  if (filter === "expired") itemsQuery = itemsQuery.lt("expiry_date", todayString);
+  if (filter === "next30") itemsQuery = itemsQuery.gte("expiry_date", todayString).lte("expiry_date", inThirtyDaysString);
+  if (filter === "next90") itemsQuery = itemsQuery.gt("expiry_date", inThirtyDaysString).lte("expiry_date", inNinetyDaysString);
+  if (filter === "invalid") itemsQuery = itemsQuery.is("expiry_date", null).not("invalid_expiry_text", "is", null);
+
   const [
     { data: items, error, count: totalCount },
+    { count: allCount },
     { count: expiredCount },
     { count: next30Count },
     { count: next90Count },
     { count: invalidCount },
   ] = await Promise.all([
-    supabase
-      .from("expiry_items")
-      .select(`
-        id,
-        material_name,
-        expiry_date,
-        quantity,
-        location,
-        invalid_expiry_text,
-        is_rejected
-      `, { count: "exact" })
-      .eq("is_active", true)
+    itemsQuery
       .order("expiry_date", { ascending: true, nullsFirst: false })
       .range(from, to),
+    supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true),
     supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true).lt("expiry_date", todayString),
     supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true).gte("expiry_date", todayString).lte("expiry_date", inThirtyDaysString),
     supabase.from("expiry_items").select("id", { count: "exact", head: true }).eq("is_active", true).gt("expiry_date", inThirtyDaysString).lte("expiry_date", inNinetyDaysString),
@@ -114,18 +127,19 @@ export default async function ExpiryPage({ searchParams }: { searchParams: Promi
         </div>
 
         <ExpiryDashboard
-          total={totalCount ?? 0}
+          total={allCount ?? 0}
           expired={expiredCount ?? 0}
           next30={next30Count ?? 0}
           next90={next90Count ?? 0}
           invalid={invalidCount ?? 0}
+          activeFilter={filter}
         />
 
         <UploadDialog />
 
-        <ExpiryTable key={page} rows={rows} />
+        <ExpiryTable key={`${filter}-${page}`} rows={rows} activeFilter={filter} counts={{ all: allCount ?? 0, expired: expiredCount ?? 0, next30: next30Count ?? 0, next90: next90Count ?? 0, invalid: invalidCount ?? 0 }} />
 
-        <PaginationControls basePath="/expiry" page={page} pageSize={PAGE_SIZE} total={totalCount ?? 0} />
+        <PaginationControls basePath="/expiry" page={page} pageSize={PAGE_SIZE} total={totalCount ?? 0} query={{ filter: filter === "all" ? undefined : filter }} />
       </div>
     </>
   );
