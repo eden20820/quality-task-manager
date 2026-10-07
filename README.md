@@ -46,8 +46,11 @@ BREVO_FROM_NAME=מערכת ניהול משימות
 APP_URL=https://your-production-domain
 CRON_SECRET=generate-a-long-random-secret
 SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+ONBOARDING_NOTIFICATION_EMAIL=quality-owner@example.com
 ```
 
 Do not use the `NEXT_PUBLIC_` prefix for the Brevo variables. `BREVO_FROM_EMAIL` must exactly match a sender marked as Verified in Brevo. Keep the API key server-side and never commit it to Git.
+
+`ONBOARDING_NOTIFICATION_EMAIL` receives the full summary of every submitted company questionnaire. If omitted, it falls back to the current quality owner address. Apply `supabase/migrations/20261007130000_company_onboarding_submissions.sql` before publishing the public questionnaire.
 
 The daily digest cron runs at 08:00 in `Asia/Jerusalem`. Two daily UTC schedules cover both daylight-saving and standard time; the route sends only when the local hour is 08:00. `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` must be Production-only server secrets.
