@@ -18,6 +18,22 @@ import {
 } from "@/app/expiry/actions";
 import { Button } from "@/components/ui/button";
 
+const previewStyles = {
+  new: "bg-emerald-100 text-emerald-800",
+  update: "bg-amber-100 text-amber-800",
+  unchanged: "bg-slate-100 text-slate-700",
+  inactive: "bg-orange-100 text-orange-800",
+  invalid: "bg-red-100 text-red-700",
+} as const;
+
+const previewLabels = {
+  new: "חדש",
+  update: "השתנה",
+  unchanged: "ללא שינוי",
+  inactive: "יהפוך ללא פעיל",
+  invalid: "לא תקין",
+} as const;
+
 type ImportResult = {
   insertedRows: number;
   updatedRows: number;
@@ -247,6 +263,54 @@ export function UploadDialog() {
               value={preview.invalidCount}
               className="text-red-600"
             />
+          </div>
+
+          <div className="mt-6 max-h-[46vh] overflow-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full min-w-[760px] text-right text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-100 text-xs text-slate-600">
+                <tr>
+                  <th className="p-3">חומר</th>
+                  <th className="p-3">סיווג</th>
+                  <th className="p-3">מה בדיוק ישתנה</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {preview.rows.map((row) => (
+                  <tr key={row.key} className="align-top">
+                    <td className="p-3 font-extrabold text-slate-900">
+                      {row.label}
+                      {row.rowNumber ? (
+                        <span className="mt-1 block text-xs font-normal text-slate-400">
+                          שורה {row.rowNumber}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${previewStyles[row.action]}`}>
+                        {previewLabels[row.action]}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {row.error ? (
+                        <p className="font-semibold text-red-700">{row.error}</p>
+                      ) : row.changes.length ? (
+                        <div className="space-y-2">
+                          {row.changes.map((change) => (
+                            <div key={change.field} className="grid grid-cols-[110px_1fr_1fr] gap-2 rounded-lg bg-slate-50 p-2">
+                              <b>{change.field}</b>
+                              <span><small className="block text-slate-400">קיים</small>{change.before}</span>
+                              <span className="text-amber-900"><small className="block text-slate-400">Excel</small>{change.after}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">הרשומה זהה למידע הקיים</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
           {preview.errors.length > 0 && (
