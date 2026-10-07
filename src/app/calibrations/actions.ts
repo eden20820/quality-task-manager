@@ -16,6 +16,23 @@ async function authorized() {
   return { supabase, user: { id: userId } };
 }
 
+async function upsertCalibrationRows(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  values: Array<Record<string, unknown>>,
+) {
+  const tenantAware = await supabase
+    .from("calibration_items")
+    .upsert(values, { onConflict: "organization_id,row_key" });
+
+  // Allows the application deployment to remain usable during the short
+  // interval before the multi-tenant database migration is applied.
+  if (tenantAware.error?.code === "42P10" || tenantAware.error?.code === "42703") {
+    return supabase.from("calibration_items").upsert(values, { onConflict: "row_key" });
+  }
+
+  return tenantAware;
+}
+
 function clean(value: unknown) { return String(value ?? "").trim(); }
 function dateValue(value: unknown): string | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -60,7 +77,7 @@ async function parseCalibrationFile(file: File, userId: string) {
 
 export async function previewCalibrationImport(formData: FormData): Promise<ImportPreview> { const file = formData.get("file"); if (!(file instanceof File) || !file.size) throw new Error("יש לבחור קובץ Excel"); const { supabase, user } = await authorized(); const incoming = await parseCalibrationFile(file, user.id); if (!incoming.length) throw new Error("לא נמצאה טבלת כיולים תקינה"); const { data: existing, error } = await supabase.from("calibration_items").select("equipment_name,serial_number,row_key,model,location,last_calibration_date,next_calibration_date,certificate_number,calibration_lab,notes,is_active"); if (error) throw error; const bySerial = new Map((existing ?? []).filter((x) => usableSerial(x.serial_number)).map((x) => [usableSerial(x.serial_number).toLowerCase(), x])); const byKey = new Map((existing ?? []).map((x) => [x.row_key, x])); const fields: Array<[string, string]> = [["equipment_name", "שם"], ["model", "דגם"], ["location", "מיקום"], ["last_calibration_date", "כיול אחרון"], ["next_calibration_date", "כיול הבא"], ["certificate_number", "תעודה"], ["calibration_lab", "מעבדה"], ["notes", "הערות"], ["is_active", "מצב"]]; const rows: ImportPreviewRow[] = incoming.map((x) => { const serial = usableSerial(x.serial_number); const old = (serial ? bySerial.get(serial.toLowerCase()) : byKey.get(String(x.row_key))) as unknown as Record<string, unknown> | undefined; if (old?.row_key) x.row_key = old.row_key; const changes = old ? fields.flatMap(([f, l]) => clean(old[f]) === clean(x[f]) ? [] : [{ field: l, before: clean(old[f]), after: clean(x[f]) }]) : []; return { key: String(x.row_key), label: `${x.equipment_name}${serial ? ` • ${serial}` : ""}`, action: !old ? "new" : changes.length ? "update" : "unchanged", changes, data: x }; }); return { fileName: file.name, rows, newCount: rows.filter((x) => x.action === "new").length, updatedCount: rows.filter((x) => x.action === "update").length, unchangedCount: rows.filter((x) => x.action === "unchanged").length, invalidCount: 0 }; }
 
-export async function confirmCalibrationImport(rows: ImportPreviewRow[], fileName: string): Promise<Result> { try { const { supabase, user } = await authorized(); const values = rows.map((r) => ({ ...r.data, source_file_name: fileName.slice(0, 255), created_by: user.id, updated_at: new Date().toISOString() })); const { error } = await supabase.from("calibration_items").upsert(values, { onConflict: "row_key" }); if (error) throw error; revalidatePath("/calibrations"); revalidatePath("/"); revalidatePath("/calendar"); return { success: true, message: `נשמרו ${values.length} כלי כיול` }; } catch (error) { console.error(error); return { success: false, message: "שמירת הכיולים נכשלה" }; } }
+export async function confirmCalibrationImport(rows: ImportPreviewRow[], fileName: string): Promise<Result> { try { const { supabase, user } = await authorized(); const values = rows.map((r) => ({ ...r.data, source_file_name: fileName.slice(0, 255), created_by: user.id, updated_at: new Date().toISOString() })); const { error } = await upsertCalibrationRows(supabase, values); if (error) throw error; revalidatePath("/calibrations"); revalidatePath("/"); revalidatePath("/calendar"); return { success: true, message: `נשמרו ${values.length} כלי כיול` }; } catch (error) { console.error(error); return { success: false, message: "שמירת הכיולים נכשלה" }; } }
 
 export async function importCalibrations(formData: FormData): Promise<Result> {
   try {
@@ -88,7 +105,7 @@ export async function importCalibrations(formData: FormData): Promise<Result> {
       }
     }
     if (!rowsToUpsert.length) return { success: false, message: "לא נמצאה טבלת כיולים תקינה בקובץ" };
-    const { error } = await supabase.from("calibration_items").upsert(rowsToUpsert, { onConflict: "row_key" });
+    const { error } = await upsertCalibrationRows(supabase, rowsToUpsert);
     if (error) throw error;
     revalidatePath("/calibrations"); revalidatePath("/"); revalidatePath("/calendar");
     const removed = rowsToUpsert.filter((item) => item.is_active === false).length;

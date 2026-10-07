@@ -40,16 +40,62 @@ async function isAuthorizedCronRequest(request: Request) {
   }
 }
 
+async function getDigestOrganizationId(supabase: ReturnType<typeof createAdminClient>) {
+  const slug = process.env.DAILY_DIGEST_ORGANIZATION_SLUG?.trim() || "caeli";
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single();
+
+  // Backward-compatible deployment ordering: code may reach production a few
+  // minutes before the database migration is applied.
+  if (error?.code === "42P01" || error?.code === "PGRST205") return null;
+  if (error || !data) throw new Error(`Active digest organization was not found for ${slug}`);
+  return data.id as string;
+}
+
 async function processDailyDigest(date: string) {
   const supabase = createAdminClient();
+  const organizationId = await getDigestOrganizationId(supabase);
+  let memberUserIds: string[] | null = null;
+  if (organizationId) {
+    const { data: memberships, error: membershipsError } = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("is_active", true);
+    if (membershipsError) throw membershipsError;
+    memberUserIds = (memberships ?? []).map((membership) => membership.user_id as string);
+  }
+
+  let tasksQuery = supabase.from("tasks").select("id, title, description, priority, assignees").eq("due_date", date).not("status", "in", "(completed,cancelled)");
+  let remindersQuery = supabase.from("reminders").select("id, title, notes, created_by, reminder_date, repeat_unit, repeat_interval").lte("reminder_date", date);
+  let profilesQuery = supabase.from("profiles").select("id, email, full_name, is_active").eq("is_active", true);
+  let followupsQuery = supabase.from("quality_followups").select("id, category, reference_number, name, quantity, assignee_key, opened_at, created_at, notes").in("status", ["open", "waiting"]).eq("alerts_enabled", true);
+  let materialsQuery = supabase.from("expiry_items").select("id, material_name, expiry_date, quantity, location").eq("expiry_date", date).eq("is_active", true).eq("is_rejected", false).order("material_name");
+  let suppliersQuery = supabase.from("suppliers").select("id, supplier_name, product_service, certification_type, expiration_date").eq("expiration_date", date).order("supplier_name");
+  let calibrationsQuery = supabase.from("calibration_items").select("id, equipment_name, serial_number, location, next_calibration_date").eq("next_calibration_date", date).eq("is_active", true).order("equipment_name");
+
+  if (organizationId) {
+    tasksQuery = tasksQuery.eq("organization_id", organizationId);
+    remindersQuery = remindersQuery.eq("organization_id", organizationId);
+    profilesQuery = profilesQuery.in("id", memberUserIds?.length ? memberUserIds : ["00000000-0000-0000-0000-000000000000"]);
+    followupsQuery = followupsQuery.eq("organization_id", organizationId);
+    materialsQuery = materialsQuery.eq("organization_id", organizationId);
+    suppliersQuery = suppliersQuery.eq("organization_id", organizationId);
+    calibrationsQuery = calibrationsQuery.eq("organization_id", organizationId);
+  }
+
   const [tasksResult, remindersResult, profilesResult, followupsResult, materialsResult, suppliersResult, calibrationsResult] = await Promise.all([
-    supabase.from("tasks").select("id, title, description, priority, assignees").eq("due_date", date).not("status", "in", "(completed,cancelled)"),
-    supabase.from("reminders").select("id, title, notes, created_by, reminder_date, repeat_unit, repeat_interval").lte("reminder_date", date),
-    supabase.from("profiles").select("id, email, full_name, is_active").eq("is_active", true),
-    supabase.from("quality_followups").select("id, category, reference_number, name, quantity, assignee_key, opened_at, created_at, notes").in("status", ["open", "waiting"]).eq("alerts_enabled", true),
-    supabase.from("expiry_items").select("id, material_name, expiry_date, quantity, location").eq("expiry_date", date).eq("is_active", true).eq("is_rejected", false).order("material_name"),
-    supabase.from("suppliers").select("id, supplier_name, product_service, certification_type, expiration_date").eq("expiration_date", date).order("supplier_name"),
-    supabase.from("calibration_items").select("id, equipment_name, serial_number, location, next_calibration_date").eq("next_calibration_date", date).eq("is_active", true).order("equipment_name"),
+    tasksQuery,
+    remindersQuery,
+    profilesQuery,
+    followupsQuery,
+    materialsQuery,
+    suppliersQuery,
+    calibrationsQuery,
   ]);
 
   const queryResults = [
@@ -113,7 +159,12 @@ async function processDailyDigest(date: string) {
   for (const recipient of recipients) {
     let { data: claim, error: claimError } = await supabase
       .from("daily_digest_notifications")
-      .insert({ digest_date: date, recipient_email: recipient.email, status: "sending" })
+      .insert({
+        ...(organizationId ? { organization_id: organizationId } : {}),
+        digest_date: date,
+        recipient_email: recipient.email,
+        status: "sending",
+      })
       .select("id")
       .single();
 
@@ -123,6 +174,7 @@ async function processDailyDigest(date: string) {
         .select("id, status, updated_at")
         .eq("digest_date", date)
         .eq("recipient_email", recipient.email)
+        .match(organizationId ? { organization_id: organizationId } : {})
         .single();
 
       if (existingError || !existing || !canRetryDigestDelivery(existing)) {
