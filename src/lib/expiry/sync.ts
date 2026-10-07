@@ -7,6 +7,7 @@ export type ExistingExpiryItem = {
   expiry_date: string | null;
   quantity: number | null;
   location: string | null;
+  is_rejected: boolean;
   is_active: boolean;
 };
 
@@ -70,7 +71,9 @@ export function buildSyncPreview(
 
     const changed =
       existing.quantity !== item.quantity ||
-      (existing.location ?? "") !== item.location;
+      (existing.location ?? "") !== item.location ||
+      existing.is_rejected !== item.isRejected ||
+      existing.is_active !== true;
 
     if (changed) {
 
