@@ -18,6 +18,7 @@ import {
   updateExpiryItem,
 } from "@/app/expiry/actions";
 import { Button } from "@/components/ui/button";
+import type { ExpiryFilter } from "@/components/expiry/expiry-dashboard";
 import {
   Dialog,
   DialogContent,
@@ -47,10 +48,10 @@ export type ExpiryRow = {
   isRejected?: boolean;
 };
 
-type Tab = "all" | "expired" | "upcoming" | "valid";
-
 type Props = {
   rows: ExpiryRow[];
+  activeFilter: ExpiryFilter;
+  counts: Record<ExpiryFilter, number>;
 };
 
 type FormMode = "create" | "edit";
@@ -123,13 +124,12 @@ function getRowClass(daysLeft: number) {
   return "";
 }
 
-export function ExpiryTable({ rows }: Props) {
+export function ExpiryTable({ rows, activeFilter, counts }: Props) {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
   const [localRows, setLocalRows] = useState(rows);
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState<Tab>("expired");
 
   const [dialogOpen, setDialogOpen] =
     useState(false);
@@ -158,59 +158,20 @@ export function ExpiryTable({ rows }: Props) {
     return () => { void supabase.removeChannel(channel); };
   }, []);
 
-  const counts = useMemo(() => {
-    return {
-      all: localRows.length,
-      expired: localRows.filter(
-        (row) => row.daysLeft < 0
-      ).length,
-      upcoming: localRows.filter(
-        (row) =>
-          row.daysLeft >= 0 &&
-          row.daysLeft <= 90
-      ).length,
-      valid: localRows.filter(
-        (row) => row.daysLeft > 90
-      ).length,
-    };
-  }, [localRows]);
-
   const filteredRows = useMemo(() => {
     const normalizedSearch = search
       .trim()
       .toLowerCase();
 
-    return localRows.filter((row) => {
-      const matchesSearch =
+    return localRows.filter((row) =>
         row.material
           .toLowerCase()
           .includes(normalizedSearch) ||
         row.location
           .toLowerCase()
-          .includes(normalizedSearch);
-
-      if (!matchesSearch) {
-        return false;
-      }
-
-      switch (tab) {
-        case "expired":
-          return row.daysLeft < 0;
-
-        case "upcoming":
-          return (
-            row.daysLeft >= 0 &&
-            row.daysLeft <= 90
-          );
-
-        case "valid":
-          return row.daysLeft > 90;
-
-        default:
-          return true;
-      }
-    });
-  }, [localRows, search, tab]);
+          .includes(normalizedSearch)
+    );
+  }, [localRows, search]);
 
   const pageSize = 50;
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -378,7 +339,7 @@ export function ExpiryTable({ rows }: Props) {
   }
 
   const tabs: {
-    key: Tab;
+    key: ExpiryFilter;
     label: string;
     count: number;
   }[] = [
@@ -388,14 +349,19 @@ export function ExpiryTable({ rows }: Props) {
       count: counts.expired,
     },
     {
-      key: "upcoming",
-      label: "עד 90 יום",
-      count: counts.upcoming,
+      key: "next30",
+      label: "עד 30 יום",
+      count: counts.next30,
     },
     {
-      key: "valid",
-      label: "מעל 90 יום",
-      count: counts.valid,
+      key: "next90",
+      label: "31–90 יום",
+      count: counts.next90,
+    },
+    {
+      key: "invalid",
+      label: "תאריכים שגויים",
+      count: counts.invalid,
     },
     {
       key: "all",
@@ -407,7 +373,7 @@ export function ExpiryTable({ rows }: Props) {
   return (
     <>
       <div className="space-y-5">
-        {counts.expired > 0 && (
+        {activeFilter === "expired" && counts.expired > 0 && (
           <div className="flex items-center gap-3 rounded-xl border border-red-300 bg-red-50 p-4">
             <AlertTriangle className="h-5 w-5 text-red-600" />
 
@@ -468,9 +434,9 @@ export function ExpiryTable({ rows }: Props) {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => { setTab(item.key); setPage(1); }}
+                onClick={() => router.push(item.key === "all" ? "/expiry" : `/expiry?filter=${item.key}`)}
                 className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition ${
-                  tab === item.key
+                  activeFilter === item.key
                     ? "bg-slate-950 text-white shadow-sm"
                     : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
@@ -479,7 +445,7 @@ export function ExpiryTable({ rows }: Props) {
 
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs ${
-                    tab === item.key
+                    activeFilter === item.key
                       ? "bg-white/20 text-white"
                       : "bg-slate-100 text-slate-600"
                   }`}
