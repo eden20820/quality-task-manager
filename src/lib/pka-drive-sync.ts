@@ -16,6 +16,26 @@ type StoredPka = {
   created_by: string;
 };
 
+async function getSyncOrganizationId(supabase: ReturnType<typeof createAdminClient>) {
+  const organizationSlug = process.env.PKA_SYNC_ORGANIZATION_SLUG?.trim() || "caeli";
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", organizationSlug)
+    .eq("is_active", true)
+    .single();
+
+  if (error?.code === "42P01" || error?.code === "PGRST205") {
+    return null;
+  }
+
+  if (error || !data) {
+    throw new Error(`Active sync organization was not found for ${organizationSlug}`);
+  }
+
+  return data.id as string;
+}
+
 function existingPka(row: StoredPka): ExistingPka {
   const packed = unpackPkaNotes(row.notes);
   return packed
@@ -53,10 +73,13 @@ export async function syncPkaFromGoogleDrive(): Promise<PkaDriveSyncResult> {
   const workbook = await downloadPkaWorkbookFromDrive();
   const parsed = parsePkaWorkbook(workbook);
   const supabase = createAdminClient();
-  const { data: storedRows, error: loadError } = await supabase
+  const organizationId = await getSyncOrganizationId(supabase);
+  let storedRowsQuery = supabase
     .from("quality_followups")
     .select("id,reference_number,name,quantity,opened_at,status,closed_at,notes,created_by")
     .eq("category", "pka");
+  if (organizationId) storedRowsQuery = storedRowsQuery.eq("organization_id", organizationId);
+  const { data: storedRows, error: loadError } = await storedRowsQuery;
   if (loadError) throw loadError;
 
   const stored = (storedRows ?? []) as StoredPka[];
@@ -75,6 +98,7 @@ export async function syncPkaFromGoogleDrive(): Promise<PkaDriveSyncResult> {
     const createdByById = new Map(stored.map((row) => [row.id, row.created_by]));
     const now = new Date().toISOString();
     const values = selected.map((row) => ({
+      ...(organizationId ? { organization_id: organizationId } : {}),
       category: "pka",
       reference_number: row.data!.reference_number,
       name: row.data!.product_name,
@@ -89,7 +113,12 @@ export async function syncPkaFromGoogleDrive(): Promise<PkaDriveSyncResult> {
     }));
     const { error: mergeError } = await supabase
       .from("quality_followups")
-      .upsert(values, { onConflict: "category,reference_number", ignoreDuplicates: false });
+      .upsert(values, {
+        onConflict: organizationId
+          ? "organization_id,category,reference_number"
+          : "category,reference_number",
+        ignoreDuplicates: false,
+      });
     if (mergeError) throw mergeError;
   }
 
