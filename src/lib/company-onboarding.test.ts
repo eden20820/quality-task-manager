@@ -33,10 +33,12 @@ describe("company onboarding", () => {
     expect(validateIntake(valid)).toEqual({});
   });
 
-  it("requires conditional details", () => {
-    const errors = validateIntake({ ...valid, industry: "אחר", dataMigration: "כן" });
-    expect(errors.industryOther).toBeTruthy();
-    expect(errors.migrationScope).toBeTruthy();
+  it("allows a completely partial intake", () => {
+    expect(validateIntake(EMPTY_INTAKE)).toEqual({});
+  });
+
+  it("validates an email only when one was entered", () => {
+    expect(validateIntake({ ...EMPTY_INTAKE, contactEmail: "not-an-email" }).contactEmail).toBeTruthy();
   });
 
   it("sanitizes unknown values and limits arrays", () => {

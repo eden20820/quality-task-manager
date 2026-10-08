@@ -166,33 +166,11 @@ export const INTAKE_FIELD_LABELS: Record<keyof IntakeAnswers, string> = {
   successDefinition: "מדדי הצלחה", additionalNotes: "הערות נוספות",
 };
 
-const REQUIRED_TEXT: Array<keyof IntakeAnswers> = [
-  "companyName", "industry", "employeeRange", "contactName", "contactEmail", "contactPhone",
-  "certificationStage", "painPoints", "dataMigration", "userCount", "electronicSignatures",
-  "ssoRequired", "goLiveTarget", "implementationPriority", "successDefinition",
-];
-
-const REQUIRED_ARRAYS: Array<keyof IntakeAnswers> = [
-  "standards", "currentTools", "modules", "userRoles", "languages", "integrations", "notifications",
-];
-
 export function validateIntake(answers: IntakeAnswers) {
   const errors: Partial<Record<keyof IntakeAnswers, string>> = {};
-  for (const key of REQUIRED_TEXT) {
-    if (!String(answers[key] ?? "").trim()) errors[key] = "שדה חובה";
-  }
-  for (const key of REQUIRED_ARRAYS) {
-    const value = answers[key];
-    if (!Array.isArray(value) || value.length === 0) errors[key] = "יש לבחור לפחות אפשרות אחת";
-  }
   if (answers.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(answers.contactEmail.trim())) {
     errors.contactEmail = "כתובת הדוא״ל אינה תקינה";
   }
-  if (answers.industry === "אחר" && !answers.industryOther.trim()) errors.industryOther = "יש לפרט את תחום הפעילות";
-  if (answers.standards.includes("אחר") && !answers.otherStandard.trim()) errors.otherStandard = "יש לפרט את התקן";
-  if (answers.dataMigration === "כן" && !answers.migrationScope.trim()) errors.migrationScope = "יש לפרט אילו נתונים נדרש להעביר";
-  if (answers.ssoRequired === "כן" && !answers.ssoProvider.trim()) errors.ssoProvider = "יש לציין את ספק ההתחברות";
-  if (answers.integrations.includes("אחר") && !answers.otherIntegration.trim()) errors.otherIntegration = "יש לפרט את האינטגרציה";
   return errors;
 }
 
