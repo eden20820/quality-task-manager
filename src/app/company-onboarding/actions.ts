@@ -47,8 +47,8 @@ function adminEmailHtml(answers: IntakeAnswers, referenceCode: string) {
     <div style="max-width:760px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden">
       <div style="padding:26px 28px;background:#0f172a;color:#fff">
         <div style="color:#93c5fd;font-size:13px;font-weight:700">אפיון מערכת חדש · ${escapeHtml(referenceCode)}</div>
-        <h1 style="margin:8px 0 0;font-size:26px">${escapeHtml(answers.companyName)}</h1>
-        <p style="margin:8px 0 0;color:#cbd5e1">${escapeHtml(answers.contactName)} · ${escapeHtml(answers.contactEmail)} · ${escapeHtml(answers.contactPhone)}</p>
+        <h1 style="margin:8px 0 0;font-size:26px">${escapeHtml(answers.companyName || "חברה ללא שם")}</h1>
+        <p style="margin:8px 0 0;color:#cbd5e1">${escapeHtml(answers.contactName || "איש קשר לא צוין")} · ${escapeHtml(answers.contactEmail || "ללא דוא״ל")} · ${escapeHtml(answers.contactPhone || "ללא טלפון")}</p>
       </div>
       <table dir="rtl" style="border-collapse:collapse;width:100%;font-size:14px">${buildSummaryRows(answers)}</table>
       <div style="padding:20px 28px;color:#64748b;font-size:13px">המידע נשמר גם בטבלת company_onboarding_submissions ב-Supabase.</div>
@@ -60,8 +60,8 @@ function confirmationEmailHtml(answers: IntakeAnswers, referenceCode: string) {
   return `<div dir="rtl" style="font-family:Arial,sans-serif;background:#f8fafc;padding:28px;color:#0f172a">
     <div style="max-width:620px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:32px">
       <div style="display:inline-block;background:#dcfce7;color:#166534;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700">האפיון התקבל</div>
-      <h1 style="margin:18px 0 10px;font-size:26px">תודה ${escapeHtml(answers.contactName)}</h1>
-      <p style="line-height:1.7;color:#475569">קיבלנו את פרטי האפיון של ${escapeHtml(answers.companyName)}. נעבור על הדרישות וניצור קשר להמשך תכנון המערכת.</p>
+      <h1 style="margin:18px 0 10px;font-size:26px">תודה${answers.contactName ? ` ${escapeHtml(answers.contactName)}` : ""}</h1>
+      <p style="line-height:1.7;color:#475569">קיבלנו את פרטי האפיון${answers.companyName ? ` של ${escapeHtml(answers.companyName)}` : ""}. נעבור על הדרישות וניצור קשר להמשך תכנון המערכת.</p>
       <div style="margin-top:20px;padding:16px;background:#f1f5f9;border-radius:12px"><strong>מספר הפנייה:</strong> ${escapeHtml(referenceCode)}</div>
     </div>
   </div>`;
@@ -95,13 +95,13 @@ export async function submitCompanyOnboarding(
     const fingerprintBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(fingerprintInput));
     const sourceFingerprint = Array.from(new Uint8Array(fingerprintBytes)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const [{ count: emailCount, error: emailCountError }, { count: sourceCount, error: sourceCountError }] = await Promise.all([
-      supabase.from("company_onboarding_submissions").select("id", { count: "exact", head: true }).eq("contact_email", answers.contactEmail.toLowerCase()).gte("submitted_at", oneHourAgo),
-      supabase.from("company_onboarding_submissions").select("id", { count: "exact", head: true }).eq("source_fingerprint", sourceFingerprint).gte("submitted_at", oneHourAgo),
-    ]);
-    if (emailCountError) throw emailCountError;
+    const { count: sourceCount, error: sourceCountError } = await supabase
+      .from("company_onboarding_submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("source_fingerprint", sourceFingerprint)
+      .gte("submitted_at", oneHourAgo);
     if (sourceCountError) throw sourceCountError;
-    if ((emailCount ?? 0) >= 3 || (sourceCount ?? 0) >= 5) {
+    if ((sourceCount ?? 0) >= 5) {
       return { success: false, message: "נשלחו מספר טפסים בזמן קצר. המתינו כשעה לפני ניסיון נוסף." };
     }
 
@@ -122,19 +122,19 @@ export async function submitCompanyOnboarding(
     const [adminResult, confirmationResult] = await Promise.all([
       sendBrevoEmail({
         to: { email: notificationEmail, name: "אחראי מערכת האיכות" },
-        subject: `אפיון מערכת חדש – ${answers.companyName} (${referenceCode})`,
+        subject: `אפיון מערכת חדש – ${answers.companyName || "חברה ללא שם"} (${referenceCode})`,
         html: adminEmailHtml(answers, referenceCode),
         tags: ["company-onboarding", "new-lead"],
       }),
-      sendBrevoEmail({
+      answers.contactEmail ? sendBrevoEmail({
         to: { email: answers.contactEmail, name: answers.contactName },
         subject: `קיבלנו את אפיון מערכת האיכות – ${referenceCode}`,
         html: confirmationEmailHtml(answers, referenceCode),
         tags: ["company-onboarding", "confirmation"],
-      }),
+      }) : Promise.resolve(null),
     ]);
     if (adminResult.status === "failed") console.error("Onboarding admin email failed:", adminResult.error);
-    if (confirmationResult.status === "failed") console.error("Onboarding confirmation email failed:", confirmationResult.error);
+    if (confirmationResult?.status === "failed") console.error("Onboarding confirmation email failed:", confirmationResult.error);
 
     return { success: true, message: "האפיון התקבל בהצלחה", referenceCode };
   } catch (error) {
