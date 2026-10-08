@@ -251,3 +251,92 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@keyframes onboarding-hero-enter {
+  from { opacity: 0; transform: translateY(18px); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+@keyframes onboarding-feature-enter {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes onboarding-wizard-enter {
+  from { opacity: 0; transform: translateY(24px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes onboarding-step-forward {
+  from { opacity: 0; transform: translateX(-24px) scale(0.992); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes onboarding-step-backward {
+  from { opacity: 0; transform: translateX(24px) scale(0.992); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes onboarding-orb-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(18px, -22px, 0) scale(1.08); }
+}
+
+@keyframes onboarding-progress-shine {
+  from { background-position: 100% 50%; }
+  to { background-position: 0 50%; }
+}
+
+.onboarding-hero-enter { animation: onboarding-hero-enter 650ms cubic-bezier(.2,.8,.2,1) both; }
+.onboarding-features-enter { animation: onboarding-feature-enter 600ms 120ms cubic-bezier(.2,.8,.2,1) both; }
+.onboarding-feature-card { animation: onboarding-feature-enter 520ms cubic-bezier(.2,.8,.2,1) both; transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease; }
+.onboarding-wizard-enter { animation: onboarding-wizard-enter 700ms 220ms cubic-bezier(.2,.8,.2,1) both; }
+.onboarding-step-forward { animation: onboarding-step-forward 380ms cubic-bezier(.2,.8,.2,1) both; }
+.onboarding-step-backward { animation: onboarding-step-backward 380ms cubic-bezier(.2,.8,.2,1) both; }
+.onboarding-progress { background-size: 200% 100%; animation: onboarding-progress-shine 2.8s linear infinite; }
+
+.onboarding-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(2px);
+  pointer-events: none;
+  animation: onboarding-orb-float 10s ease-in-out infinite;
+}
+
+.onboarding-orb-one {
+  width: 30rem;
+  height: 30rem;
+  top: -13rem;
+  right: -10rem;
+  background: radial-gradient(circle, rgb(191 219 254 / 0.65), rgb(219 234 254 / 0));
+}
+
+.onboarding-orb-two {
+  width: 26rem;
+  height: 26rem;
+  top: 28rem;
+  left: -13rem;
+  background: radial-gradient(circle, rgb(165 243 252 / 0.38), rgb(207 250 254 / 0));
+  animation-delay: -4s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onboarding-feature-card:hover {
+    transform: translateY(-4px);
+    border-color: rgb(191 219 254 / 0.9);
+    box-shadow: 0 18px 42px rgb(37 99 235 / 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-hero-enter,
+  .onboarding-features-enter,
+  .onboarding-feature-card,
+  .onboarding-wizard-enter,
+  .onboarding-step-forward,
+  .onboarding-step-backward,
+  .onboarding-progress,
+  .onboarding-orb {
+    animation: none !important;
+  }
+}
