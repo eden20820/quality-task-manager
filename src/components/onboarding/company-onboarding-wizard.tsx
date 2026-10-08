@@ -127,6 +127,8 @@ function Summary({ answers }: { answers: IntakeAnswers }) {
 
 export function CompanyOnboardingWizard() {
   const [step, setStep] = useState(0);
+  const [maxStepReached, setMaxStepReached] = useState(0);
+  const [direction, setDirection] = useState<"forward" | "backward">("forward");
   const [answers, setAnswers] = useState<IntakeAnswers>(EMPTY_INTAKE);
   const [errors, setErrors] = useState<FieldErrorMap>({});
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -171,14 +173,33 @@ export function CompanyOnboardingWizard() {
     panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function goToStep(target: number) {
+    if (target < 0 || target >= STEPS.length || target > maxStepReached || target === step) return;
+    setDirection(target > step ? "forward" : "backward");
+    setErrors({});
+    setStep(target);
+    scrollToTop();
+  }
+
   function next() {
     const currentErrors: FieldErrorMap = {};
     for (const key of STEP_FIELDS[step]) if (allErrors[key]) currentErrors[key] = allErrors[key];
     if (Object.keys(currentErrors).length) { setErrors(currentErrors); return; }
-    setErrors({}); setStep((current) => Math.min(current + 1, STEPS.length - 1)); scrollToTop();
+    const target = Math.min(step + 1, STEPS.length - 1);
+    setErrors({});
+    setDirection("forward");
+    setMaxStepReached((current) => Math.max(current, target));
+    setStep(target);
+    scrollToTop();
   }
 
-  function previous() { setErrors({}); setStep((current) => Math.max(current - 1, 0)); scrollToTop(); }
+  function previous() {
+    if (step === 0) return;
+    setErrors({});
+    setDirection("backward");
+    setStep((current) => Math.max(current - 1, 0));
+    scrollToTop();
+  }
 
   function submit() {
     const validation = validateIntake(answers);
@@ -204,14 +225,24 @@ export function CompanyOnboardingWizard() {
   );
 
   return (
-    <div ref={panelRef} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
-      <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-5 sm:px-8">
-        <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-black text-slate-950">שלב {step + 1} מתוך {STEPS.length}</p><p className="mt-1 text-xs text-slate-500">{STEPS[step].subtitle}</p></div><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Save className="size-4" />{savedAt ? `הטיוטה נשמרה ב-${savedAt}` : "הטיוטה נשמרת אוטומטית"}</div></div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-gradient-to-l from-blue-600 to-cyan-500 transition-all duration-500" style={{ width: `${completion}%` }} /></div>
-        <nav className="mt-5 hidden grid-cols-8 gap-2 lg:grid" aria-label="שלבי האפיון">{STEPS.map((item, index) => { const Icon = item.icon; return <button type="button" key={item.title} onClick={() => index < step && setStep(index)} disabled={index > step} className={cn("rounded-xl px-2 py-2 text-center transition", index === step ? "bg-slate-950 text-white" : index < step ? "text-slate-700 hover:bg-white" : "text-slate-400")}><Icon className="mx-auto mb-1 size-4" /><span className="text-[11px] font-bold">{item.title}</span></button>; })}</nav>
+    <div ref={panelRef} className="overflow-hidden rounded-[1.75rem] border border-white/90 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.13)] ring-1 ring-slate-200/70">
+      <div className="border-b border-slate-200 bg-slate-50/85 px-5 py-5 backdrop-blur sm:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={previous} disabled={step === 0 || isPending} aria-label="השלב הקודם" className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700 hover:shadow-md disabled:pointer-events-none disabled:opacity-35"><ArrowRight className="size-4" /></button>
+            <div><p className="text-sm font-black text-slate-950">שלב {step + 1} מתוך {STEPS.length}</p><p className="mt-1 text-xs text-slate-500">{STEPS[step].subtitle}</p></div>
+            <button type="button" onClick={() => goToStep(step + 1)} disabled={step >= maxStepReached || isPending} aria-label="השלב הבא" className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:text-blue-700 hover:shadow-md disabled:pointer-events-none disabled:opacity-35"><ArrowLeft className="size-4" /></button>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Save className="size-4 text-blue-600" />{savedAt ? `הטיוטה נשמרה ב-${savedAt}` : "הטיוטה נשמרת אוטומטית"}</div>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200"><div className="onboarding-progress h-full rounded-full bg-gradient-to-l from-blue-600 via-cyan-500 to-blue-600 transition-[width] duration-700 ease-out" style={{ width: `${completion}%` }} /></div>
+        <div className="mt-5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          <nav className="grid min-w-[44rem] grid-cols-8 gap-2" aria-label="שלבי האפיון">{STEPS.map((item, index) => { const Icon = item.icon; const accessible = index <= maxStepReached; return <button type="button" key={item.title} onClick={() => goToStep(index)} disabled={!accessible} aria-current={index === step ? "step" : undefined} className={cn("group rounded-xl px-2 py-2.5 text-center transition-all duration-300 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100", index === step ? "scale-[1.03] bg-slate-950 text-white shadow-lg shadow-slate-950/15" : accessible ? "bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:bg-white hover:shadow-sm" : "text-slate-400 opacity-55")}><span className={cn("mx-auto mb-1.5 flex size-7 items-center justify-center rounded-lg transition-colors", index === step ? "bg-white/15" : accessible ? "bg-blue-50 text-blue-700" : "bg-slate-100")}><Icon className="size-4" /></span><span className="text-[11px] font-bold">{item.title}</span></button>; })}</nav>
+        </div>
       </div>
 
       <div className="px-5 py-7 sm:px-8 sm:py-9 lg:px-10">
+        <div key={step} className={direction === "forward" ? "onboarding-step-forward" : "onboarding-step-backward"}>
         {step === 0 && <div className="space-y-6"><SectionIntro eyebrow="01 · היכרות" title="נתחיל מהחברה ומהאנשים" description="פרטים בסיסיים שיעזרו לנו להתאים את סביבת העבודה, ההרשאות ואופן הליווי." /><div className="grid gap-5 sm:grid-cols-2"><Field label="שם החברה" required error={errors.companyName}><input className={inputClass} value={answers.companyName} onChange={(event) => update("companyName", event.target.value)} placeholder="לדוגמה: Acme Medical" /></Field><Field label="שם משפטי / ח.פ." hint="אופציונלי"><input className={inputClass} value={answers.legalName} onChange={(event) => update("legalName", event.target.value)} /></Field></div><Field label="תחום הפעילות" required error={errors.industry}><ChoiceGroup value={answers.industry} onChange={(value) => update("industry", value)} options={INDUSTRIES} columns={4} /></Field>{answers.industry === "אחר" && <Field label="מהו תחום הפעילות?" required error={errors.industryOther}><input className={inputClass} value={answers.industryOther} onChange={(event) => update("industryOther", event.target.value)} /></Field>}<div className="grid gap-5 sm:grid-cols-3"><Field label="מספר עובדים" required error={errors.employeeRange}><select className={inputClass} value={answers.employeeRange} onChange={(event) => update("employeeRange", event.target.value)}><option value="">בחירה</option>{["1–10", "11–50", "51–100", "101–250", "251–500", "מעל 500"].map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="מספר אתרים"><input className={inputClass} type="number" min="1" value={answers.siteCount} onChange={(event) => update("siteCount", event.target.value)} /></Field><Field label="אתר אינטרנט"><input className={inputClass} type="url" dir="ltr" value={answers.website} onChange={(event) => update("website", event.target.value)} placeholder="https://" /></Field></div><Field label="מיקומי החברה" hint="מפעלים, משרדים או מחסנים"><input className={inputClass} value={answers.locations} onChange={(event) => update("locations", event.target.value)} /></Field><div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-5"><h3 className="mb-4 font-black text-slate-900">איש/אשת הקשר לפרויקט</h3><div className="grid gap-5 sm:grid-cols-2"><Field label="שם מלא" required error={errors.contactName}><input className={inputClass} autoComplete="name" value={answers.contactName} onChange={(event) => update("contactName", event.target.value)} /></Field><Field label="תפקיד"><input className={inputClass} value={answers.contactRole} onChange={(event) => update("contactRole", event.target.value)} /></Field><Field label="דוא״ל" required error={errors.contactEmail}><input className={inputClass} type="email" dir="ltr" autoComplete="email" value={answers.contactEmail} onChange={(event) => update("contactEmail", event.target.value)} /></Field><Field label="טלפון" required error={errors.contactPhone}><input className={inputClass} type="tel" dir="ltr" autoComplete="tel" value={answers.contactPhone} onChange={(event) => update("contactPhone", event.target.value)} /></Field></div></div></div>}
 
         {step === 1 && <div className="space-y-6"><SectionIntro eyebrow="02 · תאימות" title="לאילו דרישות המערכת צריכה להתאים?" description="אפשר לבחור כמה תקנים. המידע יסייע לנו לבנות תהליכים, הרשאות ותיעוד שמתאימים לביקורות שלכם." /><Field label="תקנים ודרישות רגולטוריות" required error={errors.standards}><MultiChoice values={answers.standards} onChange={(value) => update("standards", value)} options={STANDARDS} /></Field>{answers.standards.includes("אחר") && <Field label="תקן או דרישה נוספת" required error={errors.otherStandard}><input className={inputClass} value={answers.otherStandard} onChange={(event) => update("otherStandard", event.target.value)} /></Field>}<Field label="מהו שלב ההסמכה הנוכחי?" required error={errors.certificationStage}><ChoiceGroup value={answers.certificationStage} onChange={(value) => update("certificationStage", value)} options={["מוסמכים כיום", "בתהליך הסמכה", "מתכוננים להסמכה", "טרם הוחלט", "לא נדרשת הסמכה"]} /></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="תאריך יעד להסמכה / מבדק"><input className={inputClass} type="date" value={answers.certificationDeadline} onChange={(event) => update("certificationDeadline", event.target.value)} /></Field><Field label="שוקי יעד או גופים רגולטוריים"><input className={inputClass} value={answers.regulatoryNotes} onChange={(event) => update("regulatoryNotes", event.target.value)} placeholder="FDA, CE, משרד הבריאות..." /></Field></div></div>}
@@ -227,6 +258,7 @@ export function CompanyOnboardingWizard() {
         {step === 6 && <div className="space-y-6"><SectionIntro eyebrow="07 · אוטומציה" title="חיבורים, התראות ותזכורות" description="נגדיר כיצד המערכת משתלבת בסביבת העבודה ומוודאת ששום פעולה או תוקף לא נשכחים." /><Field label="אילו חיבורים נדרשים?" required error={errors.integrations}><MultiChoice values={answers.integrations} onChange={(value) => update("integrations", value)} options={INTEGRATIONS} /></Field>{answers.integrations.includes("אחר") && <Field label="איזו אינטגרציה נוספת?" required error={errors.otherIntegration}><input className={inputClass} value={answers.otherIntegration} onChange={(event) => update("otherIntegration", event.target.value)} /></Field>}<Field label="איך תרצו לקבל התראות?" required error={errors.notifications}><MultiChoice values={answers.notifications} onChange={(value) => update("notifications", value)} options={["דוא״ל", "התראה בתוך המערכת", "סיכום יומי", "סיכום שבועי", "Teams / Slack", "ללא התראות אוטומטיות"]} /></Field><Field label="כללי תזכורת והסלמה רצויים"><textarea className={textareaClass} value={answers.reminderRules} onChange={(event) => update("reminderRules", event.target.value)} placeholder="לדוגמה: 30 יום לפני תוקף, תזכורת נוספת לאחר 7 ימים, העברה למנהל..." /></Field></div>}
 
         {step === 7 && <div className="space-y-6"><SectionIntro eyebrow="08 · כמעט סיימנו" title="מה ייחשב להצלחה?" description="הפרטים האחרונים יעזרו לנו להציע סדר הקמה מציאותי ולמדוד שהמערכת אכן נותנת ערך." /><div className="grid gap-5 sm:grid-cols-2"><Field label="יעד לעלייה לאוויר" required error={errors.goLiveTarget}><select className={inputClass} value={answers.goLiveTarget} onChange={(event) => update("goLiveTarget", event.target.value)}><option value="">בחירה</option>{["בהקדם האפשרי", "תוך חודש", "תוך 3 חודשים", "תוך 6 חודשים", "בהמשך השנה", "אין עדיין יעד"].map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="עדיפות ההקמה" required error={errors.implementationPriority}><select className={inputClass} value={answers.implementationPriority} onChange={(event) => update("implementationPriority", event.target.value)}><option value="">בחירה</option>{["קריטית – צורך מיידי", "גבוהה", "בינונית", "בשלב בחינה"].map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="מיתוג רצוי"><input className={inputClass} value={answers.branding} onChange={(event) => update("branding", event.target.value)} placeholder="לוגו, צבעי מותג, white-label..." /></Field><Field label="כתובת מערכת רצויה"><input className={inputClass} dir="ltr" value={answers.preferredDomain} onChange={(event) => update("preferredDomain", event.target.value)} placeholder="quality.company.com" /></Field></div><Field label="איך תדעו שהפרויקט הצליח?" required error={errors.successDefinition}><textarea className={textareaClass} value={answers.successDefinition} onChange={(event) => update("successDefinition", event.target.value)} placeholder="לדוגמה: מעבר מלא מאקסל, ירידה בפיגורים, הכנה מהירה למבדק..." /></Field><Field label="הערות, מגבלות או מידע נוסף"><textarea className={textareaClass} value={answers.additionalNotes} onChange={(event) => update("additionalNotes", event.target.value)} /></Field><div className="border-t border-slate-200 pt-7"><h3 className="mb-4 text-xl font-black text-slate-950">סיכום הפרטים</h3><Summary answers={answers} /></div><div className="absolute -right-[10000px]" aria-hidden="true"><label htmlFor="company-site">Company site</label><input id="company-site" tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} /></div>{submitError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">{submitError}</div>}</div>}
+        </div>
       </div>
 
       <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-8">

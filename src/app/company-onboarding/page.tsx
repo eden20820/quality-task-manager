@@ -1,38 +1,65 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import { CheckCircle2, Clock3, LockKeyhole, MailCheck } from "lucide-react";
+import { CheckCircle2, Clock3, LockKeyhole, MailCheck, Sparkles } from "lucide-react";
 
 import { CompanyOnboardingWizard } from "@/components/onboarding/company-onboarding-wizard";
 
 export const metadata: Metadata = {
-  title: "אפיון מערכת ניהול איכות | Caeli Quality Hub",
+  title: "אפיון מערכת ניהול איכות",
   description: "שאלון אפיון מקצועי להקמת מערכת ניהול איכות המותאמת לתהליכים, לתקנים ולצוות שלכם.",
   robots: { index: false, follow: false },
 };
 
+const highlights = [
+  { icon: Clock3, title: "כ־12 דקות", text: "הטיוטה נשמרת אוטומטית" },
+  { icon: CheckCircle2, title: "שאלות מותאמות", text: "רק מה שרלוונטי לארגון" },
+  { icon: MailCheck, title: "סיכום מסודר", text: "אישור ומספר פנייה בדוא״ל" },
+];
+
 export default function CompanyOnboardingPage() {
   return (
-    <main dir="rtl" className="min-h-screen bg-[radial-gradient(circle_at_top_right,#dbeafe_0,transparent_34%),linear-gradient(to_bottom,#f8fafc,#eef2f7)] text-slate-950">
-      <header className="border-b border-white/70 bg-white/75 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-          <div className="flex items-center gap-3"><Image src="/caeli-logo.png" alt="Caeli" width={88} height={50} priority className="h-auto w-[76px] sm:w-[88px]" /><span className="hidden h-8 w-px bg-slate-200 sm:block" /><div className="hidden sm:block"><strong className="block text-sm text-slate-950">Quality Hub</strong><span className="text-xs text-slate-500">אפיון מערכת חכם</span></div></div>
-          <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800"><LockKeyhole className="size-3.5" />טופס מאובטח</div>
+    <main dir="rtl" className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f1f5f9_48%,#eef2f7_100%)] text-slate-950">
+      <div aria-hidden="true" className="onboarding-orb onboarding-orb-one" />
+      <div aria-hidden="true" className="onboarding-orb onboarding-orb-two" />
+
+      <header className="relative z-10 border-b border-white/80 bg-white/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+          <div>
+            <strong className="block text-sm font-black text-slate-950 sm:text-base">אפיון מערכת ניהול איכות</strong>
+            <span className="text-xs text-slate-500">תכנון מדויק מתחיל באפיון נכון</span>
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-xs font-bold text-emerald-800 shadow-sm">
+            <LockKeyhole className="size-3.5" />טופס מאובטח
+          </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-5 pb-16 pt-10 sm:px-8 sm:pt-14 lg:pb-24">
-        <div className="grid items-start gap-9 lg:grid-cols-[minmax(0,1fr)_21rem] xl:gap-14">
-          <div className="min-w-0 order-2 lg:order-1"><CompanyOnboardingWizard /></div>
-          <aside className="order-1 lg:sticky lg:top-8 lg:order-2">
-            <p className="text-xs font-extrabold tracking-[0.2em] text-blue-600">אפיון לפני הקמה</p>
-            <h1 className="mt-3 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-[2.65rem]">מערכת איכות שמתאימה לארגון שלכם</h1>
-            <p className="mt-4 text-base leading-7 text-slate-600">השאלון מרכז את המידע הנדרש לתכנון מערכת מדויקת — מהתקנים והתהליכים ועד הרשאות, התראות והעברת נתונים.</p>
-            <div className="mt-7 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              {[{ icon: Clock3, title: "כ-12 דקות", text: "אפשר לעצור ולהמשיך מאותו מכשיר" }, { icon: CheckCircle2, title: "שאלות מותאמות", text: "יוצגו רק פרטים שרלוונטיים לכם" }, { icon: MailCheck, title: "אישור מסודר", text: "בסיום תקבלו מספר פנייה בדוא״ל" }].map(({ icon: Icon, title, text }) => <div key={title} className="flex gap-3 rounded-2xl border border-white bg-white/70 p-4 shadow-sm backdrop-blur"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><Icon className="size-5" /></span><div><strong className="text-sm text-slate-950">{title}</strong><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></div></div>)}
-            </div>
-            <p className="mt-6 text-xs leading-5 text-slate-500">לא חייבים לדעת את כל התשובות. ניתן לבחור &quot;לא ידוע&quot; ולחדד יחד בשיחת האפיון.</p>
-          </aside>
+      <section className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-9 sm:px-8 sm:pt-12 lg:pb-24">
+        <div className="onboarding-hero-enter mx-auto max-w-3xl text-center">
+          <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-blue-200 bg-blue-50/90 px-4 py-2 text-xs font-extrabold text-blue-700 shadow-sm">
+            <Sparkles className="size-4" />אפיון חכם לפני הקמה
+          </div>
+          <h1 className="mt-5 text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-5xl">
+            בונים מערכת איכות שמתאימה בדיוק לארגון שלכם
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+            השאלון מרכז את כל המידע הדרוש לתכנון המערכת — מהתקנים והתהליכים ועד הרשאות, התראות והעברת נתונים.
+          </p>
         </div>
+
+        <div className="onboarding-features-enter mx-auto mt-7 grid max-w-4xl gap-3 sm:grid-cols-3">
+          {highlights.map(({ icon: Icon, title, text }, index) => (
+            <div key={title} style={{ animationDelay: `${120 + index * 90}ms` }} className="onboarding-feature-card flex items-center gap-3 rounded-2xl border border-white/90 bg-white/75 p-4 shadow-[0_10px_32px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100"><Icon className="size-5" /></span>
+              <div className="text-right"><strong className="block text-sm text-slate-950">{title}</strong><p className="mt-0.5 text-xs leading-5 text-slate-500">{text}</p></div>
+            </div>
+          ))}
+        </div>
+
+        <div className="onboarding-wizard-enter mt-8 sm:mt-10">
+          <CompanyOnboardingWizard />
+        </div>
+
+        <p className="mt-5 text-center text-xs leading-5 text-slate-500">לא חייבים לדעת את כל התשובות. אפשר לבחור &quot;לא ידוע&quot; ולחדד יחד בהמשך.</p>
       </section>
     </main>
   );
