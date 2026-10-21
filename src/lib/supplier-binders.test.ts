@@ -39,4 +39,12 @@ describe("supplier binder catalogue", () => {
     ];
     expect(findSupplierRecord(supplierBinders[3].suppliers[3], suppliers)?.id).toBe("1");
   });
+
+  it("prefers a manually linked supplier over name matching", () => {
+    const suppliers = [
+      { id: "1", supplier_name: "Nautec", status: "Approved", expiration_date: null },
+      { id: "2", supplier_name: "הספק הנכון בעברית", status: "Approved", expiration_date: "2028-04-22" },
+    ];
+    expect(findSupplierRecord({ name: "Nautec", supplierId: "2" }, suppliers)?.id).toBe("2");
+  });
 });

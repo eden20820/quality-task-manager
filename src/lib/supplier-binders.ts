@@ -1,6 +1,9 @@
 export type SupplierBinderEntry = {
+  id?: string;
   name: string;
   aliases?: readonly string[];
+  supplierId?: string | null;
+  sortOrder?: number;
 };
 
 export type SupplierBinder = {
@@ -200,6 +203,9 @@ export function isSupplierSearchMatch(query: string, entry: SupplierBinderEntry)
 }
 
 export function findSupplierRecord(entry: SupplierBinderEntry, suppliers: readonly SupplierBinderRecord[]) {
+  if (entry.supplierId) {
+    return suppliers.find((supplier) => supplier.id === entry.supplierId) ?? null;
+  }
   let best: { supplier: SupplierBinderRecord; score: number } | null = null;
   let secondScore = 0;
 
