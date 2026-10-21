@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   CalendarClock,
   CalendarDays,
+  Folders,
   FolderArchive,
   Gauge,
   ListChecks,
@@ -26,6 +27,7 @@ const navigationItems = [
   { title: "מעקב פגי תוקף", href: "/expiry", icon: CalendarClock },
   { title: "מעקב כיולים", href: "/calibrations", icon: Gauge },
   { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
+  { title: "מעקב קלסרים", href: "/supplier-binders", icon: Folders },
   { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
 ];
