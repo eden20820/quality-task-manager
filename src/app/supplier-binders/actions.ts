@@ -115,3 +115,47 @@ export async function updateSupplierBinderName(formData: FormData): Promise<Bind
     return { success: false, message: friendlyError(error, "עדכון שם הקלסר נכשל") };
   }
 }
+
+export async function updateSupplierBinderOrder(binderIds: string[]): Promise<BinderEntryActionResult> {
+  try {
+    if (!Array.isArray(binderIds) || !binderIds.length) return { success: false, message: "לא התקבל סדר קלסרים לשמירה" };
+    const normalizedIds = binderIds.map((id) => optionalUuid(id));
+    if (normalizedIds.some((id) => !id) || new Set(normalizedIds).size !== normalizedIds.length) {
+      return { success: false, message: "סדר הקלסרים אינו תקין" };
+    }
+
+    const ids = normalizedIds as string[];
+    const { supabase } = await authorized();
+    const { data: currentBinders, error: loadError } = await supabase.from("supplier_binders").select("id");
+    if (loadError) throw loadError;
+    const currentIds = new Set((currentBinders ?? []).map((binder) => binder.id));
+    if (currentIds.size !== ids.length || ids.some((id) => !currentIds.has(id))) {
+      return { success: false, message: "סדר הקלסרים אינו תואם לקלסרים הקיימים" };
+    }
+
+    async function applyOrders(orders: number[]) {
+      const results = await Promise.all(ids.map((id, index) => supabase
+        .from("supplier_binders")
+        .update({ sort_order: orders[index], updated_at: new Date().toISOString() })
+        .eq("id", id)));
+      return results.filter((result) => result.error);
+    }
+
+    // Use temporary unique values first so the existing unique sort-order constraint
+    // cannot collide while two binders exchange places.
+    const temporaryOrders = ids.map((_, index) => -1_000_000 - index);
+    let errors = await applyOrders(temporaryOrders);
+    if (errors.length) errors = await applyOrders(temporaryOrders);
+    if (errors.length) throw errors[0].error;
+
+    const finalOrders = ids.map((_, index) => index + 1);
+    errors = await applyOrders(finalOrders);
+    if (errors.length) errors = await applyOrders(finalOrders);
+    if (errors.length) throw errors[0].error;
+
+    revalidatePath("/supplier-binders");
+    return { success: true, message: "סדר הקלסרים נשמר" };
+  } catch (error) {
+    return { success: false, message: friendlyError(error, "שמירת סדר הקלסרים נכשלה") };
+  }
+}
