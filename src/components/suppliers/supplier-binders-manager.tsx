@@ -2,13 +2,50 @@
 
 import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCircle2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowUpDown, Check, CheckCircle2, ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
-import { addSupplierBinderEntry, deleteSupplierBinderEntry, updateSupplierBinderEntry, updateSupplierBinderName } from "@/app/supplier-binders/actions";
+import { addSupplierBinderEntry, deleteSupplierBinderEntry, updateSupplierBinderEntry, updateSupplierBinderName, updateSupplierBinderOrder } from "@/app/supplier-binders/actions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { entrySearchScore, findSupplierRecord, isSupplierSearchMatch, supplierNameScore, type SupplierBinder, type SupplierBinderEntry, type SupplierBinderRecord } from "@/lib/supplier-binders";
 
 type EntryEditor = { mode: "add"; binder: SupplierBinder } | { mode: "edit"; binder: SupplierBinder; entry: SupplierBinderEntry };
+
+function BinderOrderDialog({ binders, onClose }: { binders: SupplierBinder[]; onClose: () => void }) {
+  const router = useRouter();
+  const [orderedBinders, setOrderedBinders] = useState(binders);
+  const [message, setMessage] = useState("");
+  const [saving, startSaving] = useTransition();
+
+  function move(index: number, direction: -1 | 1) {
+    const destination = index + direction;
+    if (destination < 0 || destination >= orderedBinders.length) return;
+    setOrderedBinders((current) => {
+      const next = [...current];
+      [next[index], next[destination]] = [next[destination], next[index]];
+      return next;
+    });
+    setMessage("");
+  }
+
+  function save() {
+    setMessage("");
+    startSaving(async () => {
+      const result = await updateSupplierBinderOrder(orderedBinders.map((binder) => binder.id));
+      if (result.success) {
+        router.refresh();
+        onClose();
+      } else {
+        setMessage(result.message);
+      }
+    });
+  }
+
+  return <Dialog open onOpenChange={(open) => { if (!open && !saving) onClose(); }}><DialogContent dir="rtl" className="sm:max-w-lg"><DialogHeader><DialogTitle>סידור הקלסרים</DialogTitle><DialogDescription>הזיזו את הקלסרים למיקום הרצוי ושמרו. הסדר החדש יוצג לכל המשתמשים.</DialogDescription></DialogHeader>
+    <div className="max-h-[60vh] space-y-2 overflow-y-auto py-1">{orderedBinders.map((binder, index) => <div key={binder.id} className="flex items-center gap-2 rounded-xl border bg-slate-50 p-2"><GripVertical className="h-5 w-5 shrink-0 text-slate-400" /><span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-black text-white">{index + 1}</span><span className="min-w-0 flex-1 truncate font-extrabold text-slate-900">קלסר {binder.label}</span><button type="button" onClick={() => move(index, -1)} disabled={index === 0 || saving} aria-label={`הזזת קלסר ${binder.label} למעלה`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-white hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button><button type="button" onClick={() => move(index, 1)} disabled={index === orderedBinders.length - 1 || saving} aria-label={`הזזת קלסר ${binder.label} למטה`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-white hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button></div>)}</div>
+    {message ? <p aria-live="polite" className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{message}</p> : null}
+    <DialogFooter><button type="button" onClick={onClose} disabled={saving} className="h-10 rounded-xl border px-5 font-bold disabled:opacity-50">ביטול</button><button type="button" onClick={save} disabled={saving} className="h-10 rounded-xl bg-slate-950 px-5 font-bold text-white disabled:opacity-50">{saving ? "שומר..." : "שמירת הסדר"}</button></DialogFooter>
+  </DialogContent></Dialog>;
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("he-IL").format(new Date(`${value}T12:00:00`));
@@ -108,6 +145,7 @@ export function SupplierBindersManager({ binders, suppliers, today, editable }: 
   const [search, setSearch] = useState("");
   const [entryEditor, setEntryEditor] = useState<EntryEditor | null>(null);
   const [binderEditor, setBinderEditor] = useState<SupplierBinder | null>(null);
+  const [orderEditorOpen, setOrderEditorOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [deleting, startDeleting] = useTransition();
   const deferredSearch = useDeferredValue(search.trim());
@@ -143,7 +181,7 @@ export function SupplierBindersManager({ binders, suppliers, today, editable }: 
   const matchedRecords = Array.from(recordByEntry.values()).filter(Boolean).length;
 
   return <div className="space-y-5">
-    <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><h1 className="text-3xl font-black tracking-tight sm:text-4xl">מעקב קלסרים</h1><div className="grid grid-cols-3 gap-2"><div className="rounded-xl border bg-white px-3 py-2 text-center"><b>{binders.length}</b><span className="mr-1 text-[10px] text-slate-500">קלסרים</span></div><div className="rounded-xl border bg-white px-3 py-2 text-center"><b>{totalPlacements}</b><span className="mr-1 text-[10px] text-slate-500">מיקומים</span></div><div className="rounded-xl border bg-white px-3 py-2 text-center"><b className="text-emerald-700">{matchedRecords}</b><span className="mr-1 text-[10px] text-slate-500">מקושרים</span></div></div></header>
+    <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div className="flex flex-wrap items-center gap-3"><h1 className="text-3xl font-black tracking-tight sm:text-4xl">מעקב קלסרים</h1>{editable && binders.length > 1 ? <button type="button" onClick={() => setOrderEditorOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-extrabold text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"><ArrowUpDown className="h-4 w-4" />שינוי סדר</button> : null}</div><div className="grid grid-cols-3 gap-2"><div className="rounded-xl border bg-white px-3 py-2 text-center"><b>{binders.length}</b><span className="mr-1 text-[10px] text-slate-500">קלסרים</span></div><div className="rounded-xl border bg-white px-3 py-2 text-center"><b>{totalPlacements}</b><span className="mr-1 text-[10px] text-slate-500">מיקומים</span></div><div className="rounded-xl border bg-white px-3 py-2 text-center"><b className="text-emerald-700">{matchedRecords}</b><span className="mr-1 text-[10px] text-slate-500">מקושרים</span></div></div></header>
     {!editable ? <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-900">אפשרויות העריכה ממתינות להפעלת עדכון מסד הנתונים של הקלסרים. הרשימות מוצגות כעת לקריאה בלבד.</p> : null}
     {actionMessage ? <p aria-live="polite" className={`rounded-xl p-3 text-sm font-bold ${actionMessage.includes("נכשלה") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{deleting ? "מבצע..." : actionMessage}</p> : null}
     <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"><div className="relative"><Search className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="חיפוש ספק בעברית או באנגלית, למשל אלון או ALON..." autoComplete="off" className="h-11 w-full rounded-xl border border-slate-300 bg-slate-50 pr-12 pl-12 text-sm font-semibold outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" />{search ? <button type="button" onClick={() => setSearch("")} aria-label="ניקוי החיפוש" className="absolute left-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg hover:bg-slate-200"><X className="h-4 w-4" /></button> : null}</div>{deferredSearch ? <p aria-live="polite" className="mt-2 text-xs font-extrabold text-blue-700">{visiblePlacements ? `${visiblePlacements} מיקומים נמצאו` : "לא נמצאה התאמה"}</p> : <p className="mt-2 text-[11px] font-semibold text-slate-500">החיפוש סלחני לשגיאות כתיב, הבדלי שפה, רווחים וסימני פיסוק.</p>}</section>
@@ -154,5 +192,6 @@ export function SupplierBindersManager({ binders, suppliers, today, editable }: 
     </article>)}</div><div className="h-4 rounded-b-lg border-x border-b border-slate-400 bg-gradient-to-b from-slate-500 to-slate-700 shadow-lg" /></section> : <section className="rounded-2xl border border-dashed bg-white px-6 py-14 text-center"><Search className="mx-auto h-9 w-9 text-slate-300" /><h2 className="mt-3 text-xl font-black">לא נמצא ספק בשם הזה</h2><button type="button" onClick={() => setSearch("")} className="mt-4 rounded-xl bg-slate-950 px-5 py-2.5 font-bold text-white">הצגת כל הקלסרים</button></section>}
     {entryEditor ? <EntryEditorDialog key={`${entryEditor.mode}-${entryEditor.binder.id}-${entryEditor.mode === "edit" ? entryEditor.entry.id : "new"}`} editor={entryEditor} suppliers={suppliers} onClose={() => setEntryEditor(null)} /> : null}
     {binderEditor ? <BinderEditorDialog key={binderEditor.id} binder={binderEditor} onClose={() => setBinderEditor(null)} onAdd={() => { const binder = binderEditor; setBinderEditor(null); setEntryEditor({ mode: "add", binder }); }} onEdit={(entry) => { const binder = binderEditor; setBinderEditor(null); setEntryEditor({ mode: "edit", binder, entry }); }} onDelete={(entry) => { setBinderEditor(null); removeEntry(entry); }} /> : null}
+    {orderEditorOpen ? <BinderOrderDialog binders={[...binders]} onClose={() => setOrderEditorOpen(false)} /> : null}
   </div>;
 }
