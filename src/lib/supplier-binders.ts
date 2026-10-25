@@ -60,11 +60,11 @@ export const supplierBinders: readonly SupplierBinder[] = [
       { name: "CHEMSOL" },
       { name: "WINEXT" },
       { name: "גדעון שמיים" },
-      { name: "גבריאל-קנה" },
+      { name: "גבריאל-טק" },
       { name: "Tarantula" },
       { name: "DIGIKEY" },
-      { name: "רקורד סנטר" },
-      { name: "גושן ברילי" },
+      { name: "ברקוד סנטר" },
+      { name: "גוטמן ברזילי" },
       { name: "AMRON" },
       { name: "MASTERAN LTD" },
       { name: "Shenzhen Tianzhi" },
@@ -152,6 +152,11 @@ const FINAL_HEBREW_LETTERS: Record<string, string> = {
   ץ: "צ",
 };
 
+const HEBREW_TO_LATIN: Record<string, string> = {
+  א: "a", ב: "b", ג: "g", ד: "d", ה: "h", ו: "o", ז: "z", ח: "h", ט: "t", י: "i",
+  כ: "k", ל: "l", מ: "m", נ: "n", ס: "s", ע: "a", פ: "p", צ: "ts", ק: "k", ר: "r", ש: "sh", ת: "t",
+};
+
 export function normalizeSupplierName(value: string) {
   return value
     .normalize("NFKD")
@@ -159,6 +164,10 @@ export function normalizeSupplierName(value: string) {
     .replace(/[\u0591-\u05C7]/g, "")
     .replace(/[ךםןףץ]/g, (letter) => FINAL_HEBREW_LETTERS[letter] ?? letter)
     .replace(/[^a-z0-9\u05d0-\u05ea]+/g, "");
+}
+
+export function transliterateSupplierName(value: string) {
+  return normalizeSupplierName(value).replace(/[\u05d0-\u05ea]/g, (letter) => HEBREW_TO_LATIN[letter] ?? letter);
 }
 
 function levenshtein(left: string, right: string) {
@@ -185,10 +194,18 @@ export function supplierNameScore(query: string, candidate: string) {
   const normalizedQuery = normalizeSupplierName(query);
   const normalizedCandidate = normalizeSupplierName(candidate);
   if (!normalizedQuery || !normalizedCandidate) return 0;
-  if (normalizedQuery === normalizedCandidate) return 100;
-  if (normalizedCandidate.includes(normalizedQuery) || normalizedQuery.includes(normalizedCandidate)) return 92;
-  const longest = Math.max(normalizedQuery.length, normalizedCandidate.length);
-  return Math.round((1 - levenshtein(normalizedQuery, normalizedCandidate) / longest) * 90);
+  const pairs = [
+    [normalizedQuery, normalizedCandidate],
+    [transliterateSupplierName(query), transliterateSupplierName(candidate)],
+  ];
+  let best = 0;
+  for (const [left, right] of pairs) {
+    if (left === right) return 100;
+    if (right.includes(left) || left.includes(right)) best = Math.max(best, 92);
+    const longest = Math.max(left.length, right.length);
+    best = Math.max(best, Math.round((1 - levenshtein(left, right) / longest) * 90));
+  }
+  return best;
 }
 
 export function entrySearchScore(query: string, entry: SupplierBinderEntry) {

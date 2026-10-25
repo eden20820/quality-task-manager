@@ -98,3 +98,20 @@ export async function deleteSupplierBinderEntry(entryId: string): Promise<Binder
     return { success: false, message: friendlyError(error, "הסרת הספק מהקלסר נכשלה") };
   }
 }
+
+export async function updateSupplierBinderName(formData: FormData): Promise<BinderEntryActionResult> {
+  try {
+    const binderId = optionalUuid(formData.get("binder_id"));
+    const label = clean(formData.get("label"));
+    if (!binderId) return { success: false, message: "הקלסר לא נמצא" };
+    if (!label) return { success: false, message: "יש להזין שם לקלסר" };
+    if (label.length > 40) return { success: false, message: "שם הקלסר ארוך מדי" };
+    const { supabase } = await authorized();
+    const { error } = await supabase.from("supplier_binders").update({ label, updated_at: new Date().toISOString() }).eq("id", binderId);
+    if (error) throw error;
+    revalidatePath("/supplier-binders");
+    return { success: true, message: "שם הקלסר עודכן" };
+  } catch (error) {
+    return { success: false, message: friendlyError(error, "עדכון שם הקלסר נכשל") };
+  }
+}
