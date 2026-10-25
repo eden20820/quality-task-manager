@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCircle2, Pencil, Plus, Search, ShieldAlert, Trash2, X } from "lucide-react";
+import { Check, CheckCircle2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 import { addSupplierBinderEntry, deleteSupplierBinderEntry, updateSupplierBinderEntry, updateSupplierBinderName } from "@/app/supplier-binders/actions";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -100,7 +100,7 @@ function EntryEditorDialog({ editor, suppliers, onClose }: { editor: EntryEditor
 
 function LabelSupplierRow({ entry, supplier, today, editable, onEdit }: { entry: SupplierBinderEntry; supplier: SupplierBinderRecord | null; today: string; editable: boolean; onEdit: () => void }) {
   const meta = supplierMeta(supplier, today);
-  return <div title={`${meta.text}${editable ? " · לחיצה כפולה לעריכה" : ""}`} onDoubleClick={editable ? onEdit : undefined} onKeyDown={editable ? (event) => { if (event.key === "Enter") onEdit(); } : undefined} role={editable ? "button" : undefined} tabIndex={editable ? 0 : undefined} className={`flex min-h-6 items-start gap-1 border-b border-dashed border-slate-200 py-1 last:border-0 ${editable ? "cursor-pointer rounded-sm hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" : ""}`}><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${meta.dot}`} /><span className="min-w-0 flex-1 break-words text-[11px] font-extrabold leading-tight text-slate-900">{entry.name}</span>{meta.warning ? <ShieldAlert className={`mt-0.5 h-3 w-3 shrink-0 ${meta.className}`} /> : null}</div>;
+  return <div title={`${meta.text}${editable ? " · לחיצה כפולה לעריכה" : ""}`} onDoubleClick={editable ? onEdit : undefined} onKeyDown={editable ? (event) => { if (event.key === "Enter") onEdit(); } : undefined} role={editable ? "button" : undefined} tabIndex={editable ? 0 : undefined} className={`flex min-h-6 items-start border-b border-dashed border-slate-200 py-1 last:border-0 ${editable ? "cursor-pointer rounded-sm hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" : ""}`}><span className="min-w-0 flex-1 break-words text-[11px] font-extrabold leading-tight text-slate-900">{entry.name}</span></div>;
 }
 
 export function SupplierBindersManager({ binders, suppliers, today, editable }: { binders: SupplierBinder[]; suppliers: SupplierBinderRecord[]; today: string; editable: boolean }) {
