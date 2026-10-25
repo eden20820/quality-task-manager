@@ -32,6 +32,11 @@ describe("supplier binder catalogue", () => {
     expect(isSupplierSearchMatch("AMI", { name: "LMI" })).toBe(false);
   });
 
+  it("matches Hebrew and English transliterations", () => {
+    expect(isSupplierSearchMatch("ALON", { name: "אלון טכנולוגיות" })).toBe(true);
+    expect(isSupplierSearchMatch("אלון", { name: "Alon Technologies" })).toBe(true);
+  });
+
   it("links a binder entry to an exact or aliased supplier record", () => {
     const suppliers = [
       { id: "1", supplier_name: "נאותק", status: "Approved", expiration_date: "2028-04-22" },
