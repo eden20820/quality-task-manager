@@ -45,7 +45,7 @@ const emptyDetails: RirDetails = {
   orderNumber: "",
   lotNumber: "",
   drawingNumber: "",
-  drawingRevision: "",
+  drawingRevision: "00",
   comments: "",
   documents: { coc: false, cot: false, coa: false, other: false },
   otherDocument: "",
@@ -60,7 +60,7 @@ const emptyApproval: RirApproval = {
   rejectedParts: "",
   inspectorName: "",
   inspectionDate: "",
-  reviewerName: "",
+  reviewerName: "Uzi Barzilay",
   reviewDate: "",
 };
 
@@ -68,7 +68,7 @@ function createAttributes(count: number, current: RirAttribute[] = []) {
   return Array.from({ length: count }, (_, index) => current[index] ?? {
     id: `measurement-${index + 1}`,
     name: `מידה ${index + 1}`,
-    equipment: "קליבר",
+    equipment: "Caliper",
     min: "",
     max: "",
   });
@@ -79,8 +79,8 @@ function formatMetric(value: number | null) {
   return new Intl.NumberFormat("he-IL", { maximumFractionDigits: 3 }).format(value);
 }
 
-function Field({ label, value, onChange, type = "text", placeholder, min }: { label: string; value: string; onChange: (value: string) => void; type?: "text" | "number" | "date"; placeholder?: string; min?: number }) {
-  return <label className="block text-sm font-bold text-slate-700"><span>{label}</span><input type={type} min={min} step={type === "number" ? "any" : undefined} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label>;
+function Field({ label, value, onChange, type = "text", placeholder, min, readOnly = false }: { label: string; value: string; onChange: (value: string) => void; type?: "text" | "number" | "date"; placeholder?: string; min?: number; readOnly?: boolean }) {
+  return <label className="block text-sm font-bold text-slate-700"><span>{label}</span><input type={type} min={min} step={type === "number" ? "any" : undefined} value={value} readOnly={readOnly} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className={`mt-2 h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none transition ${readOnly ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-600" : "border-slate-300 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100"}`} /></label>;
 }
 
 function PassFailControl({ value, onChange, label }: { value: RirPassFail; onChange: (value: RirPassFail) => void; label: string }) {
@@ -131,11 +131,11 @@ function ResultsStep({ attributes, rows, onRows }: { attributes: RirAttribute[];
     cells[nextIndex]?.select();
   }
 
-  function fillBlankStatuses(key: "visual" | "functional") {
-    onRows((current) => current.map((row) => row[key] ? row : { ...row, [key]: "Pass" }));
+  function setAllStatuses(key: "visual" | "functional", value: RirPassFail) {
+    onRows((current) => current.map((row) => ({ ...row, [key]: value })));
   }
 
-  return <section id="results" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"><div><h2 className="text-xl font-black">גיליון תוצאות</h2><p className="mt-1 text-sm text-slate-500">Enter עובר לתא הבא. אפשר גם להדביק טווח שלם ישירות מאקסל.</p></div><div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => fillBlankStatuses("visual")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">סמן חזותי תקין בחסרים</button><button type="button" onClick={() => fillBlankStatuses("functional")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">סמן פונקציונלי תקין בחסרים</button><span className="px-2 text-sm font-extrabold text-slate-600">{rows.length} דגימות</span></div></div><div className="max-h-[68vh] overflow-auto"><table className="w-full min-w-max border-collapse text-sm"><thead className="sticky top-0 z-20 bg-slate-100 shadow-sm"><tr><th className="sticky right-0 z-30 w-20 border-b border-l border-slate-300 bg-slate-100 p-2 text-center">דגימה</th>{attributes.map((attribute, index) => <th key={attribute.id} className="min-w-40 border-b border-l border-slate-300 p-2 text-center"><span className="block font-black">{index + 1}. {attribute.name}</span><span className="mt-1 block text-[11px] font-semibold text-slate-500">{attribute.min || "—"} עד {attribute.max || "—"} · {attribute.equipment || "ללא ציוד"}</span></th>)}<th className="min-w-40 border-b border-l border-slate-300 p-2 text-center">בדיקה חזותית</th><th className="min-w-40 border-b border-slate-300 p-2 text-center">בדיקה פונקציונלית</th></tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={row.specimen} className="[content-visibility:auto]"><th className="sticky right-0 z-10 border-b border-l border-slate-200 bg-white p-2 text-center font-black text-slate-700">{row.specimen}</th>{attributes.map((attribute, columnIndex) => {
+  return <section id="results" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"><div><h2 className="text-xl font-black">גיליון תוצאות</h2><p className="mt-1 text-sm text-slate-500">Enter עובר לתא הבא. אפשר גם להדביק טווח שלם ישירות מאקסל.</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-slate-500">סימון מהיר:</span><button type="button" onClick={() => setAllStatuses("visual", "Pass")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">VIS. — סמן הכול תקין</button><button type="button" onClick={() => setAllStatuses("functional", "Pass")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">FUNC. — סמן הכול תקין</button><button type="button" onClick={() => { setAllStatuses("visual", ""); setAllStatuses("functional", ""); }} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600">נקה VIS. ו-FUNC.</button><span className="px-2 text-sm font-extrabold text-slate-600">{rows.length} דגימות</span></div></div><div className="max-h-[68vh] overflow-auto"><table className="w-full min-w-max border-collapse text-sm"><thead className="sticky top-0 z-20 bg-slate-100 shadow-sm"><tr><th className="sticky right-0 z-30 w-20 border-b border-l border-slate-300 bg-slate-100 p-2 text-center">דגימה</th>{attributes.map((attribute, index) => <th key={attribute.id} className="min-w-40 border-b border-l border-slate-300 p-2 text-center"><span className="block font-black">{index + 1}. {attribute.name}</span><span className="mt-1 block text-[11px] font-semibold text-slate-500">{attribute.min || "—"} עד {attribute.max || "—"} · {attribute.equipment || "ללא ציוד"}</span></th>)}<th className="min-w-40 border-b border-l border-slate-300 p-2 text-center">VIS.<span className="mt-1 block text-[11px] text-slate-500">בדיקה חזותית</span></th><th className="min-w-40 border-b border-slate-300 p-2 text-center">FUNC.<span className="mt-1 block text-[11px] text-slate-500">בדיקה פונקציונלית</span></th></tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={row.specimen} className="[content-visibility:auto]"><th className="sticky right-0 z-10 border-b border-l border-slate-200 bg-white p-2 text-center font-black text-slate-700">{row.specimen}</th>{attributes.map((attribute, columnIndex) => {
           const state = measurementState(row.values[columnIndex] ?? "", attribute.min, attribute.max);
           const stateClass = state === "pass" ? "border-emerald-300 bg-emerald-50 text-emerald-950" : state === "fail" || state === "invalid" ? "border-red-300 bg-red-50 text-red-950" : state === "unconfigured" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-slate-200 bg-white text-slate-900";
           return <td key={attribute.id} className="border-b border-l border-slate-200 p-1.5"><input data-rir-measurement type="number" step="any" value={row.values[columnIndex] ?? ""} onChange={(event) => updateValue(rowIndex, columnIndex, event.target.value)} onPaste={(event) => pasteMeasurements(event, rowIndex, columnIndex)} onKeyDown={focusAdjacentCell} aria-label={`דגימה ${row.specimen}, ${attribute.name}`} className={`h-9 w-full rounded-md border px-2 text-center font-bold outline-none focus:ring-2 focus:ring-blue-400 ${stateClass}`} /></td>;
@@ -155,7 +155,7 @@ function SummaryStep({ details, attributes, rows, approval, onApproval }: { deta
 
   return <div className="space-y-6"><section className={`rounded-2xl border p-5 shadow-sm ${!complete ? "border-amber-200 bg-amber-50" : totalRejected ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"}`}><div className="flex items-start gap-3"><CheckCircle2 className={`mt-0.5 h-6 w-6 shrink-0 ${!complete ? "text-amber-600" : totalRejected ? "text-red-600" : "text-emerald-600"}`} /><div><h2 className="text-lg font-black">{!complete ? "הטופס עדיין לא הושלם" : totalRejected ? "נמצאו תוצאות חריגות" : "כל התוצאות שהוזנו תקינות"}</h2><p className="mt-1 text-sm font-semibold text-slate-600">הוזנו {entered} מתוך {expected} תוצאות. {totalRejected ? `${totalRejected} תוצאות סומנו כחריגות.` : "לא נמצאו חריגות בתוצאות שהוזנו."}</p></div></div></section>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b p-4 sm:p-6"><h2 className="text-xl font-black">סיכום מחושב</h2><p className="mt-1 text-sm text-slate-500">החישובים תואמים לנוסחאות שבטופס RIR המקורי.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-100"><tr><th className="p-3 text-right">מדד</th>{columns.map((column, index) => <th key={`${column.label}-${index}`} className="p-3 text-center">{column.label}</th>)}</tr></thead><tbody className="divide-y">{([['מקסימום', 'maximum'], ['מינימום', 'minimum'], ['ממוצע', 'average'], ['סטיית תקן', 'standardDeviation'], ['כמות שהוזנה', 'entered'], ['מאושר', 'approved'], ['נדחה', 'rejected']] as const).map(([label, key]) => <tr key={key}><th className="p-3 text-right font-extrabold text-slate-700">{label}</th>{columns.map((column, index) => <td key={`${key}-${index}`} className={`p-3 text-center font-bold ${key === "rejected" && column.summary.rejected ? "bg-red-50 text-red-700" : key === "approved" ? "text-emerald-700" : ""}`}>{column.numeric || !["maximum", "minimum", "average", "standardDeviation"].includes(key) ? formatMetric(column.summary[key]) : "—"}</td>)}</tr>)}</tbody></table></div></section>
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><h2 className="text-xl font-black">החלטה ואישור</h2><p className="mt-1 text-sm text-slate-500">פריט: {details.partName || "לא הוזן"} · ספק: {details.supplierName || "לא הוזן"}</p><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{([['approved', 'מאושר'], ['hold', 'החזקה / אי־התאמה'], ['rejected', 'נדחה'], ['special', 'מאושר בתנאים מיוחדים']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => update("disposition", value)} className={`min-h-12 rounded-xl border px-4 text-sm font-extrabold transition ${approval.disposition === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</button>)}</div><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="מספר אי־התאמה" value={approval.ncNumber} onChange={(value) => update("ncNumber", value)} /><label className="block text-sm font-bold text-slate-700">החלטת אי־התאמה<select value={approval.ncDecision} onChange={(event) => update("ncDecision", event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 font-semibold"><option value="">ללא החלטה</option><option value="accept">קבלה</option><option value="reject">דחייה</option><option value="rework">עיבוד מחדש</option></select></label><Field label="מספר חלקים מאושרים" type="number" min={0} value={approval.approvedParts} onChange={(value) => update("approvedParts", value)} /><Field label="מספר חלקים שנדחו" type="number" min={0} value={approval.rejectedParts} onChange={(value) => update("rejectedParts", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">תנאים מיוחדים / פירוט החלטה<textarea value={approval.specialConditions} onChange={(event) => update("specialConditions", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="שם הבודק" value={approval.inspectorName} onChange={(value) => update("inspectorName", value)} /><Field label="תאריך בדיקה" type="date" value={approval.inspectionDate} onChange={(value) => update("inspectionDate", value)} /><Field label="נבדק ואושר על ידי" value={approval.reviewerName} onChange={(value) => update("reviewerName", value)} /><Field label="תאריך אישור" type="date" value={approval.reviewDate} onChange={(value) => update("reviewDate", value)} /></div></section></div>;
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><h2 className="text-xl font-black">החלטה ואישור</h2><p className="mt-1 text-sm text-slate-500">פריט: {details.partName || "לא הוזן"} · ספק: {details.supplierName || "לא הוזן"}</p><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{([['approved', 'מאושר'], ['hold', 'החזקה / אי־התאמה'], ['rejected', 'נדחה'], ['special', 'מאושר בתנאים מיוחדים']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => update("disposition", value)} className={`min-h-12 rounded-xl border px-4 text-sm font-extrabold transition ${approval.disposition === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</button>)}</div><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="מספר אי־התאמה" value={approval.ncNumber} onChange={(value) => update("ncNumber", value)} /><label className="block text-sm font-bold text-slate-700">החלטת אי־התאמה<select value={approval.ncDecision} onChange={(event) => update("ncDecision", event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 font-semibold"><option value="">ללא החלטה</option><option value="accept">קבלה</option><option value="reject">דחייה</option><option value="rework">עיבוד מחדש</option></select></label><Field label="מספר חלקים מאושרים" type="number" min={0} value={approval.approvedParts} onChange={(value) => update("approvedParts", value)} /><Field label="מספר חלקים שנדחו" type="number" min={0} value={approval.rejectedParts} onChange={(value) => update("rejectedParts", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">תנאים מיוחדים / פירוט החלטה<textarea value={approval.specialConditions} onChange={(event) => update("specialConditions", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="שם הבודק" value={approval.inspectorName} onChange={(value) => update("inspectorName", value)} /><Field label="תאריך בדיקה" type="date" value={approval.inspectionDate} onChange={(value) => update("inspectionDate", value)} /><Field label="נבדק ואושר על ידי" value="Uzi Barzilay" onChange={() => undefined} readOnly /><Field label="תאריך אישור" type="date" value={approval.reviewDate} onChange={(value) => update("reviewDate", value)} /></div><p className="mt-3 text-xs font-semibold text-slate-500">חתימתו המאושרת של Uzi Barzilay תתווסף אוטומטית לקובץ ה-Excel.</p></section></div>;
 }
 
 export function RirForm() {
@@ -198,11 +198,14 @@ export function RirForm() {
       const draft = JSON.parse(saved) as RirDraft;
       if (draft.version !== 1 || !draft.details || !draft.approval || !Array.isArray(draft.rows) || !Array.isArray(draft.attributes) || !draft.attributes.length) throw new Error("Invalid draft");
       const safeSampleSize = Math.min(200, Math.max(1, Number(draft.sampleSize) || 10));
-      const safeAttributes = draft.attributes.slice(0, 8);
-      setDetails(draft.details);
+      const safeAttributes = draft.attributes.slice(0, 8).map((attribute) => ({
+        ...attribute,
+        equipment: attribute.equipment === "קליבר" ? "Caliper" : attribute.equipment,
+      }));
+      setDetails({ ...draft.details, drawingRevision: draft.details.drawingRevision || "00" });
       setAttributes(safeAttributes);
       setRows(resizeMeasurementRows(draft.rows, safeSampleSize, safeAttributes.length));
-      setApproval(draft.approval);
+      setApproval({ ...draft.approval, reviewerName: draft.approval.reviewerName || "Uzi Barzilay" });
       setSampleSize(safeSampleSize);
       setDraftMessage("הטיוטה נטענה בהצלחה");
     } catch {
@@ -236,12 +239,11 @@ export function RirForm() {
         throw new Error(result.error || "לא ניתן ליצור את הקובץ");
       }
       const blob = await response.blob();
-      const identity = details.catalogNumber || details.partName || new Date().toISOString().slice(0, 10);
-      const safeIdentity = identity.replace(/[^a-zA-Z0-9\u0590-\u05ff_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "report";
+      const safeCatalogNumber = details.catalogNumber.replace(/[^a-zA-Z0-9\u0590-\u05ff_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `RIR-${safeIdentity}.xlsx`;
+      link.download = `${safeCatalogNumber || "RIR-report"}.xlsx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
