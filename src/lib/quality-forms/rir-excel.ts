@@ -11,6 +11,7 @@ import {
   SERGEY_DROR_SIGNATURE_PNG_BASE64,
   UZI_BARZILAY_SIGNATURE_PNG_BASE64,
 } from "./uzi-signature";
+import { CAELI_LOGO_PNG_BASE64 } from "./rir-assets";
 
 const navy = "FF172554";
 const slate = "FFE2E8F0";
@@ -98,6 +99,14 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: navy } };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   worksheet.getRow(1).height = 34;
+  const companyLogoImageId = workbook.addImage({
+    base64: `data:image/png;base64,${CAELI_LOGO_PNG_BASE64}`,
+    extension: "png",
+  });
+  worksheet.addImage(companyLogoImageId, {
+    tl: { col: 0.08, row: 0.08 },
+    ext: { width: 61, height: 43 },
+  });
 
   worksheet.mergeCells(2, 1, 2, Math.max(2, middleColumn - 1));
   worksheet.getCell(2, 1).value = "Quality Form 8.4.2.2.0";
