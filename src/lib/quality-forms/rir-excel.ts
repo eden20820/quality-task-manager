@@ -1,4 +1,6 @@
 import {
+  formatMeasurementForEquipment,
+  isCaliperEquipment,
   measurementState,
   summarizeMeasurementColumn,
   summarizePassFail,
@@ -9,6 +11,7 @@ import {
   SERGEY_DROR_SIGNATURE_PNG_BASE64,
   UZI_BARZILAY_SIGNATURE_PNG_BASE64,
 } from "./uzi-signature";
+import { CAELI_LOGO_PNG_BASE64 } from "./rir-assets";
 
 const navy = "FF172554";
 const slate = "FFE2E8F0";
@@ -96,6 +99,14 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: navy } };
   titleCell.alignment = { horizontal: "center", vertical: "middle" };
   worksheet.getRow(1).height = 34;
+  const companyLogoImageId = workbook.addImage({
+    base64: `data:image/png;base64,${CAELI_LOGO_PNG_BASE64}`,
+    extension: "png",
+  });
+  worksheet.addImage(companyLogoImageId, {
+    tl: { col: 0.08, row: 0.08 },
+    ext: { width: 61, height: 43 },
+  });
 
   worksheet.mergeCells(2, 1, 2, Math.max(2, middleColumn - 1));
   worksheet.getCell(2, 1).value = "Quality Form 8.4.2.2.0";
@@ -155,10 +166,13 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
 
   payload.attributes.forEach((attribute, index) => {
     const column = measurementStartColumn + index;
+    const measurementNumberFormat = isCaliperEquipment(attribute.equipment) ? "0.00" : "0.000";
     worksheet.getCell(12, column).value = index + 1;
     worksheet.getCell(13, column).value = valueOrNA(attribute.equipment === "קליבר" ? "Caliper" : attribute.equipment);
-    worksheet.getCell(14, column).value = numericValue(attribute.max) ?? valueOrNA(attribute.max);
-    worksheet.getCell(15, column).value = numericValue(attribute.min) ?? valueOrNA(attribute.min);
+    worksheet.getCell(14, column).value = numericValue(formatMeasurementForEquipment(attribute.max, attribute.equipment)) ?? valueOrNA(attribute.max);
+    worksheet.getCell(15, column).value = numericValue(formatMeasurementForEquipment(attribute.min, attribute.equipment)) ?? valueOrNA(attribute.min);
+    worksheet.getCell(14, column).numFmt = measurementNumberFormat;
+    worksheet.getCell(15, column).numFmt = measurementNumberFormat;
   });
   worksheet.getCell(12, visualColumn).value = payload.attributes.length + 1;
   worksheet.getCell(13, visualColumn).value = "vis.";
@@ -185,11 +199,11 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
     worksheet.getCell(excelRow, 1).value = row.specimen;
     payload.attributes.forEach((attribute, attributeIndex) => {
       const cell = worksheet.getCell(excelRow, measurementStartColumn + attributeIndex);
-      const value = numericValue(row.values[attributeIndex] ?? "");
+      const value = numericValue(formatMeasurementForEquipment(row.values[attributeIndex] ?? "", attribute.equipment));
       cell.value = value;
       const state = measurementState(row.values[attributeIndex] ?? "", attribute.min, attribute.max);
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: state === "pass" ? green : state === "fail" || state === "invalid" ? red : state === "unconfigured" ? amber : white } };
-      cell.numFmt = "0.000";
+      cell.numFmt = isCaliperEquipment(attribute.equipment) ? "0.00" : "0.000";
     });
     const visualCell = worksheet.getCell(excelRow, visualColumn);
     visualCell.value = row.visual;
@@ -214,6 +228,7 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
     const letter = columnLetter(column);
     const range = `${letter}${firstDataRow}:${letter}${lastDataRow}`;
     const summary = numericSummaries[index];
+    const measurementNumberFormat = isCaliperEquipment(attribute.equipment) ? "0.00" : "0.000";
     const formulas: Array<{ formula: string; result: number | string }> = [
       { formula: `IF(COUNT(${range})=0,"",MAX(${range}))`, result: summary.maximum ?? "" },
       { formula: `IF(COUNT(${range})=0,"",MIN(${range}))`, result: summary.minimum ?? "" },
@@ -226,7 +241,7 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
     formulas.forEach((formula, formulaIndex) => {
       const cell = worksheet.getCell(summaryStart + formulaIndex, column);
       cell.value = formula;
-      cell.numFmt = formulaIndex === 3 ? "0.000" : formulaIndex < 3 ? "0.000" : "0";
+      cell.numFmt = formulaIndex < 4 ? measurementNumberFormat : "0";
     });
   });
 

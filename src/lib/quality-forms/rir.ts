@@ -67,6 +67,17 @@ export function drawingNumberForCatalog(catalogNumber: string) {
   return normalized ? `DG-${normalized}` : "";
 }
 
+export function isCaliperEquipment(equipment: string) {
+  return /(^|\s)caliper(\s|$)/i.test(equipment.trim()) || equipment.trim() === "קליבר";
+}
+
+export function formatMeasurementForEquipment(valueText: string, equipment: string) {
+  const normalized = valueText.trim();
+  if (!normalized || !isCaliperEquipment(equipment)) return valueText;
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value.toFixed(2) : valueText;
+}
+
 export function resizeMeasurementRows(
   current: RirMeasurementRow[],
   sampleSize: number,

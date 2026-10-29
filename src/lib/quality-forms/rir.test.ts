@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { drawingNumberForCatalog, measurementState, resizeMeasurementRows, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
+import { drawingNumberForCatalog, formatMeasurementForEquipment, isCaliperEquipment, measurementState, resizeMeasurementRows, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
 
 describe("RIR calculations", () => {
+  it("formats Caliper measurements with exactly two decimal places", () => {
+    expect(isCaliperEquipment("Caliper")).toBe(true);
+    expect(isCaliperEquipment("Digital Caliper")).toBe(true);
+    expect(formatMeasurementForEquipment("34", "Caliper")).toBe("34.00");
+    expect(formatMeasurementForEquipment("34.126", "Caliper")).toBe("34.13");
+    expect(formatMeasurementForEquipment("34", "Micrometer")).toBe("34");
+    expect(formatMeasurementForEquipment("", "Caliper")).toBe("");
+  });
   it("creates the drawing number from the catalog number", () => {
     expect(drawingNumberForCatalog(" XXX ")).toBe("DG-XXX");
     expect(drawingNumberForCatalog(" ")).toBe("");
