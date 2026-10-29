@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { measurementState, resizeMeasurementRows, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
+import { drawingNumberForCatalog, measurementState, resizeMeasurementRows, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
 
 describe("RIR calculations", () => {
+  it("creates the drawing number from the catalog number", () => {
+    expect(drawingNumberForCatalog(" XXX ")).toBe("DG-XXX");
+    expect(drawingNumberForCatalog(" ")).toBe("");
+  });
   it("preserves existing measurements when the table is resized", () => {
     const initial = resizeMeasurementRows([], 2, 2);
     initial[0].values = ["10", "20"];

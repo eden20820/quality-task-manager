@@ -4,7 +4,11 @@ import {
   summarizePassFail,
   type RirFormPayload,
 } from "./rir";
-import { UZI_BARZILAY_SIGNATURE_PNG_BASE64 } from "./uzi-signature";
+import {
+  EDEN_AHARON_SIGNATURE_PNG_BASE64,
+  SERGEY_DROR_SIGNATURE_PNG_BASE64,
+  UZI_BARZILAY_SIGNATURE_PNG_BASE64,
+} from "./uzi-signature";
 
 const navy = "FF172554";
 const slate = "FFE2E8F0";
@@ -255,32 +259,41 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   worksheet.getCell(decisionStart + 3, 1).value = "Special Conditions";
   worksheet.mergeCells(decisionStart + 3, 2, decisionStart + 3, lastColumn);
   worksheet.getCell(decisionStart + 3, 2).value = valueOrNA(payload.approval.specialConditions);
-  worksheet.getCell(decisionStart + 4, 1).value = "Inspector Name";
-  worksheet.mergeCells(decisionStart + 4, 2, decisionStart + 4, middleColumn);
-  worksheet.getCell(decisionStart + 4, 2).value = valueOrNA(payload.approval.inspectorName);
-  worksheet.getCell(decisionStart + 4, middleColumn + 1).value = "Date";
-  worksheet.mergeCells(decisionStart + 4, middleColumn + 2, decisionStart + 4, lastColumn);
-  worksheet.getCell(decisionStart + 4, Math.min(middleColumn + 2, lastColumn)).value = displayDate(payload.approval.inspectionDate);
-  worksheet.getCell(decisionStart + 5, 1).value = "Reviewed and Approved by";
-  worksheet.mergeCells(decisionStart + 5, 2, decisionStart + 5, middleColumn);
-  worksheet.getCell(decisionStart + 5, 2).value = "Uzi Barzilay";
-  worksheet.getCell(decisionStart + 5, middleColumn + 1).value = "Date";
-  worksheet.mergeCells(decisionStart + 5, middleColumn + 2, decisionStart + 5, lastColumn);
-  worksheet.getCell(decisionStart + 5, Math.min(middleColumn + 2, lastColumn)).value = displayDate(payload.approval.reviewDate);
+  const nameEndColumn = Math.max(2, middleColumn - 1);
+  const dateLabelColumn = middleColumn;
+  const dateValueColumn = middleColumn + 1;
+  const signatureLabelColumn = middleColumn + 2;
+  const signatureValueColumn = middleColumn + 3;
+  const inspectorName = payload.approval.inspectorName === "Sergey Dror" ? "Sergey Dror" : "Eden Aharon";
+  const inspectorSignature = inspectorName === "Sergey Dror" ? SERGEY_DROR_SIGNATURE_PNG_BASE64 : EDEN_AHARON_SIGNATURE_PNG_BASE64;
 
-  worksheet.getCell(decisionStart + 6, 1).value = "Approver Signature";
-  worksheet.mergeCells(decisionStart + 6, 2, decisionStart + 6, middleColumn);
-  worksheet.getRow(decisionStart + 6).height = 54;
-  const signatureImageId = workbook.addImage({
+  for (const row of [decisionStart + 4, decisionStart + 5]) {
+    if (nameEndColumn > 2) worksheet.mergeCells(row, 2, row, nameEndColumn);
+    if (signatureValueColumn < lastColumn) worksheet.mergeCells(row, signatureValueColumn, row, lastColumn);
+    worksheet.getCell(row, dateLabelColumn).value = "Date";
+    worksheet.getCell(row, signatureLabelColumn).value = "Signature";
+    worksheet.getRow(row).height = 32;
+  }
+
+  worksheet.getCell(decisionStart + 4, 1).value = "Inspector Name";
+  worksheet.getCell(decisionStart + 4, 2).value = inspectorName;
+  worksheet.getCell(decisionStart + 4, dateValueColumn).value = displayDate(payload.approval.inspectionDate);
+  const inspectorSignatureImageId = workbook.addImage({
+    base64: `data:image/png;base64,${inspectorSignature}`,
+    extension: "png",
+  });
+  worksheet.addImage(inspectorSignatureImageId, `${columnLetter(signatureValueColumn)}${decisionStart + 4}:${columnLetter(signatureValueColumn)}${decisionStart + 4}`);
+
+  worksheet.getCell(decisionStart + 5, 1).value = "Reviewed and Approved by";
+  worksheet.getCell(decisionStart + 5, 2).value = "Uzi Barzilay";
+  worksheet.getCell(decisionStart + 5, dateValueColumn).value = displayDate(payload.approval.reviewDate);
+  const approverSignatureImageId = workbook.addImage({
     base64: `data:image/png;base64,${UZI_BARZILAY_SIGNATURE_PNG_BASE64}`,
     extension: "png",
   });
-  worksheet.addImage(signatureImageId, `B${decisionStart + 6}:${columnLetter(middleColumn)}${decisionStart + 6}`);
-  worksheet.getCell(decisionStart + 6, middleColumn + 1).value = "Authorized Approval";
-  worksheet.mergeCells(decisionStart + 6, middleColumn + 2, decisionStart + 6, lastColumn);
-  worksheet.getCell(decisionStart + 6, Math.min(middleColumn + 2, lastColumn)).value = "Uzi Barzilay";
+  worksheet.addImage(approverSignatureImageId, `${columnLetter(signatureValueColumn)}${decisionStart + 5}:${columnLetter(signatureValueColumn)}${decisionStart + 5}`);
 
-  for (let row = 2; row <= decisionStart + 6; row += 1) {
+  for (let row = 2; row <= decisionStart + 5; row += 1) {
     for (let column = 1; column <= lastColumn; column += 1) {
       const cell = worksheet.getCell(row, column);
       cell.font = { name: "Arial", size: 10, bold: row >= 11 && row <= 15 };
@@ -316,13 +329,21 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   }
   worksheet.getCell(decisionStart, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: navy } };
   worksheet.getCell(decisionStart, 1).font = { name: "Arial", size: 11, bold: true, color: { argb: white } };
-  for (let row = decisionStart + 1; row <= decisionStart + 6; row += 1) {
+  for (let row = decisionStart + 1; row <= decisionStart + 5; row += 1) {
     worksheet.getCell(row, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightSlate } };
     worksheet.getCell(row, 1).font = { name: "Arial", size: 10, bold: true };
+  }
+  for (const row of [decisionStart + 1, decisionStart + 2]) {
     worksheet.getCell(row, middleColumn + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightSlate } };
     worksheet.getCell(row, middleColumn + 1).font = { name: "Arial", size: 10, bold: true };
   }
-  worksheet.pageSetup.printArea = `A1:${columnLetter(lastColumn)}${decisionStart + 6}`;
+  for (const row of [decisionStart + 4, decisionStart + 5]) {
+    for (const column of [dateLabelColumn, signatureLabelColumn]) {
+      worksheet.getCell(row, column).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightSlate } };
+      worksheet.getCell(row, column).font = { name: "Arial", size: 10, bold: true };
+    }
+  }
+  worksheet.pageSetup.printArea = `A1:${columnLetter(lastColumn)}${decisionStart + 5}`;
   worksheet.pageSetup.printTitlesRow = "1:15";
   worksheet.headerFooter.oddFooter = "Quality Task Manager · RIR";
   return workbook;

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import {
+  drawingNumberForCatalog,
   measurementState,
   resizeMeasurementRows,
   RIR_DRAFT_STORAGE_KEY,
@@ -51,18 +52,32 @@ const emptyDetails: RirDetails = {
   otherDocument: "",
 };
 
-const emptyApproval: RirApproval = {
-  disposition: "",
-  ncNumber: "",
-  ncDecision: "",
-  specialConditions: "",
-  approvedParts: "",
-  rejectedParts: "",
-  inspectorName: "",
-  inspectionDate: "",
-  reviewerName: "Uzi Barzilay",
-  reviewDate: "",
-};
+function todayInIsrael() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function createEmptyApproval(): RirApproval {
+  const today = todayInIsrael();
+  return {
+    disposition: "",
+    ncNumber: "",
+    ncDecision: "",
+    specialConditions: "",
+    approvedParts: "",
+    rejectedParts: "",
+    inspectorName: "Eden Aharon",
+    inspectionDate: today,
+    reviewerName: "Uzi Barzilay",
+    reviewDate: today,
+  };
+}
 
 function createAttributes(count: number, current: RirAttribute[] = []) {
   return Array.from({ length: count }, (_, index) => current[index] ?? {
@@ -89,9 +104,14 @@ function PassFailControl({ value, onChange, label }: { value: RirPassFail; onCha
 
 function DetailsStep({ details, onChange }: { details: RirDetails; onChange: (details: RirDetails) => void }) {
   const update = (key: keyof Omit<RirDetails, "documents">, value: string) => onChange({ ...details, [key]: value });
+  const updateCatalogNumber = (value: string) => onChange({
+    ...details,
+    catalogNumber: value,
+    drawingNumber: drawingNumberForCatalog(value),
+  });
   const toggleDocument = (key: keyof RirDetails["documents"]) => onChange({ ...details, documents: { ...details.documents, [key]: !details.documents[key] } });
 
-  return <div className="space-y-6"><section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5"><h2 className="text-xl font-black">פרטי קבלה ופריט</h2><p className="mt-1 text-sm text-slate-500">הפרטים שיופיעו בראש דוח ביקורת הקבלה.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Field label="מק״ט / מספר קטלוגי" value={details.catalogNumber} onChange={(value) => update("catalogNumber", value)} /><Field label="שם הפריט" value={details.partName} onChange={(value) => update("partName", value)} /><Field label="שם הספק" value={details.supplierName} onChange={(value) => update("supplierName", value)} /><Field label="כמות שהתקבלה" type="number" min={0} value={details.receivedQuantity} onChange={(value) => update("receivedQuantity", value)} /><Field label="מספר הזמנה" value={details.orderNumber} onChange={(value) => update("orderNumber", value)} /><Field label="מספר אצווה" value={details.lotNumber} onChange={(value) => update("lotNumber", value)} /><Field label="מספר שרטוט" value={details.drawingNumber} onChange={(value) => update("drawingNumber", value)} /><Field label="רוויזיית שרטוט" value={details.drawingRevision} onChange={(value) => update("drawingRevision", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">הערות<textarea value={details.comments} onChange={(event) => update("comments", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label></section>
+  return <div className="space-y-6"><section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5"><h2 className="text-xl font-black">פרטי קבלה ופריט</h2><p className="mt-1 text-sm text-slate-500">הפרטים שיופיעו בראש דוח ביקורת הקבלה.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Field label="מק״ט / מספר קטלוגי" value={details.catalogNumber} onChange={updateCatalogNumber} /><Field label="שם הפריט" value={details.partName} onChange={(value) => update("partName", value)} /><Field label="שם הספק" value={details.supplierName} onChange={(value) => update("supplierName", value)} /><Field label="כמות שהתקבלה" type="number" min={0} value={details.receivedQuantity} onChange={(value) => update("receivedQuantity", value)} /><Field label="מספר הזמנה" value={details.orderNumber} onChange={(value) => update("orderNumber", value)} /><Field label="מספר אצווה" value={details.lotNumber} onChange={(value) => update("lotNumber", value)} /><Field label="מספר שרטוט" value={details.drawingNumber} onChange={(value) => update("drawingNumber", value)} /><Field label="רוויזיית שרטוט" value={details.drawingRevision} onChange={(value) => update("drawingRevision", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">הערות<textarea value={details.comments} onChange={(event) => update("comments", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label></section>
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><h2 className="text-lg font-black">מסמכים מצורפים</h2><div className="mt-4 flex flex-wrap gap-3">{([['coc', 'COC'], ['cot', 'COT'], ['coa', 'COA'], ['other', 'אחר']] as const).map(([key, label]) => <label key={key} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-4 font-bold transition ${details.documents[key] ? "border-blue-500 bg-blue-50 text-blue-900" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}><input type="checkbox" checked={details.documents[key]} onChange={() => toggleDocument(key)} className="h-4 w-4 accent-blue-600" />{label}</label>)}</div>{details.documents.other ? <div className="mt-4 max-w-md"><Field label="שם המסמך האחר" value={details.otherDocument} onChange={(value) => update("otherDocument", value)} /></div> : null}</section></div>;
 }
 
@@ -124,11 +144,12 @@ function ResultsStep({ attributes, rows, onRows }: { attributes: RirAttribute[];
   function focusAdjacentCell(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    const cells = Array.from(document.querySelectorAll<HTMLInputElement>("[data-rir-measurement]"));
-    const currentIndex = cells.indexOf(event.currentTarget);
-    const nextIndex = currentIndex + (event.shiftKey ? -1 : 1);
-    cells[nextIndex]?.focus();
-    cells[nextIndex]?.select();
+    const row = Number(event.currentTarget.dataset.rirRow);
+    const column = Number(event.currentTarget.dataset.rirColumn);
+    const targetRow = row + (event.shiftKey ? -1 : 1);
+    const target = document.querySelector<HTMLInputElement>(`[data-rir-row="${targetRow}"][data-rir-column="${column}"]`);
+    target?.focus();
+    target?.select();
   }
 
   function setAllStatuses(key: "visual" | "functional", value: RirPassFail) {
@@ -138,7 +159,7 @@ function ResultsStep({ attributes, rows, onRows }: { attributes: RirAttribute[];
   return <section id="results" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"><div><h2 className="text-xl font-black">גיליון תוצאות</h2><p className="mt-1 text-sm text-slate-500">Enter עובר לתא הבא. אפשר גם להדביק טווח שלם ישירות מאקסל.</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-slate-500">סימון מהיר:</span><button type="button" onClick={() => setAllStatuses("visual", "Pass")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">VIS. — סמן הכול תקין</button><button type="button" onClick={() => setAllStatuses("functional", "Pass")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">FUNC. — סמן הכול תקין</button><button type="button" onClick={() => { setAllStatuses("visual", ""); setAllStatuses("functional", ""); }} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600">נקה VIS. ו-FUNC.</button><span className="px-2 text-sm font-extrabold text-slate-600">{rows.length} דגימות</span></div></div><div className="max-h-[68vh] overflow-auto"><table className="w-full min-w-max border-collapse text-sm"><thead className="sticky top-0 z-20 bg-slate-100 shadow-sm"><tr><th className="sticky right-0 z-30 w-20 border-b border-l border-slate-300 bg-slate-100 p-2 text-center">דגימה</th>{attributes.map((attribute, index) => <th key={attribute.id} className="min-w-40 border-b border-l border-slate-300 p-2 text-center"><span className="block font-black">{index + 1}. {attribute.name}</span><span className="mt-1 block text-[11px] font-semibold text-slate-500">{attribute.min || "—"} עד {attribute.max || "—"} · {attribute.equipment || "ללא ציוד"}</span></th>)}<th className="min-w-40 border-b border-l border-slate-300 p-2 text-center">VIS.<span className="mt-1 block text-[11px] text-slate-500">בדיקה חזותית</span></th><th className="min-w-40 border-b border-slate-300 p-2 text-center">FUNC.<span className="mt-1 block text-[11px] text-slate-500">בדיקה פונקציונלית</span></th></tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={row.specimen} className="[content-visibility:auto]"><th className="sticky right-0 z-10 border-b border-l border-slate-200 bg-white p-2 text-center font-black text-slate-700">{row.specimen}</th>{attributes.map((attribute, columnIndex) => {
           const state = measurementState(row.values[columnIndex] ?? "", attribute.min, attribute.max);
           const stateClass = state === "pass" ? "border-emerald-300 bg-emerald-50 text-emerald-950" : state === "fail" || state === "invalid" ? "border-red-300 bg-red-50 text-red-950" : state === "unconfigured" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-slate-200 bg-white text-slate-900";
-          return <td key={attribute.id} className="border-b border-l border-slate-200 p-1.5"><input data-rir-measurement type="number" step="any" value={row.values[columnIndex] ?? ""} onChange={(event) => updateValue(rowIndex, columnIndex, event.target.value)} onPaste={(event) => pasteMeasurements(event, rowIndex, columnIndex)} onKeyDown={focusAdjacentCell} aria-label={`דגימה ${row.specimen}, ${attribute.name}`} className={`h-9 w-full rounded-md border px-2 text-center font-bold outline-none focus:ring-2 focus:ring-blue-400 ${stateClass}`} /></td>;
+          return <td key={attribute.id} className="border-b border-l border-slate-200 p-1.5"><input data-rir-measurement data-rir-row={rowIndex} data-rir-column={columnIndex} type="number" step="any" value={row.values[columnIndex] ?? ""} onChange={(event) => updateValue(rowIndex, columnIndex, event.target.value)} onPaste={(event) => pasteMeasurements(event, rowIndex, columnIndex)} onKeyDown={focusAdjacentCell} aria-label={`דגימה ${row.specimen}, ${attribute.name}`} className={`h-9 w-full rounded-md border px-2 text-center font-bold outline-none focus:ring-2 focus:ring-blue-400 ${stateClass}`} /></td>;
         })}<td className="border-b border-l border-slate-200 p-1.5"><PassFailControl value={row.visual} onChange={(value) => updateStatus(rowIndex, "visual", value)} label={`בדיקה חזותית לדגימה ${row.specimen}`} /></td><td className="border-b border-slate-200 p-1.5"><PassFailControl value={row.functional} onChange={(value) => updateStatus(rowIndex, "functional", value)} label={`בדיקה פונקציונלית לדגימה ${row.specimen}`} /></td></tr>)}</tbody></table></div></section>;
 }
 
@@ -155,7 +176,7 @@ function SummaryStep({ details, attributes, rows, approval, onApproval }: { deta
 
   return <div className="space-y-6"><section className={`rounded-2xl border p-5 shadow-sm ${!complete ? "border-amber-200 bg-amber-50" : totalRejected ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"}`}><div className="flex items-start gap-3"><CheckCircle2 className={`mt-0.5 h-6 w-6 shrink-0 ${!complete ? "text-amber-600" : totalRejected ? "text-red-600" : "text-emerald-600"}`} /><div><h2 className="text-lg font-black">{!complete ? "הטופס עדיין לא הושלם" : totalRejected ? "נמצאו תוצאות חריגות" : "כל התוצאות שהוזנו תקינות"}</h2><p className="mt-1 text-sm font-semibold text-slate-600">הוזנו {entered} מתוך {expected} תוצאות. {totalRejected ? `${totalRejected} תוצאות סומנו כחריגות.` : "לא נמצאו חריגות בתוצאות שהוזנו."}</p></div></div></section>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b p-4 sm:p-6"><h2 className="text-xl font-black">סיכום מחושב</h2><p className="mt-1 text-sm text-slate-500">החישובים תואמים לנוסחאות שבטופס RIR המקורי.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-slate-100"><tr><th className="p-3 text-right">מדד</th>{columns.map((column, index) => <th key={`${column.label}-${index}`} className="p-3 text-center">{column.label}</th>)}</tr></thead><tbody className="divide-y">{([['מקסימום', 'maximum'], ['מינימום', 'minimum'], ['ממוצע', 'average'], ['סטיית תקן', 'standardDeviation'], ['כמות שהוזנה', 'entered'], ['מאושר', 'approved'], ['נדחה', 'rejected']] as const).map(([label, key]) => <tr key={key}><th className="p-3 text-right font-extrabold text-slate-700">{label}</th>{columns.map((column, index) => <td key={`${key}-${index}`} className={`p-3 text-center font-bold ${key === "rejected" && column.summary.rejected ? "bg-red-50 text-red-700" : key === "approved" ? "text-emerald-700" : ""}`}>{column.numeric || !["maximum", "minimum", "average", "standardDeviation"].includes(key) ? formatMetric(column.summary[key]) : "—"}</td>)}</tr>)}</tbody></table></div></section>
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><h2 className="text-xl font-black">החלטה ואישור</h2><p className="mt-1 text-sm text-slate-500">פריט: {details.partName || "לא הוזן"} · ספק: {details.supplierName || "לא הוזן"}</p><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{([['approved', 'מאושר'], ['hold', 'החזקה / אי־התאמה'], ['rejected', 'נדחה'], ['special', 'מאושר בתנאים מיוחדים']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => update("disposition", value)} className={`min-h-12 rounded-xl border px-4 text-sm font-extrabold transition ${approval.disposition === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</button>)}</div><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="מספר אי־התאמה" value={approval.ncNumber} onChange={(value) => update("ncNumber", value)} /><label className="block text-sm font-bold text-slate-700">החלטת אי־התאמה<select value={approval.ncDecision} onChange={(event) => update("ncDecision", event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 font-semibold"><option value="">ללא החלטה</option><option value="accept">קבלה</option><option value="reject">דחייה</option><option value="rework">עיבוד מחדש</option></select></label><Field label="מספר חלקים מאושרים" type="number" min={0} value={approval.approvedParts} onChange={(value) => update("approvedParts", value)} /><Field label="מספר חלקים שנדחו" type="number" min={0} value={approval.rejectedParts} onChange={(value) => update("rejectedParts", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">תנאים מיוחדים / פירוט החלטה<textarea value={approval.specialConditions} onChange={(event) => update("specialConditions", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="שם הבודק" value={approval.inspectorName} onChange={(value) => update("inspectorName", value)} /><Field label="תאריך בדיקה" type="date" value={approval.inspectionDate} onChange={(value) => update("inspectionDate", value)} /><Field label="נבדק ואושר על ידי" value="Uzi Barzilay" onChange={() => undefined} readOnly /><Field label="תאריך אישור" type="date" value={approval.reviewDate} onChange={(value) => update("reviewDate", value)} /></div><p className="mt-3 text-xs font-semibold text-slate-500">חתימתו המאושרת של Uzi Barzilay תתווסף אוטומטית לקובץ ה-Excel.</p></section></div>;
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><h2 className="text-xl font-black">החלטה ואישור</h2><p className="mt-1 text-sm text-slate-500">פריט: {details.partName || "לא הוזן"} · ספק: {details.supplierName || "לא הוזן"}</p><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{([['approved', 'מאושר'], ['hold', 'החזקה / אי־התאמה'], ['rejected', 'נדחה'], ['special', 'מאושר בתנאים מיוחדים']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => update("disposition", value)} className={`min-h-12 rounded-xl border px-4 text-sm font-extrabold transition ${approval.disposition === value ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</button>)}</div><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Field label="מספר אי־התאמה" value={approval.ncNumber} onChange={(value) => update("ncNumber", value)} /><label className="block text-sm font-bold text-slate-700">החלטת אי־התאמה<select value={approval.ncDecision} onChange={(event) => update("ncDecision", event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 font-semibold"><option value="">ללא החלטה</option><option value="accept">קבלה</option><option value="reject">דחייה</option><option value="rework">עיבוד מחדש</option></select></label><Field label="מספר חלקים מאושרים" type="number" min={0} value={approval.approvedParts} onChange={(value) => update("approvedParts", value)} /><Field label="מספר חלקים שנדחו" type="number" min={0} value={approval.rejectedParts} onChange={(value) => update("rejectedParts", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">תנאים מיוחדים / פירוט החלטה<textarea value={approval.specialConditions} onChange={(event) => update("specialConditions", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><label className="block text-sm font-bold text-slate-700">שם הבודק<select value={approval.inspectorName} onChange={(event) => update("inspectorName", event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-slate-300 bg-white px-3 font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"><option value="Eden Aharon">Eden Aharon</option><option value="Sergey Dror">Sergey Dror</option></select></label><Field label="תאריך בדיקה" type="date" value={approval.inspectionDate} onChange={(value) => update("inspectionDate", value)} /><Field label="Authorized Approval" value="Uzi Barzilay" onChange={() => undefined} readOnly /><Field label="תאריך אישור" type="date" value={approval.reviewDate} onChange={(value) => update("reviewDate", value)} /></div><p className="mt-3 text-xs font-semibold text-slate-500">חתימת הבודק שנבחר וחתימת האישור הקבועה של Uzi Barzilay יתווספו אוטומטית לקובץ ה-Excel.</p></section></div>;
 }
 
 export function RirForm() {
@@ -163,7 +184,7 @@ export function RirForm() {
   const [sampleSize, setSampleSize] = useState(10);
   const [attributes, setAttributes] = useState<RirAttribute[]>(() => createAttributes(3));
   const [rows, setRows] = useState<RirMeasurementRow[]>(() => resizeMeasurementRows([], 10, 3));
-  const [approval, setApproval] = useState<RirApproval>(emptyApproval);
+  const [approval, setApproval] = useState<RirApproval>(() => createEmptyApproval());
   const [draftMessage, setDraftMessage] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -202,10 +223,21 @@ export function RirForm() {
         ...attribute,
         equipment: attribute.equipment === "קליבר" ? "Caliper" : attribute.equipment,
       }));
-      setDetails({ ...draft.details, drawingRevision: draft.details.drawingRevision || "00" });
+      setDetails({
+        ...draft.details,
+        drawingRevision: draft.details.drawingRevision || "00",
+        drawingNumber: draft.details.drawingNumber || drawingNumberForCatalog(draft.details.catalogNumber),
+      });
       setAttributes(safeAttributes);
       setRows(resizeMeasurementRows(draft.rows, safeSampleSize, safeAttributes.length));
-      setApproval({ ...draft.approval, reviewerName: draft.approval.reviewerName || "Uzi Barzilay" });
+      const today = todayInIsrael();
+      setApproval({
+        ...draft.approval,
+        inspectorName: draft.approval.inspectorName === "Sergey Dror" ? "Sergey Dror" : "Eden Aharon",
+        inspectionDate: draft.approval.inspectionDate || today,
+        reviewerName: "Uzi Barzilay",
+        reviewDate: draft.approval.reviewDate || today,
+      });
       setSampleSize(safeSampleSize);
       setDraftMessage("הטיוטה נטענה בהצלחה");
     } catch {
@@ -219,7 +251,7 @@ export function RirForm() {
     setSampleSize(10);
     setAttributes(createAttributes(3));
     setRows(resizeMeasurementRows([], 10, 3));
-    setApproval(emptyApproval);
+    setApproval(createEmptyApproval());
     setDraftMessage("");
     window.localStorage.removeItem(RIR_DRAFT_STORAGE_KEY);
   }

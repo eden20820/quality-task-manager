@@ -62,6 +62,11 @@ export type RirFormPayload = {
 
 export const RIR_DRAFT_STORAGE_KEY = "quality-task-manager:rir-draft:v1";
 
+export function drawingNumberForCatalog(catalogNumber: string) {
+  const normalized = catalogNumber.trim();
+  return normalized ? `DG-${normalized}` : "";
+}
+
 export function resizeMeasurementRows(
   current: RirMeasurementRow[],
   sampleSize: number,
