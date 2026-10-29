@@ -62,7 +62,8 @@ describe("RIR Excel export", () => {
     expect(worksheet?.getCell("D22").value).toMatchObject({ formula: expect.stringContaining("STDEV(") });
     expect(worksheet?.getCell("B32").value).toBe("Sergey Dror");
     expect(worksheet?.getCell("B33").value).toBe("Uzi Barzilay");
-    expect(worksheet?.getImages()).toHaveLength(2);
+    expect(worksheet?.getImages()).toHaveLength(3);
+    expect(worksheet?.getImages()[0]?.range).toMatchObject({ ext: { width: 61, height: 43 } });
 
     const buffer = await workbook.xlsx.writeBuffer();
     expect(buffer.byteLength).toBeGreaterThan(5_000);
