@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   CalendarClock,
   CalendarDays,
+  FilePenLine,
   Folders,
   FolderArchive,
   Gauge,
@@ -29,6 +30,7 @@ const navigationItems = [
   { title: "מעקב ספקים", href: "/suppliers", icon: Truck },
   { title: "מעקב קלסרים", href: "/supplier-binders", icon: Folders },
   { title: "פק״ע, אי התאמה, ECO", href: "/followups", icon: ListChecks },
+  { title: "מילוי טפסים", href: "/forms", icon: FilePenLine },
   { title: "מרכז מסמכים", href: "/documents", icon: FolderArchive },
 ];
 
