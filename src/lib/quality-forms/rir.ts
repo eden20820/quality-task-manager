@@ -1,5 +1,32 @@
 export type RirPassFail = "" | "Pass" | "Fail";
 
+export type RirDetails = {
+  catalogNumber: string;
+  partName: string;
+  supplierName: string;
+  receivedQuantity: string;
+  orderNumber: string;
+  lotNumber: string;
+  drawingNumber: string;
+  drawingRevision: string;
+  comments: string;
+  documents: { coc: boolean; cot: boolean; coa: boolean; other: boolean };
+  otherDocument: string;
+};
+
+export type RirApproval = {
+  disposition: "" | "approved" | "hold" | "rejected" | "special";
+  ncNumber: string;
+  ncDecision: "" | "accept" | "reject" | "rework";
+  specialConditions: string;
+  approvedParts: string;
+  rejectedParts: string;
+  inspectorName: string;
+  inspectionDate: string;
+  reviewerName: string;
+  reviewDate: string;
+};
+
 export type RirAttribute = {
   id: string;
   name: string;
@@ -23,6 +50,14 @@ export type RirColumnSummary = {
   standardDeviation: number | null;
   approved: number;
   rejected: number;
+};
+
+export type RirFormPayload = {
+  details: RirDetails;
+  attributes: RirAttribute[];
+  rows: RirMeasurementRow[];
+  approval: RirApproval;
+  sampleSize: number;
 };
 
 export const RIR_DRAFT_STORAGE_KEY = "quality-task-manager:rir-draft:v1";
