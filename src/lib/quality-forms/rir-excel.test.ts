@@ -15,9 +15,9 @@ function examplePayload(): RirFormPayload {
       supplierName: "Test Supplier",
       receivedQuantity: "50",
       orderNumber: "PO-20",
-      lotNumber: "LOT-7",
+      lotNumber: "",
       drawingNumber: "DWG-1",
-      drawingRevision: "B",
+      drawingRevision: "",
       comments: "Incoming inspection",
       documents: { coc: true, cot: false, coa: true, other: false },
       otherDocument: "",
@@ -48,9 +48,15 @@ describe("RIR Excel export", () => {
     const workbook = await buildRirWorkbook(examplePayload());
     const worksheet = workbook.getWorksheet("RIR");
     expect(worksheet?.getCell("A1").value).toBe("Receiving Inspection Report (RIR)");
+    expect(worksheet?.getCell("C2").value).toBe("Rev.: 00");
     expect(worksheet?.getCell("B3").value).toBe("CAT-100");
+    expect(worksheet?.getCell("E5").value).toBe("N/A");
+    expect(worksheet?.getCell("E6").value).toBe("00");
     expect(worksheet?.getCell("D16").value).toBe(10);
     expect(worksheet?.getCell("D19").value).toMatchObject({ formula: expect.stringContaining("MAX") });
+    expect(worksheet?.getCell("D22").value).toMatchObject({ formula: expect.stringContaining("STDEV(") });
+    expect(worksheet?.getCell("B33").value).toBe("Uzi Barzilay");
+    expect(worksheet?.getImages()).toHaveLength(1);
 
     const buffer = await workbook.xlsx.writeBuffer();
     expect(buffer.byteLength).toBeGreaterThan(5_000);
