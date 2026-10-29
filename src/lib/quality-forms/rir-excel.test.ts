@@ -35,7 +35,7 @@ function examplePayload(): RirFormPayload {
       specialConditions: "",
       approvedParts: "49",
       rejectedParts: "1",
-      inspectorName: "Inspector",
+      inspectorName: "Sergey Dror",
       inspectionDate: "2026-10-29",
       reviewerName: "Reviewer",
       reviewDate: "2026-10-29",
@@ -55,8 +55,9 @@ describe("RIR Excel export", () => {
     expect(worksheet?.getCell("D16").value).toBe(10);
     expect(worksheet?.getCell("D19").value).toMatchObject({ formula: expect.stringContaining("MAX") });
     expect(worksheet?.getCell("D22").value).toMatchObject({ formula: expect.stringContaining("STDEV(") });
+    expect(worksheet?.getCell("B32").value).toBe("Sergey Dror");
     expect(worksheet?.getCell("B33").value).toBe("Uzi Barzilay");
-    expect(worksheet?.getImages()).toHaveLength(1);
+    expect(worksheet?.getImages()).toHaveLength(2);
 
     const buffer = await workbook.xlsx.writeBuffer();
     expect(buffer.byteLength).toBeGreaterThan(5_000);
@@ -67,6 +68,6 @@ describe("RIR Excel export", () => {
     const restored = reloaded.getWorksheet("RIR");
     expect(restored?.getCell("A1").value).toBe("Receiving Inspection Report (RIR)");
     expect(restored?.getCell("D16").value).toBe(10);
-    expect(restored?.getCell("B32").value).toBe("Inspector");
+    expect(restored?.getCell("B32").value).toBe("Sergey Dror");
   });
 });
