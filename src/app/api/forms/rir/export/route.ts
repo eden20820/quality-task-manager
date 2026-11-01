@@ -13,8 +13,10 @@ function isValidPayload(value: unknown): value is RirFormPayload {
     payload.details
     && payload.approval
     && Array.isArray(payload.attributes)
-    && payload.attributes.length >= 1
     && payload.attributes.length <= 8
+    && typeof payload.includeVisual === "boolean"
+    && typeof payload.includeFunctional === "boolean"
+    && (payload.attributes.length > 0 || payload.includeVisual || payload.includeFunctional)
     && Array.isArray(payload.rows)
     && payload.rows.length >= 1
     && payload.rows.length <= 200

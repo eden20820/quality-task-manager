@@ -58,6 +58,8 @@ export type RirFormPayload = {
   rows: RirMeasurementRow[];
   approval: RirApproval;
   sampleSize: number;
+  includeVisual: boolean;
+  includeFunctional: boolean;
 };
 
 export const RIR_DRAFT_STORAGE_KEY = "quality-task-manager:rir-draft:v1";
