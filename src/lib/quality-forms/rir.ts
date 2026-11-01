@@ -80,6 +80,102 @@ export function formatMeasurementForEquipment(valueText: string, equipment: stri
   return Number.isFinite(value) ? value.toFixed(2) : valueText;
 }
 
+export function sampleSizeForReceivedQuantity(quantityText: string) {
+  const quantity = Math.ceil(Number(quantityText.replace(/,/g, "").trim()));
+  if (!Number.isFinite(quantity) || quantity <= 0) return null;
+  if (quantity === 1) return 1;
+  const samplePlan = [
+    { maximum: 8, sampleSize: 2 },
+    { maximum: 15, sampleSize: 3 },
+    { maximum: 25, sampleSize: 5 },
+    { maximum: 50, sampleSize: 8 },
+    { maximum: 90, sampleSize: 13 },
+    { maximum: 150, sampleSize: 20 },
+    { maximum: 280, sampleSize: 32 },
+    { maximum: 500, sampleSize: 50 },
+    { maximum: 1_200, sampleSize: 80 },
+    { maximum: 3_200, sampleSize: 125 },
+    { maximum: Number.POSITIVE_INFINITY, sampleSize: 200 },
+  ];
+  return samplePlan.find((entry) => quantity <= entry.maximum)?.sampleSize ?? 200;
+}
+
+export function evaluateMeasurementFormula(valueText: string) {
+  const formula = valueText.trim();
+  if (!formula.startsWith("=")) return null;
+  const expression = formula.slice(1);
+  if (!expression || !/^[\d+\-*/().\s]+$/.test(expression)) return null;
+  let position = 0;
+
+  const skipWhitespace = () => {
+    while (/\s/.test(expression[position] ?? "")) position += 1;
+  };
+  const parseNumber = () => {
+    skipWhitespace();
+    const match = expression.slice(position).match(/^(?:\d+(?:\.\d*)?|\.\d+)/);
+    if (!match) throw new Error("Invalid number");
+    position += match[0].length;
+    return Number(match[0]);
+  };
+  const parseFactor = (): number => {
+    skipWhitespace();
+    const operator = expression[position];
+    if (operator === "+" || operator === "-") {
+      position += 1;
+      const value = parseFactor();
+      return operator === "-" ? -value : value;
+    }
+    if (operator === "(") {
+      position += 1;
+      const value = parseExpression();
+      skipWhitespace();
+      if (expression[position] !== ")") throw new Error("Missing closing parenthesis");
+      position += 1;
+      return value;
+    }
+    return parseNumber();
+  };
+  const parseTerm = () => {
+    let value = parseFactor();
+    while (true) {
+      skipWhitespace();
+      const operator = expression[position];
+      if (operator !== "*" && operator !== "/") break;
+      position += 1;
+      const operand = parseFactor();
+      value = operator === "*" ? value * operand : value / operand;
+    }
+    return value;
+  };
+  function parseExpression() {
+    let value = parseTerm();
+    while (true) {
+      skipWhitespace();
+      const operator = expression[position];
+      if (operator !== "+" && operator !== "-") break;
+      position += 1;
+      const operand = parseTerm();
+      value = operator === "+" ? value + operand : value - operand;
+    }
+    return value;
+  }
+
+  try {
+    const result = parseExpression();
+    skipWhitespace();
+    if (position !== expression.length || !Number.isFinite(result)) return null;
+    return Number(result.toPrecision(12));
+  } catch {
+    return null;
+  }
+}
+
+export function resolveMeasurementInput(valueText: string, equipment: string) {
+  const formulaResult = evaluateMeasurementFormula(valueText);
+  const resolved = formulaResult === null ? valueText : String(formulaResult);
+  return formatMeasurementForEquipment(resolved, equipment);
+}
+
 export function resizeMeasurementRows(
   current: RirMeasurementRow[],
   sampleSize: number,
