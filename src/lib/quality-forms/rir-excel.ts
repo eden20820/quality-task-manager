@@ -402,5 +402,9 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   worksheet.pageSetup.printArea = `A1:${columnLetter(lastColumn)}${decisionStart + 5}`;
   worksheet.pageSetup.printTitlesRow = "1:15";
   worksheet.headerFooter.oddFooter = "Quality Task Manager · RIR";
+  const metadataSheet = workbook.addWorksheet("_QTM_DATA");
+  metadataSheet.state = "veryHidden";
+  metadataSheet.getCell("A1").value = "QTM_RIR_V1";
+  metadataSheet.getCell("A2").value = JSON.stringify({ attributes: payload.attributes });
   return workbook;
 }

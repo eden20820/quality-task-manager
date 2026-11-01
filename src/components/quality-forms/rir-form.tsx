@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -200,6 +200,8 @@ export function RirForm() {
   const [approval, setApproval] = useState<RirApproval>(() => createEmptyApproval());
   const [draftMessage, setDraftMessage] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const draftFileInputRef = useRef<HTMLInputElement>(null);
 
   function changeDetails(nextDetails: RirDetails) {
     setDetails(nextDetails);
@@ -278,6 +280,45 @@ export function RirForm() {
     }
   }
 
+  async function importExcelDraft(file: File) {
+    setIsLoadingDraft(true);
+    setDraftMessage("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/forms/rir/import", { method: "POST", body: formData });
+      const result = await response.json().catch(() => ({})) as { payload?: RirFormPayload; error?: string };
+      if (!response.ok || !result.payload) throw new Error(result.error || "לא ניתן לטעון את קובץ ה-Excel");
+      const payload = result.payload;
+      const safeSampleSize = Math.min(200, Math.max(1, Number(payload.sampleSize) || 1));
+      const safeAttributes = payload.attributes.slice(0, 8);
+      const today = todayInIsrael();
+      setDetails({
+        ...payload.details,
+        drawingRevision: payload.details.drawingRevision || "00",
+        drawingNumber: payload.details.drawingNumber || drawingNumberForCatalog(payload.details.catalogNumber),
+      });
+      setAttributes(safeAttributes);
+      setRows(resizeMeasurementRows(payload.rows, safeSampleSize, safeAttributes.length));
+      setApproval({
+        ...payload.approval,
+        inspectorName: payload.approval.inspectorName === "Sergey Dror" ? "Sergey Dror" : "Eden Aharon",
+        inspectionDate: payload.approval.inspectionDate || today,
+        reviewerName: "Uzi Barzilay",
+        reviewDate: payload.approval.reviewDate || today,
+      });
+      setSampleSize(safeSampleSize);
+      setIncludeVisual(payload.includeVisual);
+      setIncludeFunctional(payload.includeFunctional);
+      setDraftMessage(`הקובץ ${file.name} נטען בהצלחה וניתן לעריכה`);
+    } catch (error) {
+      setDraftMessage(error instanceof Error ? error.message : "לא ניתן לטעון את קובץ ה-Excel");
+    } finally {
+      setIsLoadingDraft(false);
+      if (draftFileInputRef.current) draftFileInputRef.current.value = "";
+    }
+  }
+
   function resetForm() {
     if (!window.confirm("לנקות את כל הנתונים שהוזנו בטופס?")) return;
     setDetails(emptyDetails);
@@ -323,7 +364,7 @@ export function RirForm() {
     }
   }
 
-  return <div className="space-y-5"><header className="sticky top-0 z-40 -mx-2 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur xl:flex-row xl:items-center xl:justify-between"><div><Link href="/forms" className="inline-flex items-center gap-2 text-sm font-extrabold text-blue-700 hover:text-blue-900"><ArrowRight className="h-4 w-4" />חזרה לבחירת טופס</Link><div className="mt-2 flex items-center gap-3"><span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><ClipboardCheck className="h-6 w-6" /></span><div><h1 className="text-xl font-black tracking-tight sm:text-2xl">דוח ביקורת קבלה (RIR)</h1><p className="text-xs font-medium text-slate-500">טופס דיגיטלי מהיר · Quality Form 8.4.2.2.0</p></div></div></div><div className="flex flex-wrap gap-2"><button type="button" onClick={loadDraft} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50"><FileSpreadsheet className="h-4 w-4" />טעינת טיוטה</button><button type="button" onClick={saveDraft} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50"><Save className="h-4 w-4" />שמירה</button><button type="button" onClick={downloadExcel} disabled={isDownloading} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60">{isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}הורדת Excel</button><button type="button" onClick={resetForm} aria-label="ניקוי הטופס" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 hover:bg-red-50"><RotateCcw className="h-4 w-4" /></button></div></header>
+  return <div className="space-y-5"><input ref={draftFileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importExcelDraft(file); }} /><header className="sticky top-0 z-40 -mx-2 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur xl:flex-row xl:items-center xl:justify-between"><div><Link href="/forms" className="inline-flex items-center gap-2 text-sm font-extrabold text-blue-700 hover:text-blue-900"><ArrowRight className="h-4 w-4" />חזרה לבחירת טופס</Link><div className="mt-2 flex items-center gap-3"><span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700"><ClipboardCheck className="h-6 w-6" /></span><div><h1 className="text-xl font-black tracking-tight sm:text-2xl">דוח ביקורת קבלה (RIR)</h1><p className="text-xs font-medium text-slate-500">טופס דיגיטלי מהיר · Quality Form 8.4.2.2.0</p></div></div></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => draftFileInputRef.current?.click()} disabled={isLoadingDraft} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-60">{isLoadingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}טעינת טיוטה</button><button type="button" onClick={loadDraft} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600 hover:bg-slate-50">שחזור מקומי</button><button type="button" onClick={saveDraft} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50"><Save className="h-4 w-4" />שמירה</button><button type="button" onClick={downloadExcel} disabled={isDownloading} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60">{isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}הורדת Excel</button><button type="button" onClick={resetForm} className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-sm font-extrabold text-red-600 hover:bg-red-50"><RotateCcw className="h-4 w-4" />ניקוי</button></div></header>
     {draftMessage ? <p aria-live="polite" className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">{draftMessage}</p> : null}
     <nav className="flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-2 text-sm font-extrabold"><a href="#details" className="whitespace-nowrap rounded-lg bg-white px-3 py-2 shadow-sm">פרטי פריט</a><a href="#setup" className="whitespace-nowrap rounded-lg bg-white px-3 py-2 shadow-sm">הגדרת בדיקה</a><a href="#results" className="whitespace-nowrap rounded-lg bg-white px-3 py-2 shadow-sm">תוצאות</a><a href="#summary" className="whitespace-nowrap rounded-lg bg-white px-3 py-2 shadow-sm">סיכום ואישור</a></nav>
     <div id="details" className="scroll-mt-24"><DetailsStep details={details} onChange={changeDetails} /></div>
