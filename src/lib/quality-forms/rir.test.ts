@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { drawingNumberForCatalog, formatMeasurementForEquipment, isCaliperEquipment, measurementState, resizeMeasurementRows, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
+import { drawingNumberForCatalog, evaluateMeasurementFormula, formatMeasurementForEquipment, isCaliperEquipment, measurementState, resizeMeasurementRows, resolveMeasurementInput, sampleSizeForReceivedQuantity, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
 
 describe("RIR calculations", () => {
   it("formats Caliper measurements with exactly two decimal places", () => {
@@ -14,6 +14,26 @@ describe("RIR calculations", () => {
   it("creates the drawing number from the catalog number", () => {
     expect(drawingNumberForCatalog(" XXX ")).toBe("DG-XXX");
     expect(drawingNumberForCatalog(" ")).toBe("");
+  });
+  it("selects the sample size from the receiving-inspection table", () => {
+    expect(sampleSizeForReceivedQuantity("1")).toBe(1);
+    expect(sampleSizeForReceivedQuantity("8")).toBe(2);
+    expect(sampleSizeForReceivedQuantity("9")).toBe(3);
+    expect(sampleSizeForReceivedQuantity("50")).toBe(8);
+    expect(sampleSizeForReceivedQuantity("51")).toBe(13);
+    expect(sampleSizeForReceivedQuantity("1,200")).toBe(80);
+    expect(sampleSizeForReceivedQuantity("1201")).toBe(125);
+    expect(sampleSizeForReceivedQuantity("3201")).toBe(200);
+    expect(sampleSizeForReceivedQuantity("")).toBeNull();
+  });
+
+  it("calculates safe Excel-style formulas for specification limits", () => {
+    expect(evaluateMeasurementFormula("=0.75+0.15")).toBe(0.9);
+    expect(evaluateMeasurementFormula("=(2+3)*4/2")).toBe(10);
+    expect(evaluateMeasurementFormula("=1/0")).toBeNull();
+    expect(evaluateMeasurementFormula("=alert(1)")).toBeNull();
+    expect(resolveMeasurementInput("=0.75+0.15", "Caliper")).toBe("0.90");
+    expect(resolveMeasurementInput("=0.75+0.15", "Micrometer")).toBe("0.9");
   });
   it("preserves existing measurements when the table is resized", () => {
     const initial = resizeMeasurementRows([], 2, 2);
