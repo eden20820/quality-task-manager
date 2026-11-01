@@ -51,6 +51,20 @@ function valueOrNA(value: string | number | null | undefined) {
   return value.trim() || "N/A";
 }
 
+type ColumnSpan = { start: number; end: number };
+
+function createTestColumnSpans(count: number): ColumnSpan[] {
+  const availableColumns = Math.max(3, count);
+  return Array.from({ length: count }, (_, index) => ({
+    start: 4 + Math.floor((index * availableColumns) / count),
+    end: 3 + Math.floor(((index + 1) * availableColumns) / count),
+  }));
+}
+
+function mergeSpan(worksheet: import("exceljs").Worksheet, row: number, span: ColumnSpan) {
+  if (span.end > span.start) worksheet.mergeCells(row, span.start, row, span.end);
+}
+
 function dispositionLabel(value: RirFormPayload["approval"]["disposition"]) {
   return { "": "", approved: "Approved", hold: "Hold / NC", rejected: "Rejected", special: "Approved with Special Conditions" }[value];
 }
@@ -81,11 +95,18 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
     views: [{ state: "frozen", xSplit: 3, ySplit: 15 }],
   });
 
-  const measurementStartColumn = 4;
-  const visualColumn = measurementStartColumn + payload.attributes.length;
-  const functionalColumn = visualColumn + 1;
-  const lastColumn = functionalColumn;
+  const includeVisual = payload.includeVisual !== false;
+  const includeFunctional = payload.includeFunctional !== false;
+  const logicalColumnCount = payload.attributes.length + Number(includeVisual) + Number(includeFunctional);
+  if (!logicalColumnCount) throw new Error("RIR must include at least one inspection column");
+  const testColumnSpans = createTestColumnSpans(logicalColumnCount);
+  const measurementSpans = testColumnSpans.slice(0, payload.attributes.length);
+  let statusColumnIndex = payload.attributes.length;
+  const visualSpan = includeVisual ? testColumnSpans[statusColumnIndex++] : null;
+  const functionalSpan = includeFunctional ? testColumnSpans[statusColumnIndex] : null;
+  const lastColumn = Math.max(6, 3 + logicalColumnCount);
   const middleColumn = Math.max(3, Math.floor(lastColumn / 2));
+  const measurementStartColumn = 4;
 
   worksheet.getColumn(1).width = 15;
   worksheet.getColumn(2).width = 20;
@@ -152,7 +173,7 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   worksheet.getCell(10, 1).value = "Sample Size";
   worksheet.getCell(10, 2).value = payload.sampleSize;
   worksheet.getCell(10, 3).value = "Test Columns";
-  worksheet.getCell(10, 4).value = payload.attributes.length;
+  worksheet.getCell(10, 4).value = logicalColumnCount;
 
   worksheet.mergeCells(11, 1, 15, 1);
   worksheet.getCell(11, 1).value = "Specimen\nNo.";
@@ -165,8 +186,10 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   worksheet.getCell(15, 2).value = "Min Value Required";
 
   payload.attributes.forEach((attribute, index) => {
-    const column = measurementStartColumn + index;
+    const span = measurementSpans[index];
+    const column = span.start;
     const measurementNumberFormat = isCaliperEquipment(attribute.equipment) ? "0.00" : "0.000";
+    for (const row of [12, 13, 14, 15]) mergeSpan(worksheet, row, span);
     worksheet.getCell(12, column).value = index + 1;
     worksheet.getCell(13, column).value = valueOrNA(attribute.equipment === "קליבר" ? "Caliper" : attribute.equipment);
     worksheet.getCell(14, column).value = numericValue(formatMeasurementForEquipment(attribute.max, attribute.equipment)) ?? valueOrNA(attribute.max);
@@ -174,14 +197,20 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
     worksheet.getCell(14, column).numFmt = measurementNumberFormat;
     worksheet.getCell(15, column).numFmt = measurementNumberFormat;
   });
-  worksheet.getCell(12, visualColumn).value = payload.attributes.length + 1;
-  worksheet.getCell(13, visualColumn).value = "vis.";
-  worksheet.getCell(14, visualColumn).value = "Pass";
-  worksheet.getCell(15, visualColumn).value = "Fail";
-  worksheet.getCell(12, functionalColumn).value = payload.attributes.length + 2;
-  worksheet.getCell(13, functionalColumn).value = "Func.";
-  worksheet.getCell(14, functionalColumn).value = "Pass";
-  worksheet.getCell(15, functionalColumn).value = "Fail";
+  if (visualSpan) {
+    for (const row of [12, 13, 14, 15]) mergeSpan(worksheet, row, visualSpan);
+    worksheet.getCell(12, visualSpan.start).value = payload.attributes.length + 1;
+    worksheet.getCell(13, visualSpan.start).value = "vis.";
+    worksheet.getCell(14, visualSpan.start).value = "Pass";
+    worksheet.getCell(15, visualSpan.start).value = "Fail";
+  }
+  if (functionalSpan) {
+    for (const row of [12, 13, 14, 15]) mergeSpan(worksheet, row, functionalSpan);
+    worksheet.getCell(12, functionalSpan.start).value = payload.attributes.length + Number(includeVisual) + 1;
+    worksheet.getCell(13, functionalSpan.start).value = "Func.";
+    worksheet.getCell(14, functionalSpan.start).value = "Pass";
+    worksheet.getCell(15, functionalSpan.start).value = "Fail";
+  }
 
   const firstDataRow = 16;
   const lastDataRow = firstDataRow + payload.rows.length - 1;
@@ -198,19 +227,27 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
     const excelRow = firstDataRow + rowIndex;
     worksheet.getCell(excelRow, 1).value = row.specimen;
     payload.attributes.forEach((attribute, attributeIndex) => {
-      const cell = worksheet.getCell(excelRow, measurementStartColumn + attributeIndex);
+      const span = measurementSpans[attributeIndex];
+      mergeSpan(worksheet, excelRow, span);
+      const cell = worksheet.getCell(excelRow, span.start);
       const value = numericValue(formatMeasurementForEquipment(row.values[attributeIndex] ?? "", attribute.equipment));
       cell.value = value;
       const state = measurementState(row.values[attributeIndex] ?? "", attribute.min, attribute.max);
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: state === "pass" ? green : state === "fail" || state === "invalid" ? red : state === "unconfigured" ? amber : white } };
       cell.numFmt = isCaliperEquipment(attribute.equipment) ? "0.00" : "0.000";
     });
-    const visualCell = worksheet.getCell(excelRow, visualColumn);
-    visualCell.value = row.visual;
-    visualCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: row.visual === "Pass" ? green : row.visual === "Fail" ? red : white } };
-    const functionalCell = worksheet.getCell(excelRow, functionalColumn);
-    functionalCell.value = row.functional;
-    functionalCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: row.functional === "Pass" ? green : row.functional === "Fail" ? red : white } };
+    if (visualSpan) {
+      mergeSpan(worksheet, excelRow, visualSpan);
+      const visualCell = worksheet.getCell(excelRow, visualSpan.start);
+      visualCell.value = row.visual;
+      visualCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: row.visual === "Pass" ? green : row.visual === "Fail" ? red : white } };
+    }
+    if (functionalSpan) {
+      mergeSpan(worksheet, excelRow, functionalSpan);
+      const functionalCell = worksheet.getCell(excelRow, functionalSpan.start);
+      functionalCell.value = row.functional;
+      functionalCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: row.functional === "Pass" ? green : row.functional === "Fail" ? red : white } };
+    }
   });
 
   const summaryStart = lastDataRow + 1;
@@ -224,7 +261,8 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   });
 
   payload.attributes.forEach((attribute, index) => {
-    const column = measurementStartColumn + index;
+    const span = measurementSpans[index];
+    const column = span.start;
     const letter = columnLetter(column);
     const range = `${letter}${firstDataRow}:${letter}${lastDataRow}`;
     const summary = numericSummaries[index];
@@ -239,6 +277,7 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
       { formula: `${letter}${summaryStart + 4}-${letter}${summaryStart + 5}`, result: summary.rejected },
     ];
     formulas.forEach((formula, formulaIndex) => {
+      mergeSpan(worksheet, summaryStart + formulaIndex, span);
       const cell = worksheet.getCell(summaryStart + formulaIndex, column);
       cell.value = formula;
       cell.numFmt = formulaIndex < 4 ? measurementNumberFormat : "0";
@@ -246,11 +285,13 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   });
 
   [
-    { column: visualColumn, summary: visualSummary },
-    { column: functionalColumn, summary: functionalSummary },
-  ].forEach(({ column, summary }) => {
+    ...(visualSpan ? [{ span: visualSpan, summary: visualSummary }] : []),
+    ...(functionalSpan ? [{ span: functionalSpan, summary: functionalSummary }] : []),
+  ].forEach(({ span, summary }) => {
+    const column = span.start;
     const letter = columnLetter(column);
     const range = `${letter}${firstDataRow}:${letter}${lastDataRow}`;
+    for (let index = 0; index < summaryRows.length; index += 1) mergeSpan(worksheet, summaryStart + index, span);
     worksheet.getCell(summaryStart + 4, column).value = { formula: `COUNTA(${range})`, result: summary.entered };
     worksheet.getCell(summaryStart + 5, column).value = { formula: `COUNTIF(${range},"Pass")`, result: summary.approved };
     worksheet.getCell(summaryStart + 6, column).value = { formula: `COUNTIF(${range},"Fail")`, result: summary.rejected };

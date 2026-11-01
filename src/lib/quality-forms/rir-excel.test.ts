@@ -23,6 +23,8 @@ function examplePayload(): RirFormPayload {
       otherDocument: "",
     },
     sampleSize: 3,
+    includeVisual: true,
+    includeFunctional: true,
     attributes: [
       { id: "a1", name: "Length", equipment: "Caliper", min: "9", max: "12" },
       { id: "a2", name: "Width", equipment: "Micrometer", min: "3", max: "4" },
@@ -75,5 +77,35 @@ describe("RIR Excel export", () => {
     expect(restored?.getCell("A1").value).toBe("Receiving Inspection Report (RIR)");
     expect(restored?.getCell("D16").value).toBe(10);
     expect(restored?.getCell("B32").value).toBe("Sergey Dror");
+  });
+
+  it("exports VIS and FUNC without measurement columns", async () => {
+    const payload = examplePayload();
+    payload.attributes = [];
+    payload.rows = resizeMeasurementRows(payload.rows, 3, 0);
+    const workbook = await buildRirWorkbook(payload);
+    const worksheet = workbook.getWorksheet("RIR");
+
+    expect(worksheet?.getCell("D13").value).toBe("vis.");
+    expect(worksheet?.getCell("F13").value).toBe("Func.");
+    expect(worksheet?.getCell("D16").value).toBe("Pass");
+    expect(worksheet?.getCell("F17").value).toBe("Fail");
+    expect(worksheet?.getCell("D24").value).toMatchObject({ formula: expect.stringContaining("COUNTIF") });
+  });
+
+  it("exports a VIS-only form as one inspection column", async () => {
+    const payload = examplePayload();
+    payload.attributes = [];
+    payload.rows = resizeMeasurementRows(payload.rows, 3, 0);
+    payload.includeFunctional = false;
+    const workbook = await buildRirWorkbook(payload);
+    const worksheet = workbook.getWorksheet("RIR");
+
+    expect(worksheet?.getCell("D13").value).toBe("vis.");
+    expect(worksheet?.getCell("D16").value).toBe("Pass");
+    expect(worksheet?.getCell("D13").isMerged).toBe(true);
+    expect(worksheet?.getCell("F13").master.address).toBe("D13");
+    const values = worksheet?.getSheetValues().flat(2);
+    expect(values).not.toContain("Func.");
   });
 });
