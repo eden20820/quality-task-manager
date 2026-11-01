@@ -24,6 +24,7 @@ function isValidPayload(value: unknown): value is ShelfProductInspectionPayload 
     && payload.inspections.every((item) => ["", "pass", "fail"].includes(item.result) && typeof item.comment === "string")
     && ["", "approved", "rejected", "conditional"].includes(payload.usageApproval ?? "")
     && typeof payload.notes === "string"
+    && ["Eden Aharon", "Sergey Dror"].includes(payload.inspectorName ?? "")
     && typeof payload.inspectorDate === "string"
     && typeof payload.approverDate === "string"
   );

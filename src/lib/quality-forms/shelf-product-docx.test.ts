@@ -23,6 +23,7 @@ const sample: ShelfProductInspectionPayload = {
   ],
   usageApproval: "approved",
   notes: "המסמך נוצר בהצלחה.",
+  inspectorName: "Sergey Dror",
   inspectorDate: "2026-01-15",
   approverDate: "2026-01-15",
 };
@@ -36,6 +37,7 @@ describe("shelf product inspection DOCX", () => {
     expect(xml).toContain("מוצר בדיקה");
     expect(xml).toContain("15.01.2026");
     expect(xml).toContain("המסמך נוצר בהצלחה.");
+    expect(xml).toContain("Sergey Dror");
     expect(xml).not.toMatch(/\{\{[A-Z0-9_]+\}\}/);
     if (process.env.SHELF_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_DOCX_SAMPLE_PATH, buffer);
   });

@@ -12,6 +12,7 @@ export type ShelfProductInspectionPayload = {
   inspections: Array<{ result: InspectionResult; comment: string }>;
   usageApproval: "approved" | "rejected" | "conditional" | "";
   notes: string;
+  inspectorName: "Eden Aharon" | "Sergey Dror";
   inspectorDate: string;
   approverDate: string;
 };
@@ -36,6 +37,7 @@ export function createEmptyShelfInspection(today: string): ShelfProductInspectio
     inspections: SHELF_INSPECTION_ITEMS.map(() => ({ result: "", comment: "" })),
     usageApproval: "",
     notes: "",
+    inspectorName: "Eden Aharon",
     inspectorDate: today,
     approverDate: today,
   };
