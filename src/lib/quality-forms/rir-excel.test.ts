@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildRirWorkbook } from "./rir-excel";
+import { parseRirWorkbook } from "./rir-excel-import";
 import { resizeMeasurementRows, type RirFormPayload } from "./rir";
 
 function examplePayload(): RirFormPayload {
@@ -107,5 +108,65 @@ describe("RIR Excel export", () => {
     expect(worksheet?.getCell("F13").master.address).toBe("D13");
     const values = worksheet?.getSheetValues().flat(2);
     expect(values).not.toContain("Func.");
+  });
+
+  it("loads an exported RIR workbook back into an editable form", async () => {
+    const source = examplePayload();
+    const workbook = await buildRirWorkbook(source);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const restored = await parseRirWorkbook(Buffer.from(buffer));
+
+    expect(restored.details).toMatchObject({
+      catalogNumber: "CAT-100",
+      partName: "Test Part",
+      supplierName: "Test Supplier",
+      receivedQuantity: "50",
+      lotNumber: "",
+      drawingRevision: "00",
+    });
+    expect(restored.attributes).toEqual([
+      { ...source.attributes[0], min: "9.00", max: "12.00" },
+      source.attributes[1],
+    ]);
+    expect(restored.rows).toEqual([
+      { ...source.rows[0], values: ["10.00", "3.2"] },
+      { ...source.rows[1], values: ["11.00", "3.4"] },
+      { ...source.rows[2], values: ["15.00", "3.3"] },
+    ]);
+    expect(restored.approval).toMatchObject({
+      disposition: "approved",
+      approvedParts: "49",
+      rejectedParts: "1",
+      inspectorName: "Sergey Dror",
+      inspectionDate: "2026-10-29",
+      reviewerName: "Uzi Barzilay",
+      reviewDate: "2026-10-29",
+    });
+    expect(restored).toMatchObject({ sampleSize: 3, includeVisual: true, includeFunctional: true });
+    expect(workbook.getWorksheet("_QTM_DATA")?.state).toBe("veryHidden");
+  });
+
+  it("loads older exported RIR files that do not contain metadata", async () => {
+    const workbook = await buildRirWorkbook(examplePayload());
+    const metadataSheet = workbook.getWorksheet("_QTM_DATA");
+    if (metadataSheet) workbook.removeWorksheet(metadataSheet.id);
+    const restored = await parseRirWorkbook(Buffer.from(await workbook.xlsx.writeBuffer()));
+
+    expect(restored.details.catalogNumber).toBe("CAT-100");
+    expect(restored.attributes.map((attribute) => attribute.name)).toEqual(["מידה 1", "מידה 2"]);
+    expect(restored.rows[1]).toMatchObject({ values: ["11.00", "3.4"], visual: "Pass", functional: "Fail" });
+  });
+
+  it("keeps blank detail fields blank when importing", async () => {
+    const source = examplePayload();
+    source.details.catalogNumber = "";
+    source.details.supplierName = "";
+    const workbook = await buildRirWorkbook(source);
+    const restored = await parseRirWorkbook(Buffer.from(await workbook.xlsx.writeBuffer()));
+
+    expect(restored.details.catalogNumber).toBe("");
+    expect(restored.details.partName).toBe("Test Part");
+    expect(restored.details.supplierName).toBe("");
+    expect(restored.details.receivedQuantity).toBe("50");
   });
 });
