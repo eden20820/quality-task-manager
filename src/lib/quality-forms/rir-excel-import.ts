@@ -6,7 +6,7 @@ type Cell = import("exceljs").Cell;
 const formLabels = new Set([
   "Part / Product Catalog No.", "Part Name", "Supplier Name", "Received Quantity", "Order No.", "Lot / Batch No.",
   "DWG No.", "Rev.", "Attached Documents", "Comments", "Sample Size", "Test Columns", "Disposition", "NC No.",
-  "NC Decision", "Approved / Rejected Parts", "Special Conditions", "Inspector Name", "Reviewed and Approved by", "Date", "Signature",
+  "NC Decision", "Approved Parts", "Rejected Parts", "Approved / Rejected Parts", "Special Conditions", "Inspector Name", "Reviewed and Approved by", "Date", "Signature",
 ]);
 
 function cellValue(cell: Cell) {
@@ -164,7 +164,9 @@ export async function parseRirWorkbook(data: Buffer | Uint8Array) {
   const sampleSize = Math.min(200, Math.max(1, Number.isFinite(requestedSampleSize) && requestedSampleSize > 0 ? requestedSampleSize : rows.length || 1));
   const normalizedRows = resizeMeasurementRows(rows, sampleSize, attributes.length);
 
-  const parts = valueAfterLabel(worksheet, "Approved / Rejected Parts").split("/").map((value) => cleanValue(value));
+  const legacyParts = valueAfterLabel(worksheet, "Approved / Rejected Parts").split("/").map((value) => cleanValue(value));
+  const approvedParts = valueAfterLabel(worksheet, "Approved Parts") || legacyParts[0] || "";
+  const rejectedParts = valueAfterLabel(worksheet, "Rejected Parts") || legacyParts[1] || "";
   const inspectorRow = findLabel(worksheet, "Inspector Name")?.fullAddress.row;
   const reviewerRow = findLabel(worksheet, "Reviewed and Approved by")?.fullAddress.row;
   const approval: RirFormPayload["approval"] = {
@@ -172,8 +174,8 @@ export async function parseRirWorkbook(data: Buffer | Uint8Array) {
     ncNumber: valueAfterLabel(worksheet, "NC No."),
     ncDecision: ncDecisionValue(valueAfterLabel(worksheet, "NC Decision")),
     specialConditions: valueAfterLabel(worksheet, "Special Conditions"),
-    approvedParts: parts[0] ?? "",
-    rejectedParts: parts[1] ?? "",
+    approvedParts,
+    rejectedParts,
     inspectorName: inspectorRow ? valueAfterLabel(worksheet, "Inspector Name") : "Eden Aharon",
     inspectionDate: inspectorRow ? isoDate(cellValue(worksheet.getCell(inspectorRow, Math.max(4, Math.floor(worksheet.columnCount / 2) + 1)))) : "",
     reviewerName: reviewerRow ? valueAfterLabel(worksheet, "Reviewed and Approved by") : "Uzi Barzilay",

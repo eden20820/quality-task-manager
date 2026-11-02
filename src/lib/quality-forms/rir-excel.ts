@@ -309,12 +309,15 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   worksheet.getCell(decisionStart + 2, 1).value = "NC Decision";
   worksheet.mergeCells(decisionStart + 2, 2, decisionStart + 2, middleColumn);
   worksheet.getCell(decisionStart + 2, 2).value = valueOrNA(ncDecisionLabel(payload.approval.ncDecision));
-  worksheet.getCell(decisionStart + 2, middleColumn + 1).value = "Approved / Rejected Parts";
+  worksheet.getCell(decisionStart + 2, middleColumn + 1).value = "Approved Parts";
   worksheet.mergeCells(decisionStart + 2, middleColumn + 2, decisionStart + 2, lastColumn);
-  worksheet.getCell(decisionStart + 2, Math.min(middleColumn + 2, lastColumn)).value = `${payload.approval.approvedParts || "N/A"} / ${payload.approval.rejectedParts || "N/A"}`;
-  worksheet.getCell(decisionStart + 3, 1).value = "Special Conditions";
-  worksheet.mergeCells(decisionStart + 3, 2, decisionStart + 3, lastColumn);
-  worksheet.getCell(decisionStart + 3, 2).value = valueOrNA(payload.approval.specialConditions);
+  worksheet.getCell(decisionStart + 2, Math.min(middleColumn + 2, lastColumn)).value = valueOrNA(payload.approval.approvedParts);
+  worksheet.getCell(decisionStart + 3, 1).value = "Rejected Parts";
+  worksheet.mergeCells(decisionStart + 3, 2, decisionStart + 3, middleColumn);
+  worksheet.getCell(decisionStart + 3, 2).value = valueOrNA(payload.approval.rejectedParts);
+  worksheet.getCell(decisionStart + 3, middleColumn + 1).value = "Special Conditions";
+  worksheet.mergeCells(decisionStart + 3, middleColumn + 2, decisionStart + 3, lastColumn);
+  worksheet.getCell(decisionStart + 3, Math.min(middleColumn + 2, lastColumn)).value = valueOrNA(payload.approval.specialConditions);
   const nameEndColumn = Math.max(2, middleColumn - 1);
   const dateLabelColumn = middleColumn;
   const dateValueColumn = middleColumn + 1;
@@ -389,7 +392,7 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
     worksheet.getCell(row, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightSlate } };
     worksheet.getCell(row, 1).font = { name: "Arial", size: 10, bold: true };
   }
-  for (const row of [decisionStart + 1, decisionStart + 2]) {
+  for (const row of [decisionStart + 1, decisionStart + 2, decisionStart + 3]) {
     worksheet.getCell(row, middleColumn + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightSlate } };
     worksheet.getCell(row, middleColumn + 1).font = { name: "Arial", size: 10, bold: true };
   }
