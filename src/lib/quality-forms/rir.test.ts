@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { drawingNumberForCatalog, evaluateMeasurementFormula, formatMeasurementForEquipment, isCaliperEquipment, measurementState, resizeMeasurementRows, resolveMeasurementInput, sampleSizeForReceivedQuantity, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
+import { automaticApprovedPartCounts, drawingNumberForCatalog, evaluateMeasurementFormula, formatMeasurementForEquipment, isCaliperEquipment, measurementState, resizeMeasurementRows, resolveMeasurementInput, sampleSizeForReceivedQuantity, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
 
 describe("RIR calculations", () => {
   it("formats Caliper measurements with exactly two decimal places", () => {
@@ -73,5 +73,15 @@ describe("RIR calculations", () => {
     expect(measurementState("1.5", "", "2")).toBe("unconfigured");
     expect(measurementState("1", "1", "2")).toBe("pass");
     expect(measurementState("2.1", "1", "2")).toBe("fail");
+  });
+
+  it("approves the full received quantity when every sampled inspection passes", () => {
+    const attributes = [{ id: "size", name: "Size", equipment: "Caliper", min: "1", max: "2" }];
+    const rows = resizeMeasurementRows([], 2, 1);
+    rows.forEach((row) => { row.values[0] = "1.50"; row.visual = "Pass"; });
+    expect(automaticApprovedPartCounts({ receivedQuantity: "225", attributes, rows, includeVisual: true, includeFunctional: false }))
+      .toEqual({ automatic: true, approvedParts: "225", rejectedParts: "0" });
+    rows[1].visual = "Fail";
+    expect(automaticApprovedPartCounts({ receivedQuantity: "225", attributes, rows, includeVisual: true, includeFunctional: false }).automatic).toBe(false);
   });
 });

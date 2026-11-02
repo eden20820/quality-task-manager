@@ -251,3 +251,21 @@ export function measurementState(valueText: string, minimumText: string, maximum
   return value >= minimum && value <= maximum ? "pass" as const : "fail" as const;
 }
 
+export function automaticApprovedPartCounts(input: {
+  receivedQuantity: string;
+  attributes: RirAttribute[];
+  rows: RirMeasurementRow[];
+  includeVisual: boolean;
+  includeFunctional: boolean;
+}) {
+  const quantity = Number(input.receivedQuantity.replace(/,/g, "").trim());
+  const hasTests = input.rows.length > 0 && (input.attributes.length > 0 || input.includeVisual || input.includeFunctional);
+  const allPassed = hasTests && input.rows.every((row) => (
+    input.attributes.every((attribute, index) => measurementState(row.values[index] ?? "", attribute.min, attribute.max) === "pass")
+    && (!input.includeVisual || row.visual === "Pass")
+    && (!input.includeFunctional || row.functional === "Pass")
+  ));
+  if (!allPassed || !Number.isFinite(quantity) || quantity < 0) return { automatic: false as const, approvedParts: "", rejectedParts: "" };
+  return { automatic: true as const, approvedParts: String(quantity), rejectedParts: "0" };
+}
+
