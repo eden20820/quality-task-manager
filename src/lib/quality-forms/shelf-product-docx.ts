@@ -24,9 +24,13 @@ function inspectionTable(payload: ShelfProductInspectionPayload) {
   return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ tableHeader: true, children: [cell("הערות", 35, { bold: true, shade: true }), cell("לא תקין", 13, { bold: true, shade: true }), cell("תקין", 13, { bold: true, shade: true }), cell("פרמטר לבדיקה", 39, { bold: true, shade: true })] }), ...labels.map((label, index) => new TableRow({ children: [cell(payload.inspections[index].comment, 35), cell(payload.inspections[index].result === "fail" ? "X" : "", 13), cell(payload.inspections[index].result === "pass" ? "V" : "", 13), cell(label, 39, { bold: true, align: AlignmentType.RIGHT })] }))] });
 }
 
+function instructionTable() {
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [cell("1. סמן X / V בהתאם לממצאים   2. יש לצרף טופס זה למסמכי הקליטה של החומר", 100, { align: AlignmentType.RIGHT })] })] });
+}
+
 function approvalTable(payload: ShelfProductInspectionPayload) {
   const choices = [["מאושר לשימוש", "approved"], ["לא מאושר לשימוש", "rejected"], ["מאושר מותנה (לפרטים בהערות)", "conditional"]] as const;
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [cell(choices.map(([label, value]) => `${payload.usageApproval === value ? "☒" : "☐"} ${label}`).join("     "), 80), cell("אישור לשימוש:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [cell(choices.map(([label, value]) => `${payload.usageApproval === value ? "☒" : "☐"} ${label}`).join("     "), 80), cell("אישור לשימוש:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] }), new TableRow({ children: [cell(display(payload.notes), 80, { align: AlignmentType.RIGHT }), cell("הערות:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
 }
 
 function signatureImage(base64: string) { return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(base64, "base64"), type: "png", transformation: { width: 54, height: 28 } })] }); }
@@ -38,15 +42,13 @@ function signaturesTable(payload: ShelfProductInspectionPayload) {
 }
 
 export async function buildShelfProductInspectionDocx(payload: ShelfProductInspectionPayload) {
-  const notes = display(payload.notes).split(/\r?\n/).map((line, index) => new TextRun({ text: line, break: index ? 1 : undefined, size: 18, font: "Arial" }));
   const document = new Document({ sections: [{ properties: { page: { margin: { top: 320, right: 420, bottom: 320, left: 420 } } }, children: [
     new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(CAELI_LOGO_PNG_BASE64, "base64"), type: "png", transformation: { width: 78, height: 54 } })] }),
     new Paragraph({ bidirectional: true, alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120 }, children: [new TextRun({ text: "טופס ביקורת קבלה למוצר מדף", bold: true, underline: {}, size: 30, font: "Arial" })] }),
     detailsTable(payload), new Paragraph({ spacing: { before: 80, after: 0 } }), inspectionTable(payload),
-    new Paragraph({ bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { before: 30, after: 0 }, children: [new TextRun({ text: "1. סמן X / V בהתאם לממצאים   2. יש לצרף טופס זה למסמכי הקליטה של החומר", size: 17, font: "Arial" })] }),
+    new Paragraph({ spacing: { before: 30, after: 0 } }), instructionTable(),
     new Paragraph({ spacing: { before: 50, after: 0 } }), approvalTable(payload),
-    new Paragraph({ bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { before: 55, after: 35 }, children: [new TextRun({ text: "הערות: ", bold: true, size: 18, font: "Arial" }), ...notes] }),
-    signaturesTable(payload),
+    new Paragraph({ spacing: { before: 35, after: 0 } }), signaturesTable(payload),
   ] }] });
   return Buffer.from(await Packer.toBuffer(document));
 }

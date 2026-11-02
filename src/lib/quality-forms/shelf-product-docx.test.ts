@@ -29,7 +29,7 @@ const sample: ShelfProductInspectionPayload = {
 };
 
 describe("shelf product inspection DOCX", () => {
-  it("creates a complete two-page inspection document", async () => {
+  it("creates a complete single-page inspection document", async () => {
     const buffer = await buildShelfProductInspectionDocx(sample);
     const zip = await JSZip.loadAsync(buffer);
     const xml = await zip.file("word/document.xml")?.async("string");
@@ -37,6 +37,8 @@ describe("shelf product inspection DOCX", () => {
     expect(xml).toContain("מוצר בדיקה");
     expect(xml).toContain("15.01.2026");
     expect(xml).toContain("המסמך נוצר בהצלחה.");
+    expect(xml).toContain("יש לצרף טופס זה למסמכי הקליטה של החומר");
+    expect((xml?.match(/<w:tbl>/g) ?? []).length).toBe(5);
     expect(xml).toContain("Sergey Dror");
     expect(xml).not.toMatch(/\{\{[A-Z0-9_]+\}\}/);
     if (process.env.SHELF_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_DOCX_SAMPLE_PATH, buffer);
