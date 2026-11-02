@@ -25,12 +25,12 @@ function inspectionTable(payload: ShelfProductInspectionPayload) {
 }
 
 function instructionTable() {
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [cell("1. סמן X / V בהתאם לממצאים   2. יש לצרף טופס זה למסמכי הקליטה של החומר", 100, { align: AlignmentType.RIGHT })] })] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [cell("2. יש לצרף טופס זה למסמכי הקליטה של החומר", 62, { align: AlignmentType.RIGHT }), cell("1. סמן X / V בהתאם לממצאים", 38, { align: AlignmentType.RIGHT })] })] });
 }
 
 function approvalTable(payload: ShelfProductInspectionPayload) {
-  const choices = [["מאושר לשימוש", "approved"], ["לא מאושר לשימוש", "rejected"], ["מאושר מותנה (לפרטים בהערות)", "conditional"]] as const;
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [cell(choices.map(([label, value]) => `${payload.usageApproval === value ? "☒" : "☐"} ${label}`).join("     "), 80), cell("אישור לשימוש:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] }), new TableRow({ children: [cell(display(payload.notes), 80, { align: AlignmentType.RIGHT }), cell("הערות:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
+  const mark = (value: ShelfProductInspectionPayload["usageApproval"]) => payload.usageApproval === value ? "☒" : "☐";
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [cell(`${mark("conditional")} מאושר מותנה (לפרטים בהערות)`, 36), cell(`${mark("rejected")} לא מאושר לשימוש`, 22), cell(`${mark("approved")} מאושר לשימוש`, 22), cell("אישור לשימוש:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] }), new TableRow({ children: [cell(display(payload.notes), 80, { align: AlignmentType.RIGHT }), cell("הערות:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
 }
 
 function signatureImage(base64: string) { return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(base64, "base64"), type: "png", transformation: { width: 54, height: 28 } })] }); }
