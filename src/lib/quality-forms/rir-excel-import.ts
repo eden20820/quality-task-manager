@@ -108,7 +108,7 @@ export async function parseRirWorkbook(data: Buffer | Uint8Array) {
     orderNumber: valueAfterLabel(worksheet, "Order No."),
     lotNumber: valueAfterLabel(worksheet, "Lot / Batch No."),
     drawingNumber: valueAfterLabel(worksheet, "DWG No."),
-    drawingRevision: valueAfterLabel(worksheet, "Rev.") || "00",
+    drawingRevision: valueAfterLabel(worksheet, "Rev.") || "01",
     comments: valueAfterLabel(worksheet, "Comments"),
     documents: {
       coc: documentParts.includes("COC"),
