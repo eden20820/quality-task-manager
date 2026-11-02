@@ -63,6 +63,11 @@ describe("RIR Excel export", () => {
     expect(worksheet?.getCell("D19").value).toMatchObject({ formula: expect.stringContaining("MAX") });
     expect(worksheet?.getCell("D19").numFmt).toBe("0.00");
     expect(worksheet?.getCell("D22").value).toMatchObject({ formula: expect.stringContaining("STDEV(") });
+    expect(worksheet?.getCell("D30").value).toBe("Approved Parts");
+    expect(worksheet?.getCell("E30").value).toBe("49");
+    expect(worksheet?.getCell("A31").value).toBe("Rejected Parts");
+    expect(worksheet?.getCell("B31").value).toBe("1");
+    expect(worksheet?.getCell("D31").value).toBe("Special Conditions");
     expect(worksheet?.getCell("B32").value).toBe("Sergey Dror");
     expect(worksheet?.getCell("B33").value).toBe("Uzi Barzilay");
     expect(worksheet?.getImages()).toHaveLength(3);
@@ -77,6 +82,8 @@ describe("RIR Excel export", () => {
     const restored = reloaded.getWorksheet("RIR");
     expect(restored?.getCell("A1").value).toBe("Receiving Inspection Report (RIR)");
     expect(restored?.getCell("D16").value).toBe(10);
+    expect(restored?.getCell("E30").value).toBe("49");
+    expect(restored?.getCell("B31").value).toBe("1");
     expect(restored?.getCell("B32").value).toBe("Sergey Dror");
   });
 
