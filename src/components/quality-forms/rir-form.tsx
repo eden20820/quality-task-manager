@@ -134,8 +134,9 @@ function AutocompleteField({ label, value, suggestions, onChange }: { label: str
   const [activeIndex, setActiveIndex] = useState(-1);
   const visibleSuggestions = useMemo(() => {
     const query = normalizeSuggestion(value);
+    if (!query) return [];
     return suggestions
-      .filter((suggestion) => !query || normalizeSuggestion(suggestion).includes(query))
+      .filter((suggestion) => normalizeSuggestion(suggestion).includes(query))
       .filter((suggestion) => suggestion !== value)
       .slice(0, 8);
   }, [suggestions, value]);
