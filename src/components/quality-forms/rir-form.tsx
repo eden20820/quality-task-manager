@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -32,7 +32,7 @@ import {
   type RirMeasurementRow,
   type RirPassFail,
 } from "@/lib/quality-forms/rir";
-import { buildQualityFormFileName } from "@/lib/quality-forms/form-archive";
+import { buildQualityFormDownloadName, RIR_ARCHIVE_EDIT_STORAGE_KEY } from "@/lib/quality-forms/form-archive";
 
 type RirDraft = {
   version: 1;
@@ -101,6 +101,21 @@ function formatMetric(value: number | null, equipment?: string) {
   if (value === null) return "—";
   if (equipment && isCaliperEquipment(equipment)) return value.toFixed(2);
   return new Intl.NumberFormat("he-IL", { maximumFractionDigits: 3 }).format(value);
+}
+
+function normalizeImportedPayload(payload: RirFormPayload) {
+  const sampleSize = Math.min(200, Math.max(1, Number(payload.sampleSize) || 1));
+  const attributes = payload.attributes.slice(0, 8);
+  const today = todayInIsrael();
+  return {
+    details: { ...payload.details, drawingRevision: payload.details.drawingRevision || "01", drawingNumber: payload.details.drawingNumber || drawingNumberForCatalog(payload.details.catalogNumber) },
+    attributes,
+    rows: resizeMeasurementRows(payload.rows, sampleSize, attributes.length),
+    approval: { ...payload.approval, inspectorName: payload.approval.inspectorName === "Sergey Dror" ? "Sergey Dror" : "Eden Aharon", inspectionDate: payload.approval.inspectionDate || today, reviewerName: "Uzi Barzilay", reviewDate: payload.approval.reviewDate || today } as RirApproval,
+    sampleSize,
+    includeVisual: payload.includeVisual,
+    includeFunctional: payload.includeFunctional,
+  };
 }
 
 function Field({ label, value, onChange, onBlur, type = "text", placeholder, min, readOnly = false }: { label: string; value: string; onChange: (value: string) => void; onBlur?: (value: string) => void; type?: "text" | "number" | "date"; placeholder?: string; min?: number; readOnly?: boolean }) {
@@ -204,6 +219,23 @@ export function RirForm() {
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const draftFileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const saved = window.sessionStorage.getItem(RIR_ARCHIVE_EDIT_STORAGE_KEY);
+    if (!saved) return;
+    window.sessionStorage.removeItem(RIR_ARCHIVE_EDIT_STORAGE_KEY);
+    const timer = window.setTimeout(() => {
+      try {
+        const normalized = normalizeImportedPayload(JSON.parse(saved) as RirFormPayload);
+        setDetails(normalized.details); setAttributes(normalized.attributes); setRows(normalized.rows); setApproval(normalized.approval);
+        setSampleSize(normalized.sampleSize); setIncludeVisual(normalized.includeVisual); setIncludeFunctional(normalized.includeFunctional);
+        setDraftMessage("הטופס נטען מהמאגר וניתן לעריכה");
+      } catch {
+        setDraftMessage("לא ניתן לטעון את הטופס מהמאגר");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   function changeDetails(nextDetails: RirDetails) {
     setDetails(nextDetails);
     if (nextDetails.receivedQuantity === details.receivedQuantity) return;
@@ -290,27 +322,9 @@ export function RirForm() {
       const response = await fetch("/api/forms/rir/import", { method: "POST", body: formData });
       const result = await response.json().catch(() => ({})) as { payload?: RirFormPayload; error?: string };
       if (!response.ok || !result.payload) throw new Error(result.error || "לא ניתן לטעון את קובץ ה-Excel");
-      const payload = result.payload;
-      const safeSampleSize = Math.min(200, Math.max(1, Number(payload.sampleSize) || 1));
-      const safeAttributes = payload.attributes.slice(0, 8);
-      const today = todayInIsrael();
-      setDetails({
-        ...payload.details,
-        drawingRevision: payload.details.drawingRevision || "01",
-        drawingNumber: payload.details.drawingNumber || drawingNumberForCatalog(payload.details.catalogNumber),
-      });
-      setAttributes(safeAttributes);
-      setRows(resizeMeasurementRows(payload.rows, safeSampleSize, safeAttributes.length));
-      setApproval({
-        ...payload.approval,
-        inspectorName: payload.approval.inspectorName === "Sergey Dror" ? "Sergey Dror" : "Eden Aharon",
-        inspectionDate: payload.approval.inspectionDate || today,
-        reviewerName: "Uzi Barzilay",
-        reviewDate: payload.approval.reviewDate || today,
-      });
-      setSampleSize(safeSampleSize);
-      setIncludeVisual(payload.includeVisual);
-      setIncludeFunctional(payload.includeFunctional);
+      const normalized = normalizeImportedPayload(result.payload);
+      setDetails(normalized.details); setAttributes(normalized.attributes); setRows(normalized.rows); setApproval(normalized.approval);
+      setSampleSize(normalized.sampleSize); setIncludeVisual(normalized.includeVisual); setIncludeFunctional(normalized.includeFunctional);
       setDraftMessage(`הקובץ ${file.name} נטען בהצלחה וניתן לעריכה`);
     } catch (error) {
       setDraftMessage(error instanceof Error ? error.message : "לא ניתן לטעון את קובץ ה-Excel");
@@ -351,7 +365,7 @@ export function RirForm() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = buildQualityFormFileName({ supplierName: details.supplierName, date: approval.inspectionDate, catalogNumber: details.catalogNumber, extension: "xlsx" });
+      link.download = buildQualityFormDownloadName(details.catalogNumber, "xlsx");
       document.body.appendChild(link);
       link.click();
       link.remove();
