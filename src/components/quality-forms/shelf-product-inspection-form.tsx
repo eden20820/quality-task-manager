@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, Download, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { buildQualityFormFileName } from "@/lib/quality-forms/form-archive";
 
 import {
   createEmptyShelfInspection,
@@ -51,7 +52,7 @@ export function ShelfProductInspectionForm() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${form.catalogNumber.trim() || "shelf-product-inspection"}.docx`;
+      anchor.download = buildQualityFormFileName({ supplierName: form.supplierName, date: form.receiptDate, catalogNumber: form.catalogNumber, extension: "docx" });
       anchor.click();
       URL.revokeObjectURL(url);
       toast.success("הטופס נוצר והורד בהצלחה");

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { buildRirWorkbook } from "@/lib/quality-forms/rir-excel";
+import { archiveQualityFormExport } from "@/lib/quality-forms/form-archive-server";
 import type { RirFormPayload } from "@/lib/quality-forms/rir";
 import { createClient } from "@/lib/supabase/server";
 
@@ -35,17 +36,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "נתוני הטופס אינם תקינים" }, { status: 400 });
     }
 
-    const workbook = await buildRirWorkbook(payload);
+    const normalizedPayload: RirFormPayload = {
+      ...payload,
+      details: {
+        ...payload.details,
+        drawingRevision: payload.details.drawingRevision.trim() || "01",
+      },
+    };
+    const workbook = await buildRirWorkbook(normalizedPayload);
+    workbook.eachSheet((worksheet) => {
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          if (cell.value === "Rev.: 00") cell.value = "Rev.: 01";
+        });
+      });
+    });
     const buffer = await workbook.xlsx.writeBuffer();
+    const bytes = new Uint8Array(buffer);
+    const { fileName } = await archiveQualityFormExport({
+      bytes,
+      supplierName: payload.details.supplierName,
+      date: payload.approval.inspectionDate,
+      catalogNumber: payload.details.catalogNumber,
+      extension: "xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      formTitle: "דוח ביקורת קבלה RIR",
+    });
     return new Response(buffer, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": "attachment; filename=RIR-report.xlsx",
+        "Content-Disposition": `attachment; filename="RIR-report.xlsx"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
         "Cache-Control": "no-store",
       },
     });
   } catch (error) {
     console.error("RIR export failed", error);
-    return NextResponse.json({ error: "לא ניתן ליצור את קובץ ה-Excel כרגע" }, { status: 500 });
+    return NextResponse.json({ error: "לא ניתן ליצור ולשמור את קובץ ה-Excel כרגע" }, { status: 500 });
   }
 }

@@ -32,6 +32,7 @@ import {
   type RirMeasurementRow,
   type RirPassFail,
 } from "@/lib/quality-forms/rir";
+import { buildQualityFormFileName } from "@/lib/quality-forms/form-archive";
 
 type RirDraft = {
   version: 1;
@@ -53,7 +54,7 @@ const emptyDetails: RirDetails = {
   orderNumber: "",
   lotNumber: "",
   drawingNumber: "",
-  drawingRevision: "00",
+  drawingRevision: "01",
   comments: "",
   documents: { coc: false, cot: false, coa: false, other: false },
   otherDocument: "",
@@ -146,7 +147,7 @@ function ResultsStep({ attributes, rows, includeVisual, includeFunctional, onRow
       const values = [...row.values];
       sourceRow.forEach((value, sourceColumnIndex) => {
         const targetColumn = columnIndex + sourceColumnIndex;
-        if (targetColumn < values.length) values[targetColumn] = formatMeasurementForEquipment(value.trim(), attributes[targetColumn]?.equipment ?? "");
+        if (targetColumn < values.length) values[targetColumn] = resolveMeasurementInput(value.trim(), attributes[targetColumn]?.equipment ?? "");
       });
       return { ...row, values };
     }));
@@ -170,7 +171,7 @@ function ResultsStep({ attributes, rows, includeVisual, includeFunctional, onRow
   return <section id="results" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:justify-between"><div><h2 className="text-xl font-black">גיליון תוצאות</h2><p className="mt-1 text-sm text-slate-500">Enter עובר לתא הבא. אפשר גם להדביק טווח שלם ישירות מאקסל.</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-slate-500">סימון מהיר:</span>{includeVisual ? <button type="button" onClick={() => setAllStatuses("visual", "Pass")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">VIS. — סמן הכול תקין</button> : null}{includeFunctional ? <button type="button" onClick={() => setAllStatuses("functional", "Pass")} className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-extrabold text-emerald-800">FUNC. — סמן הכול תקין</button> : null}{includeVisual || includeFunctional ? <button type="button" onClick={() => { if (includeVisual) setAllStatuses("visual", ""); if (includeFunctional) setAllStatuses("functional", ""); }} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-600">נקה עמודות בחירה</button> : null}<span className="px-2 text-sm font-extrabold text-slate-600">{rows.length} דגימות</span></div></div><div className="max-h-[68vh] overflow-auto"><table className="w-full min-w-max border-collapse text-sm"><thead className="sticky top-0 z-20 bg-slate-100 shadow-sm"><tr><th className="sticky right-0 z-30 w-20 border-b border-l border-slate-300 bg-slate-100 p-2 text-center">דגימה</th>{attributes.map((attribute, index) => <th key={attribute.id} className="min-w-40 border-b border-l border-slate-300 p-2 text-center"><span className="block font-black">{index + 1}. {attribute.name}</span><span className="mt-1 block text-[11px] font-semibold text-slate-500">{formatMeasurementForEquipment(attribute.min, attribute.equipment) || "—"} עד {formatMeasurementForEquipment(attribute.max, attribute.equipment) || "—"} · {attribute.equipment || "ללא ציוד"}</span></th>)}{includeVisual ? <th className="min-w-40 border-b border-l border-slate-300 p-2 text-center">VIS.<span className="mt-1 block text-[11px] text-slate-500">בדיקה חזותית</span></th> : null}{includeFunctional ? <th className="min-w-40 border-b border-slate-300 p-2 text-center">FUNC.<span className="mt-1 block text-[11px] text-slate-500">בדיקה פונקציונלית</span></th> : null}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={row.specimen} className="[content-visibility:auto]"><th className="sticky right-0 z-10 border-b border-l border-slate-200 bg-white p-2 text-center font-black text-slate-700">{row.specimen}</th>{attributes.map((attribute, columnIndex) => {
           const state = measurementState(row.values[columnIndex] ?? "", attribute.min, attribute.max);
           const stateClass = state === "pass" ? "border-emerald-300 bg-emerald-50 text-emerald-950" : state === "fail" || state === "invalid" ? "border-red-300 bg-red-50 text-red-950" : state === "unconfigured" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-slate-200 bg-white text-slate-900";
-          return <td key={attribute.id} className="border-b border-l border-slate-200 p-1.5"><input data-rir-measurement data-rir-row={rowIndex} data-rir-column={columnIndex} type="number" step={isCaliperEquipment(attribute.equipment) ? "0.01" : "any"} value={row.values[columnIndex] ?? ""} onChange={(event) => updateValue(rowIndex, columnIndex, event.target.value)} onBlur={(event) => updateValue(rowIndex, columnIndex, formatMeasurementForEquipment(event.currentTarget.value, attribute.equipment))} onPaste={(event) => pasteMeasurements(event, rowIndex, columnIndex)} onKeyDown={focusAdjacentCell} aria-label={`דגימה ${row.specimen}, ${attribute.name}`} className={`h-9 w-full rounded-md border px-2 text-center font-bold outline-none focus:ring-2 focus:ring-blue-400 ${stateClass}`} /></td>;
+          return <td key={attribute.id} className="border-b border-l border-slate-200 p-1.5"><input data-rir-measurement data-rir-row={rowIndex} data-rir-column={columnIndex} type="text" inputMode="decimal" value={row.values[columnIndex] ?? ""} placeholder="=0.75+0.15" onChange={(event) => updateValue(rowIndex, columnIndex, event.target.value)} onBlur={(event) => updateValue(rowIndex, columnIndex, resolveMeasurementInput(event.currentTarget.value, attribute.equipment))} onPaste={(event) => pasteMeasurements(event, rowIndex, columnIndex)} onKeyDown={focusAdjacentCell} aria-label={`דגימה ${row.specimen}, ${attribute.name}`} className={`h-9 w-full rounded-md border px-2 text-center font-bold outline-none focus:ring-2 focus:ring-blue-400 ${stateClass}`} /></td>;
         })}{includeVisual ? <td className="border-b border-l border-slate-200 p-1.5"><PassFailControl value={row.visual} onChange={(value) => updateStatus(rowIndex, "visual", value)} label={`בדיקה חזותית לדגימה ${row.specimen}`} /></td> : null}{includeFunctional ? <td className="border-b border-slate-200 p-1.5"><PassFailControl value={row.functional} onChange={(value) => updateStatus(rowIndex, "functional", value)} label={`בדיקה פונקציונלית לדגימה ${row.specimen}`} /></td> : null}</tr>)}</tbody></table></div></section>;
 }
 
@@ -253,13 +254,13 @@ export function RirForm() {
       });
       setDetails({
         ...draft.details,
-        drawingRevision: draft.details.drawingRevision || "00",
+        drawingRevision: draft.details.drawingRevision || "01",
         drawingNumber: draft.details.drawingNumber || drawingNumberForCatalog(draft.details.catalogNumber),
       });
       setAttributes(safeAttributes);
       setRows(resizeMeasurementRows(draft.rows, safeSampleSize, safeAttributes.length).map((row) => ({
         ...row,
-        values: row.values.map((value, index) => formatMeasurementForEquipment(value, safeAttributes[index]?.equipment ?? "")),
+        values: row.values.map((value, index) => resolveMeasurementInput(value, safeAttributes[index]?.equipment ?? "")),
       })));
       const today = todayInIsrael();
       setApproval({
@@ -295,7 +296,7 @@ export function RirForm() {
       const today = todayInIsrael();
       setDetails({
         ...payload.details,
-        drawingRevision: payload.details.drawingRevision || "00",
+        drawingRevision: payload.details.drawingRevision || "01",
         drawingNumber: payload.details.drawingNumber || drawingNumberForCatalog(payload.details.catalogNumber),
       });
       setAttributes(safeAttributes);
@@ -347,11 +348,10 @@ export function RirForm() {
         throw new Error(result.error || "לא ניתן ליצור את הקובץ");
       }
       const blob = await response.blob();
-      const safeCatalogNumber = details.catalogNumber.replace(/[^a-zA-Z0-9\u0590-\u05ff_.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${safeCatalogNumber || "RIR-report"}.xlsx`;
+      link.download = buildQualityFormFileName({ supplierName: details.supplierName, date: approval.inspectionDate, catalogNumber: details.catalogNumber, extension: "xlsx" });
       document.body.appendChild(link);
       link.click();
       link.remove();
