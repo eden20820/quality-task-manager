@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildQualityFormFileName } from "./form-archive";
+import { buildQualityFormDownloadName, buildQualityFormFileName, downloadNameFromArchivedFile } from "./form-archive";
 
 describe("quality form archive filenames", () => {
   it("uses supplier, date and catalog number in the requested order", () => {
@@ -11,5 +11,10 @@ describe("quality form archive filenames", () => {
   it("uses readable fallbacks for missing metadata", () => {
     expect(buildQualityFormFileName({ supplierName: "", date: "", catalogNumber: "", extension: ".docx" }))
       .toBe("ללא-ספק_ללא-תאריך_ללא-מקט.docx");
+  });
+
+  it("uses only the catalog number for files downloaded to the computer", () => {
+    expect(buildQualityFormDownloadName("CNC/ALM-NSP.034", "xlsx")).toBe("CNC-ALM-NSP.034.xlsx");
+    expect(downloadNameFromArchivedFile("LMI_2026-11-02_CNC-ALM-NSP.034.xlsx")).toBe("CNC-ALM-NSP.034.xlsx");
   });
 });
