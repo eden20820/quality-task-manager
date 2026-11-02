@@ -39,7 +39,7 @@ describe("shelf product inspection DOCX", () => {
     expect(xml).toContain("המסמך נוצר בהצלחה.");
     expect(xml).toContain("יש לצרף טופס זה למסמכי הקליטה של החומר");
     expect(xml).toContain("מאושר מותנה (לפרטים בהערות)");
-    expect((xml?.match(/<w:tbl>/g) ?? []).length).toBe(5);
+    expect((xml?.match(/<w:tbl>/g) ?? []).length).toBe(6);
     expect(xml).toContain("Sergey Dror");
     expect(xml).not.toMatch(/\{\{[A-Z0-9_]+\}\}/);
     if (process.env.SHELF_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_DOCX_SAMPLE_PATH, buffer);
