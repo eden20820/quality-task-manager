@@ -1,4 +1,5 @@
 export const ONLINE_FORM_CATEGORY = "טופס מקוון";
+export const RIR_ARCHIVE_EDIT_STORAGE_KEY = "quality-rir-archive-edit";
 
 function safeFilePart(value: string, fallback: string) {
   return value
@@ -21,4 +22,15 @@ export function buildQualityFormFileName(input: {
   const catalog = safeFilePart(input.catalogNumber, "ללא-מקט");
   const extension = safeFilePart(input.extension.replace(/^\./, ""), "bin").toLowerCase();
   return `${supplier}_${date}_${catalog}.${extension}`;
+}
+
+export function buildQualityFormDownloadName(catalogNumber: string, extension: string) {
+  const catalog = safeFilePart(catalogNumber, "טופס");
+  const safeExtension = safeFilePart(extension.replace(/^\./, ""), "bin").toLowerCase();
+  return `${catalog}.${safeExtension}`;
+}
+
+export function downloadNameFromArchivedFile(fileName: string) {
+  const match = fileName.match(/_(?:\d{4}-\d{2}-\d{2}|ללא-תאריך)_(.+)\.([^.]+)$/);
+  return match ? buildQualityFormDownloadName(match[1], match[2]) : fileName;
 }
