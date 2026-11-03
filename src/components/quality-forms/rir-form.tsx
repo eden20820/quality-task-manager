@@ -34,7 +34,7 @@ import {
   type RirPassFail,
 } from "@/lib/quality-forms/rir";
 import { buildQualityFormDownloadName, RIR_ARCHIVE_EDIT_STORAGE_KEY } from "@/lib/quality-forms/form-archive";
-import { findKnownPartName, type FormAutocompleteSuggestions } from "@/lib/quality-forms/form-suggestions";
+import { catalogNumbersMatch, findKnownPartName, type FormAutocompleteSuggestions } from "@/lib/quality-forms/form-suggestions";
 import { measurementNavigationTarget, type MeasurementNavigationKey } from "@/lib/quality-forms/keyboard-navigation";
 
 type RirDraft = {
@@ -276,6 +276,7 @@ export function RirForm({ suggestions }: { suggestions: FormAutocompleteSuggesti
   const [isDownloading, setIsDownloading] = useState(false);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const draftFileInputRef = useRef<HTMLInputElement>(null);
+  const partNameRef = useRef(details.partName);
   const automaticCounts = automaticApprovedPartCounts({ receivedQuantity: details.receivedQuantity, attributes, rows, includeVisual, includeFunctional });
   const effectiveApproval = automaticCounts.automatic ? { ...approval, approvedParts: automaticCounts.approvedParts, rejectedParts: automaticCounts.rejectedParts } : approval;
 
@@ -295,6 +296,34 @@ export function RirForm({ suggestions }: { suggestions: FormAutocompleteSuggesti
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    partNameRef.current = details.partName;
+  }, [details.partName]);
+
+  useEffect(() => {
+    const catalogNumber = details.catalogNumber.trim();
+    if (catalogNumber.length < 2 || findKnownPartName(catalogNumber, suggestions.catalogItems)) return;
+    const partNameAtStart = partNameRef.current;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/forms/item-lookup?catalogNumber=${encodeURIComponent(catalogNumber)}`, { signal: controller.signal });
+        if (!response.ok) return;
+        const result = await response.json() as { partName?: string | null };
+        if (!result.partName) return;
+        setDetails((current) => catalogNumbersMatch(current.catalogNumber, catalogNumber) && current.partName === partNameAtStart
+          ? { ...current, partName: result.partName ?? current.partName }
+          : current);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) console.error("Historical item lookup failed", error);
+      }
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [details.catalogNumber, suggestions.catalogItems]);
 
   function changeDetails(nextDetails: RirDetails) {
     setDetails(nextDetails);
