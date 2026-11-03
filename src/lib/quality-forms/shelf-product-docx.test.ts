@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 
 import { buildShelfProductInspectionDocx } from "./shelf-product-docx";
+import { parseShelfProductInspectionDocx } from "./shelf-product-docx-import";
 import type { ShelfProductInspectionPayload } from "./shelf-product-inspection";
 
 const sample: ShelfProductInspectionPayload = {
@@ -43,5 +44,24 @@ describe("shelf product inspection DOCX", () => {
     expect(xml).toContain("Sergey Dror");
     expect(xml).not.toMatch(/\{\{[A-Z0-9_]+\}\}/);
     if (process.env.SHELF_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_DOCX_SAMPLE_PATH, buffer);
+  });
+
+  it("loads an exported document back into an editable form", async () => {
+    const restored = await parseShelfProductInspectionDocx(await buildShelfProductInspectionDocx(sample));
+    expect(restored).toEqual(sample);
+  });
+
+  it("restores failures, conditional approval, other documents and blank values", async () => {
+    const source: ShelfProductInspectionPayload = {
+      ...sample,
+      batchNumber: "",
+      documents: { coc: false, coa: true, cot: false, other: true },
+      otherDocument: "Packing list",
+      inspections: sample.inspections.map((inspection, index) => index === 1 ? { result: "fail", comment: "תווית חסרה" } : { ...inspection, result: "" }),
+      usageApproval: "conditional",
+      notes: "אישור לאחר השלמת תווית",
+      inspectorName: "Eden Aharon",
+    };
+    expect(await parseShelfProductInspectionDocx(await buildShelfProductInspectionDocx(source))).toEqual(source);
   });
 });
