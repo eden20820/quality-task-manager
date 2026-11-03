@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFormAutocompleteSuggestions, findKnownPartName, parseArchivedFormFileName } from "./form-suggestions";
+import { buildFormAutocompleteSuggestions, catalogNumbersMatch, findKnownPartName, parseArchivedFormFileName } from "./form-suggestions";
 
 describe("quality form autocomplete suggestions", () => {
   it("extracts supplier and catalog values from archived form names", () => {
@@ -44,5 +44,7 @@ describe("quality form autocomplete suggestions", () => {
     const items = [{ catalogNumber: "CNC-ALM 034", partName: "Aluminum housing" }];
     expect(findKnownPartName("cnc alm-034", items)).toBe("Aluminum housing");
     expect(findKnownPartName("unknown", items)).toBe("");
+    expect(catalogNumbersMatch("CNC-ALM 034", "cnc alm-034")).toBe(true);
+    expect(catalogNumbersMatch("", "")).toBe(false);
   });
 });
