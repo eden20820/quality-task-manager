@@ -27,8 +27,8 @@ function examplePayload(): RirFormPayload {
     includeVisual: true,
     includeFunctional: true,
     attributes: [
-      { id: "a1", name: "Length", equipment: "Caliper", min: "9", max: "12" },
-      { id: "a2", name: "Width", equipment: "Micrometer", min: "3", max: "4" },
+      { id: "a1", name: "Length", equipment: "Caliper", dimension: "10±1", min: "9", max: "12" },
+      { id: "a2", name: "Width", equipment: "Micrometer", dimension: "", min: "3", max: "4" },
     ],
     rows,
     approval: {
