@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildFormAutocompleteSuggestions, parseArchivedFormFileName } from "./form-suggestions";
+import { buildFormAutocompleteSuggestions, findKnownPartName, parseArchivedFormFileName } from "./form-suggestions";
 
 describe("quality form autocomplete suggestions", () => {
   it("extracts supplier and catalog values from archived form names", () => {
@@ -25,6 +25,7 @@ describe("quality form autocomplete suggestions", () => {
 
     expect(suggestions.supplierNames).toEqual(["Test Supplier", "LMI", "Legacy Supplier"]);
     expect(suggestions.catalogNumbers).toEqual(["CAT-100", "OLD-20"]);
+    expect(suggestions.catalogItems).toEqual([{ catalogNumber: "CAT 100", partName: "Rotor" }]);
     expect(suggestions.partNames).toEqual(["Rotor"]);
     expect(suggestions.orderNumbers).toEqual(["PO-7"]);
     expect(suggestions.revisions).toEqual(["02"]);
@@ -36,6 +37,12 @@ describe("quality form autocomplete suggestions", () => {
       archivedForms: [{ file_name: "unrelated.pdf" }],
       followups: [{ name: "Fallback", notes: "PKA_IMPORT_JSON:not-json" }],
     });
-    expect(suggestions).toEqual({ supplierNames: [], catalogNumbers: [], partNames: [], orderNumbers: [], revisions: [] });
+    expect(suggestions).toEqual({ supplierNames: [], catalogNumbers: [], catalogItems: [], partNames: [], orderNumbers: [], revisions: [] });
+  });
+
+  it("finds a known item name despite catalog punctuation and spacing differences", () => {
+    const items = [{ catalogNumber: "CNC-ALM 034", partName: "Aluminum housing" }];
+    expect(findKnownPartName("cnc alm-034", items)).toBe("Aluminum housing");
+    expect(findKnownPartName("unknown", items)).toBe("");
   });
 });
