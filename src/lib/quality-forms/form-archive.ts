@@ -1,5 +1,6 @@
 export const ONLINE_FORM_CATEGORY = "טופס מקוון";
 export const RIR_ARCHIVE_EDIT_STORAGE_KEY = "quality-rir-archive-edit";
+export const SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY = "quality-shelf-inspection-archive-edit";
 
 function safeFilePart(value: string, fallback: string) {
   return value

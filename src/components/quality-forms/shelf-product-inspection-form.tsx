@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Download, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { buildQualityFormDownloadName } from "@/lib/quality-forms/form-archive";
+import { buildQualityFormDownloadName, SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY } from "@/lib/quality-forms/form-archive";
 
 import {
   createEmptyShelfInspection,
@@ -33,6 +33,21 @@ export function ShelfProductInspectionForm() {
   const [downloading, setDownloading] = useState(false);
   const update = <K extends keyof ShelfProductInspectionPayload>(key: K, value: ShelfProductInspectionPayload[K]) => setForm((current) => ({ ...current, [key]: value }));
   const toggleDocument = (key: keyof ShelfProductInspectionPayload["documents"]) => setForm((current) => ({ ...current, documents: { ...current.documents, [key]: !current.documents[key] } }));
+
+  useEffect(() => {
+    const archived = window.sessionStorage.getItem(SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY);
+    if (!archived) return;
+    window.sessionStorage.removeItem(SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY);
+    const timer = window.setTimeout(() => {
+      try {
+        setForm(JSON.parse(archived) as ShelfProductInspectionPayload);
+        toast.success("הטופס נטען מהמאגר וניתן לעריכה");
+      } catch {
+        toast.error("לא ניתן לטעון את הטופס מהמאגר");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   function updateInspection(index: number, patch: Partial<ShelfProductInspectionPayload["inspections"][number]>) {
     setForm((current) => ({ ...current, inspections: current.inspections.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) }));
