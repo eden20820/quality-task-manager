@@ -21,10 +21,14 @@ function suggestionKey(value: string) {
   return value.toLocaleLowerCase("he-IL").replace(/[\s_.\-/\\]+/g, "");
 }
 
+export function catalogNumbersMatch(left: string, right: string) {
+  const leftKey = suggestionKey(clean(left));
+  return Boolean(leftKey) && leftKey === suggestionKey(clean(right));
+}
+
 export function findKnownPartName(catalogNumber: string, catalogItems: FormAutocompleteSuggestions["catalogItems"]) {
-  const key = suggestionKey(clean(catalogNumber));
-  if (!key) return "";
-  return catalogItems.find((item) => suggestionKey(item.catalogNumber) === key)?.partName ?? "";
+  if (!suggestionKey(clean(catalogNumber))) return "";
+  return catalogItems.find((item) => catalogNumbersMatch(item.catalogNumber, catalogNumber))?.partName ?? "";
 }
 
 function uniqueSuggestions(values: unknown[]) {
