@@ -1,5 +1,6 @@
 export type FormAutocompleteSuggestions = {
   catalogNumbers: string[];
+  catalogItems: Array<{ catalogNumber: string; partName: string }>;
   supplierNames: string[];
   partNames: string[];
   orderNumbers: string[];
@@ -18,6 +19,12 @@ function clean(value: unknown) {
 
 function suggestionKey(value: string) {
   return value.toLocaleLowerCase("he-IL").replace(/[\s_.\-/\\]+/g, "");
+}
+
+export function findKnownPartName(catalogNumber: string, catalogItems: FormAutocompleteSuggestions["catalogItems"]) {
+  const key = suggestionKey(clean(catalogNumber));
+  if (!key) return "";
+  return catalogItems.find((item) => suggestionKey(item.catalogNumber) === key)?.partName ?? "";
 }
 
 function uniqueSuggestions(values: unknown[]) {
@@ -68,6 +75,12 @@ export function buildFormAutocompleteSuggestions(input: {
     const parsed = parsePkaNotes(followup.notes);
     return parsed ? [{ ...parsed, fallbackName: clean(followup.name) }] : [];
   });
+  const catalogItems = pka.reduce<FormAutocompleteSuggestions["catalogItems"]>((items, item) => {
+    if (!item.partNumber || !item.productName) return items;
+    if (items.some((entry) => suggestionKey(entry.catalogNumber) === suggestionKey(item.partNumber))) return items;
+    items.push({ catalogNumber: item.partNumber, partName: item.productName });
+    return items;
+  }, []);
 
   return {
     supplierNames: uniqueSuggestions([
@@ -78,6 +91,7 @@ export function buildFormAutocompleteSuggestions(input: {
       ...archived.map((form) => form.catalogNumber),
       ...pka.map((item) => item.partNumber),
     ]),
+    catalogItems,
     partNames: uniqueSuggestions(pka.map((item) => item.productName || item.fallbackName)),
     orderNumbers: uniqueSuggestions(pka.map((item) => item.customerOrder)),
     revisions: uniqueSuggestions(pka.map((item) => item.revision)),
