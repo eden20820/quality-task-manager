@@ -142,6 +142,7 @@ export async function parseRirWorkbook(data: Buffer | Uint8Array) {
       id: metadataAttribute?.id || `measurement-${index + 1}`,
       name: metadataAttribute?.name || `מידה ${index + 1}`,
       equipment,
+      dimension: metadataAttribute?.dimension || "",
       max: formatMeasurementForEquipment(inputValue(worksheet.getCell(14, entry.column)), equipment),
       min: formatMeasurementForEquipment(inputValue(worksheet.getCell(15, entry.column)), equipment),
     };

@@ -31,6 +31,7 @@ export type RirAttribute = {
   id: string;
   name: string;
   equipment: string;
+  dimension?: string;
   min: string;
   max: string;
 };
