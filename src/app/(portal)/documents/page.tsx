@@ -1,6 +1,7 @@
 import { DocumentsCenter, type DocumentRow } from "@/components/documents/documents-center";
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
+import { ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
@@ -10,6 +11,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const { data, error, count } = await supabase
     .from("quality_documents")
     .select("id, title, category, description, file_name, file_size, mime_type, storage_path, created_at", { count: "exact" })
+    .neq("category", ONLINE_FORM_CATEGORY)
     .order("created_at", { ascending: false })
     .range(from, to);
 

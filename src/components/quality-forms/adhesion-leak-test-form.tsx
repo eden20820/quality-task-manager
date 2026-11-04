@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type KeyboardEvent } from "react";
-import { ArrowRight, Download, Loader2, RotateCcw, Save } from "lucide-react";
+import { ArrowRight, CircleCheckBig, Download, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { SignaturePad } from "@/components/quality-forms/signature-pad";
-import { ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY, buildQualityFormDownloadName } from "@/lib/quality-forms/form-archive";
+import { ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY, ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY, buildQualityFormDownloadName } from "@/lib/quality-forms/form-archive";
 import { createEmptyAdhesionLeakTest, isAdhesionLeakTestPayload, type AdhesionLeakTestPayload, type FinalDecision, type LeakTestMethod, type YesNo } from "@/lib/quality-forms/adhesion-leak-test";
 
 function todayInIsrael() {
@@ -44,11 +45,17 @@ function YesNoChoice({ value, onChange }: { value: YesNo; onChange: (value: YesN
 }
 
 export function AdhesionLeakTestForm() {
+  const router = useRouter();
   const [form, setForm] = useState(() => createEmptyAdhesionLeakTest(todayInIsrael()));
   const [busy, setBusy] = useState<"download" | "save" | null>(null);
+  const [sourceArchiveId, setSourceArchiveId] = useState<string | null>(null);
+  const [saveCompleted, setSaveCompleted] = useState(false);
   const update = <K extends keyof AdhesionLeakTestPayload>(key: K, value: AdhesionLeakTestPayload[K]) => setForm((current) => ({ ...current, [key]: value }));
 
   useEffect(() => {
+    const archiveId = window.sessionStorage.getItem(ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY);
+    window.sessionStorage.removeItem(ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY);
+    if (archiveId) window.setTimeout(() => setSourceArchiveId(archiveId), 0);
     const saved = window.sessionStorage.getItem(ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY);
     if (!saved) return;
     window.sessionStorage.removeItem(ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY);
@@ -92,11 +99,16 @@ export function AdhesionLeakTestForm() {
   async function saveForm() {
     setBusy("save");
     try {
-      const response = await fetch("/api/forms/adhesion-leak-test/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const response = await fetch("/api/forms/adhesion-leak-test/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payload: form, archiveId: sourceArchiveId }) });
       const result = await response.json().catch(() => null) as { error?: string; emailStatus?: "sent" | "partial" | "failed" } | null;
       if (!response.ok) throw new Error(result?.error ?? "לא ניתן לשמור את הטופס");
       if (result?.emailStatus === "sent") toast.success("הטופס נשמר ונשלחה התראה לעדן ולסרגיי");
       else toast.warning("הטופס נשמר, אך שליחת אחת מהתראות המייל לא הושלמה");
+      setSaveCompleted(true);
+      window.setTimeout(() => {
+        router.push("/forms");
+        router.refresh();
+      }, 1800);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "לא ניתן לשמור את הטופס");
     } finally {
@@ -104,7 +116,7 @@ export function AdhesionLeakTestForm() {
     }
   }
 
-  return <div className="space-y-5" dir="rtl"><header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><Link href="/forms" className="inline-flex items-center gap-1 text-sm font-extrabold text-slate-500 hover:text-blue-700"><ArrowRight className="h-4 w-4" />חזרה למילוי טפסים</Link><h1 className="mt-2 text-2xl font-black sm:text-3xl">טופס בדיקת אטימות – הדבקה</h1><p className="mt-1 text-sm text-slate-500">נספח 8.4.2.4.0 · מילוי דיגיטלי, חתימות בעכבר ושמירה למאגר.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={clearForm} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-extrabold"><RotateCcw className="h-4 w-4" />ניקוי</button><button type="button" disabled={Boolean(busy)} onClick={downloadForm} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-900 bg-white px-4 text-sm font-extrabold disabled:opacity-50">{busy === "download" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}הורדה</button><button type="button" disabled={Boolean(busy)} onClick={saveForm} className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-50">{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}שמירה ושליחת התראה</button></div></header>
+  return <div className="space-y-5" dir="rtl">{saveCompleted ? <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-5 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl"><span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><CircleCheckBig className="h-11 w-11" /></span><h2 className="mt-5 text-2xl font-black text-slate-950">הטופס נשמר בהצלחה</h2><p className="mt-2 font-semibold text-slate-600">הטופס נוסף למאגר הטפסים. מיד נחזיר אותך למסך הראשי של מילוי טפסים.</p><Loader2 className="mx-auto mt-5 h-5 w-5 animate-spin text-blue-600" /></div></div> : null}<header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><Link href="/forms" className="inline-flex items-center gap-1 text-sm font-extrabold text-slate-500 hover:text-blue-700"><ArrowRight className="h-4 w-4" />חזרה למילוי טפסים</Link><h1 className="mt-2 text-2xl font-black sm:text-3xl">טופס בדיקת אטימות – הדבקה</h1><p className="mt-1 text-sm text-slate-500">נספח 8.4.2.4.0 · מילוי דיגיטלי, חתימות בעכבר ושמירה למאגר.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={clearForm} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-extrabold"><RotateCcw className="h-4 w-4" />ניקוי</button><button type="button" disabled={Boolean(busy)} onClick={downloadForm} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-900 bg-white px-4 text-sm font-extrabold disabled:opacity-50">{busy === "download" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}הורדה</button><button type="button" disabled={Boolean(busy)} onClick={saveForm} className="inline-flex h-11 items-center gap-2 rounded-xl bg-slate-950 px-5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-50">{busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}שמירה ושליחת התראה</button></div></header>
 
     <main className="mx-auto max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-lg sm:p-8 lg:p-10"><div className="relative mb-6 min-h-24"><Image src="/caeli-logo.png" alt="CAELI" width={150} height={105} className="absolute left-0 top-0 h-auto w-24 object-contain sm:w-32" priority /><h2 className="px-24 pt-7 text-center text-xl font-black underline sm:text-3xl">טופס בדיקת אטימות – הדבקה</h2></div>
 

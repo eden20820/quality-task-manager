@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { createClient } from "@/lib/supabase/server";
 
-import { buildQualityFormFileName, ONLINE_FORM_CATEGORY } from "./form-archive";
+import { buildArchivedFormDescription, buildQualityFormFileName, ONLINE_FORM_CATEGORY, type QualityFormStatus } from "./form-archive";
 
 export async function archiveQualityFormExport(input: {
   bytes: Uint8Array;
@@ -14,6 +14,7 @@ export async function archiveQualityFormExport(input: {
   extension: string;
   mimeType: string;
   formTitle: string;
+  formStatus?: QualityFormStatus;
 }) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -32,7 +33,7 @@ export async function archiveQualityFormExport(input: {
   const { error: insertError } = await supabase.from("quality_documents").insert({
     title: archiveTitle,
     category: ONLINE_FORM_CATEGORY,
-    description: input.formTitle,
+    description: buildArchivedFormDescription(input.formTitle, input.formStatus),
     file_name: fileName,
     file_size: input.bytes.byteLength,
     mime_type: input.mimeType,
