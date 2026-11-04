@@ -35,13 +35,15 @@ describe("shelf product inspection DOCX", () => {
     const buffer = await buildShelfProductInspectionDocx(sample);
     const zip = await JSZip.loadAsync(buffer);
     const xml = await zip.file("word/document.xml")?.async("string");
+    const footerXml = await zip.file("word/footer1.xml")?.async("string");
     expect(xml).toContain("TEST-100");
     expect(xml).toContain("מוצר בדיקה");
     expect(xml).toContain("15.01.2026");
     expect(xml).toContain("המסמך נוצר בהצלחה.");
     expect(xml).toContain("יש לצרף טופס זה למסמכי הקליטה של החומר");
     expect(xml).toContain("מאושר מותנה (לפרטים בהערות)");
-    expect((xml?.match(/<w:tbl>/g) ?? []).length).toBe(7);
+    expect((xml?.match(/<w:tbl>/g) ?? []).length).toBe(6);
+    expect(footerXml).toContain("נספח 8.4.2.1.0");
     expect(xml).toContain("Sergey Dror");
     expect(xml).not.toContain("שם הספק:");
     expect(xml).not.toContain("אישור לשימוש:");
