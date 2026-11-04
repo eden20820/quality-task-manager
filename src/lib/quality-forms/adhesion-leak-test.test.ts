@@ -2,10 +2,21 @@ import { PDFDocument } from "pdf-lib";
 import { writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { buildAdhesionLeakTestPdf, extractAdhesionLeakTestPayload } from "./adhesion-leak-test-pdf";
+import { buildAdhesionLeakTestPdf, directionalTextLayout, extractAdhesionLeakTestPayload } from "./adhesion-leak-test-pdf";
 import { createEmptyAdhesionLeakTest, isAdhesionLeakTestPayload } from "./adhesion-leak-test";
 
 describe("adhesion leak test form", () => {
+  it("keeps Hebrew and English in separate directional runs", () => {
+    expect(directionalTextLayout("בדיקה ABC תקינה")).toEqual({
+      baseDirection: "rtl",
+      runs: [
+        { direction: "rtl", text: "בדיקה " },
+        { direction: "ltr", text: "ABC " },
+        { direction: "rtl", text: "תקינה" },
+      ],
+    });
+  });
+
   it("creates a valid empty payload with today's dates", () => {
     const payload = createEmptyAdhesionLeakTest("2026-11-04");
     expect(payload.testDate).toBe("2026-11-04");
@@ -25,6 +36,7 @@ describe("adhesion leak test form", () => {
       testerName: "עדן אהרון",
       testLocation: "מעבדת אלקטרוניקה",
       operationDescription: "בדיקת אטימות",
+      bondedProductMaterial: "אלומיניום AL-6061 תקין",
       testedProduct: "מכלול 101",
       adhesiveManufacturerModel: "יצרן ודגם לדוגמה",
       adhesiveExpiryDate: "2026-11-25",
