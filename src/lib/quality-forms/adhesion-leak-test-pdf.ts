@@ -10,10 +10,37 @@ const black = rgb(0, 0, 0);
 const gray = rgb(0.94, 0.94, 0.94);
 const payloadKey = PDFName.of("QualityFormPayload");
 const pageHeight = 841.89;
+type TextDirection = "rtl" | "ltr";
 
 function display(value: string) { return value.trim() || "N/A"; }
 function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : "N/A"; }
-function yesNo(value: string) { return value === "yes" ? "כן" : value === "no" ? "לא" : "N/A"; }
+function yesNo(value: string) { return value === "yes" ? "כן" : value === "no" ? "לא" : ""; }
+
+function strongDirection(character: string): TextDirection | null {
+  if (/\p{Script=Hebrew}/u.test(character)) return "rtl";
+  if (/[A-Za-z0-9]/.test(character)) return "ltr";
+  return null;
+}
+
+export function directionalTextLayout(value: string) {
+  const characters = Array.from(value);
+  const strong = characters.map(strongDirection);
+  const baseDirection = strong.find((direction): direction is TextDirection => direction !== null) ?? "ltr";
+  const resolved = strong.map((direction, index) => {
+    if (direction) return direction;
+    for (let previous = index - 1; previous >= 0; previous -= 1) if (strong[previous]) return strong[previous] as TextDirection;
+    for (let next = index + 1; next < strong.length; next += 1) if (strong[next]) return strong[next] as TextDirection;
+    return baseDirection;
+  });
+  const runs: Array<{ direction: TextDirection; text: string }> = [];
+  characters.forEach((character, index) => {
+    const direction = resolved[index];
+    const last = runs.at(-1);
+    if (last?.direction === direction) last.text += character;
+    else runs.push({ direction, text: character });
+  });
+  return { baseDirection, runs };
+}
 
 function fitSize(font: PDFFont, text: string, maxWidth: number, preferred = 8, minimum = 5.8) {
   let size = preferred;
@@ -21,16 +48,29 @@ function fitSize(font: PDFFont, text: string, maxWidth: number, preferred = 8, m
   return size;
 }
 
-function drawText(page: PDFPage, font: PDFFont, value: string, options: { x: number; top: number; width: number; height?: number; size?: number; align?: "left" | "center" | "right"; bold?: boolean }) {
-  const text = display(value);
+function drawText(page: PDFPage, font: PDFFont, value: string, options: { x: number; top: number; width: number; height?: number; size?: number; align?: "left" | "center" | "right"; bold?: boolean; empty?: "na" | "blank" }) {
+  const text = options.empty === "blank" ? value.trim() : display(value);
+  if (!text) return;
   const size = fitSize(font, text, options.width - 6, options.size ?? 8);
   const height = options.height ?? 12;
   const textWidth = font.widthOfTextAtSize(text, size);
   const align = options.align ?? "center";
   const x = align === "right" ? options.x + options.width - textWidth - 3 : align === "left" ? options.x + 3 : options.x + (options.width - textWidth) / 2;
   const y = pageHeight - options.top - (height + size) / 2 + 1;
-  page.drawText(text, { x, y, size, font, color: black });
-  if (options.bold) page.drawText(text, { x: x + 0.22, y, size, font, color: black });
+  const layout = directionalTextLayout(text);
+  if (layout.runs.length <= 1) {
+    page.drawText(text, { x, y, size, font, color: black });
+    if (options.bold) page.drawText(text, { x: x + 0.22, y, size, font, color: black });
+    return;
+  }
+  let cursor = layout.baseDirection === "rtl" ? x + textWidth : x;
+  for (const run of layout.runs) {
+    const runWidth = font.widthOfTextAtSize(run.text, size);
+    const runX = layout.baseDirection === "rtl" ? cursor - runWidth : cursor;
+    page.drawText(run.text, { x: runX, y, size, font, color: black });
+    if (options.bold) page.drawText(run.text, { x: runX + 0.22, y, size, font, color: black });
+    cursor += layout.baseDirection === "rtl" ? -runWidth : runWidth;
+  }
 }
 
 function rect(page: PDFPage, x: number, top: number, width: number, height: number, fill = false, borderWidth = 0.65) {
@@ -50,7 +90,7 @@ function checkbox(page: PDFPage, checked: boolean, x: number, top: number, size 
   page.drawLine({ start: { x: x + inset, y: yTop - size + inset }, end: { x: x + size - inset, y: yTop - inset }, thickness: 1, color: black });
 }
 
-function fieldLine(page: PDFPage, font: PDFFont, top: number, label: string, value: string, options: { valueX?: number; valueWidth?: number; labelX?: number; labelWidth?: number } = {}) {
+function fieldLine(page: PDFPage, font: PDFFont, top: number, label: string, value: string, options: { valueX?: number; valueWidth?: number; labelX?: number; labelWidth?: number; emptyValue?: "na" | "blank" } = {}) {
   const valueX = options.valueX ?? 92;
   const valueWidth = options.valueWidth ?? 132;
   const labelX = options.labelX ?? 224;
@@ -60,7 +100,7 @@ function fieldLine(page: PDFPage, font: PDFFont, top: number, label: string, val
   const labelTextX = labelX + labelWidth - labelTextWidth - 3;
   const lineEnd = Math.max(valueX + valueWidth - 4, labelTextX - 3);
   drawText(page, font, label, { x: labelX, top: top - 0.8, width: labelWidth, height: 11, align: "right", size: labelSize });
-  drawText(page, font, value, { x: valueX, top: top - 0.8, width: lineEnd - valueX, height: 11, size: 7.8 });
+  drawText(page, font, value, { x: valueX, top: top - 0.8, width: lineEnd - valueX, height: 11, size: 7.8, empty: options.emptyValue });
   line(page, valueX + 4, lineEnd, top + 10.5, 0.45);
 }
 
@@ -74,9 +114,9 @@ function choiceRow(page: PDFPage, font: PDFFont, top: number, label: string, che
   drawText(page, font, label, { x: 126, top, width: x - 134, height: 12, align: "right", size: 8 });
 }
 
-async function signature(page: PDFPage, pdf: PDFDocument, font: PDFFont, dataUrl: string, x: number, top: number, width: number, height: number) {
+async function signature(page: PDFPage, pdf: PDFDocument, dataUrl: string, x: number, top: number, width: number, height: number) {
   const match = dataUrl.match(/^data:image\/png;base64,(.+)$/);
-  if (!match) { drawText(page, font, "N/A", { x, top, width, height, size: 7.5 }); return; }
+  if (!match) return;
   const image = await pdf.embedPng(Buffer.from(match[1], "base64"));
   const imageHeight = Math.min(height - 3, 10);
   const imageWidth = Math.min(width - 8, imageHeight * image.width / image.height);
@@ -136,7 +176,6 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
   drawText(page, font, "שיטת הקשיה", { x: 224, top: 293, width: 94, height: 12, align: "right", size: 7.8 });
   choiceRow(page, font, 307, "אפוקסי", payload.curingMethod === "epoxy");
   choiceRow(page, font, 320, "UV", payload.curingMethod === "uv");
-  if (!payload.curingMethod) drawText(page, font, "N/A", { x: 94, top: 307, width: 65, height: 24, size: 7.5 });
   fieldLine(page, font, 333, "זמן חשיפה", payload.exposureTime);
   fieldLine(page, font, 342.5, "זמן המתנה לפני בדיקה", payload.waitingTime, { valueWidth: 116, labelX: 208, labelWidth: 110 });
 
@@ -144,7 +183,7 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
   sectionTitle(page, font, 356, 48, "תנאי סביבה");
   fieldLine(page, font, 357, "טמפרטורה", payload.temperature);
   fieldLine(page, font, 369, "לחות", payload.humidity);
-  fieldLine(page, font, 381, "עבודה תחת מנדף", yesNo(payload.underHood), { valueWidth: 105, labelX: 197, labelWidth: 121 });
+  fieldLine(page, font, 381, "עבודה תחת מנדף", yesNo(payload.underHood), { valueWidth: 105, labelX: 197, labelWidth: 121, emptyValue: "blank" });
   fieldLine(page, font, 390.5, "הערות", payload.environmentNotes);
 
   rect(page, 88, 404, 233, 59);
@@ -154,7 +193,6 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
     ["בדיקת בועות )מים/סבון(", "bubbles"], ["בדיקת חדירות צבע", "dye-penetration"],
   ] as const;
   methods.forEach(([label, value], index) => choiceRow(page, font, 407 + index * 13, label, payload.testMethod === value));
-  if (!payload.testMethod) drawText(page, font, "N/A", { x: 94, top: 425, width: 55, height: 12, size: 7.5 });
 
   rect(page, 88, 463, 233, 60);
   sectionTitle(page, font, 463, 60, "בדיקה ויזואלית");
@@ -168,7 +206,6 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
     drawText(page, font, "כן", { x: 166, top, width: 21, height: 14, align: "right", size: 7.5 });
     checkbox(page, value === "no", 137, top + 3, 8);
     drawText(page, font, "לא", { x: 113, top, width: 21, height: 14, align: "right", size: 7.5 });
-    if (!value) drawText(page, font, "N/A", { x: 91, top, width: 25, height: 14, size: 6.8 });
   });
 
   rect(page, 88, 523, 233, 46);
@@ -178,7 +215,6 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
   drawText(page, font, "כן", { x: 176, top: 524, width: 20, height: 12, align: "right", size: 7.5 });
   checkbox(page, payload.leakObserved === "no", 147, 526, 8);
   drawText(page, font, "לא", { x: 126, top: 524, width: 20, height: 12, align: "right", size: 7.5 });
-  if (!payload.leakObserved) drawText(page, font, "N/A", { x: 94, top: 524, width: 35, height: 12, size: 7 });
   fieldLine(page, font, 537.5, "מיקום הדליפה", payload.leakLocation, { valueWidth: 112, labelX: 204, labelWidth: 114 });
   fieldLine(page, font, 552, "ממצאים", payload.findings);
 
@@ -193,7 +229,6 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
     drawText(page, font, label, { x, top: 573, width, height: 12, align: "right", size: value === "repair" ? 6.3 : 6.8 });
     checkbox(page, payload.decision === value, boxX, 575, 8);
   });
-  if (!payload.decision) drawText(page, font, "N/A", { x: 89, top: 573, width: 28, height: 12, size: 6.5 });
 
   rect(page, 88, 625, 433, 42);
   rect(page, 88, 625, 433, 13, true);
@@ -212,7 +247,7 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
     drawText(page, font, "תאריך", { x: 245, top: row.top, width: 34, height: 14, align: "right", size: 7 });
     drawText(page, font, ":", { x: 250, top: row.top, width: 5, height: 14, size: 7 });
     drawText(page, font, row.date, { x: 168, top: row.top, width: 80, height: 14, align: "right", size: 7 });
-    await signature(page, pdf, font, row.image, 88, row.top, 78, 14);
+    await signature(page, pdf, row.image, 88, row.top, 78, 14);
   }
 
   drawText(page, font, "8.4.2.4.0", { x: 88, top: 793, width: 58, height: 12, align: "left", size: 8, bold: true });
