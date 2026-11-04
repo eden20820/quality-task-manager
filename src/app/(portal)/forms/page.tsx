@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ClipboardCheck, PackageCheck, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, FlaskConical, PackageCheck, ShieldCheck } from "lucide-react";
 
 import { FormsNavigation } from "@/components/quality-forms/forms-navigation";
 
@@ -7,6 +7,7 @@ const forms = [
   { href: "/forms/rir", title: "דוח ביקורת קבלה", subtitle: "Receiving Inspection Report (RIR)", description: "קליטת פרטי ספק ופריט, הגדרת מאפייני בדיקה, הזנת מדידות, בדיקות Pass/Fail וסיכום תוצאות אוטומטי.", icon: ClipboardCheck, iconClass: "bg-blue-50 text-blue-700", hoverClass: "group-hover:bg-blue-700" },
   { href: "/forms/shelf-product-inspection", title: "ביקורת קבלה למוצר מדף", subtitle: "נספח 8.4.2.1.0", description: "פרטי מוצר וספק, מסמכים נלווים, ארבע בדיקות קבלה, אישור שימוש וחתימות קבועות.", icon: PackageCheck, iconClass: "bg-violet-50 text-violet-700", hoverClass: "group-hover:bg-violet-700" },
   { href: "/forms/adhesion-leak-test", title: "בדיקת אטימות – הדבקה", subtitle: "נספח 8.4.2.4.0", description: "תיעוד פרטי ההדבקה, תנאי סביבה, שיטת בדיקה, תוצאות, החלטה וחתימות דיגיטליות.", icon: ShieldCheck, iconClass: "bg-cyan-50 text-cyan-700", hoverClass: "group-hover:bg-cyan-700" },
+  { href: "/forms/development-inspection", title: "ביקורת קבלה – מוצרי פיתוח", subtitle: "נספח 8.4.2.3.2", description: "בדיקת מסמכים, בדיקה ויזואלית, התאמה לשרטוט, תיעוד חריגות, החלטה וחתימות דיגיטליות.", icon: FlaskConical, iconClass: "bg-amber-50 text-amber-700", hoverClass: "group-hover:bg-amber-700" },
 ];
 
 export default function FormsPage() {
