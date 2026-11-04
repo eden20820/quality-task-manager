@@ -55,9 +55,13 @@ function fieldLine(page: PDFPage, font: PDFFont, top: number, label: string, val
   const valueWidth = options.valueWidth ?? 132;
   const labelX = options.labelX ?? 224;
   const labelWidth = options.labelWidth ?? 94;
-  drawText(page, font, label, { x: labelX, top: top - 0.8, width: labelWidth, height: 11, align: "right", size: 7.8 });
-  drawText(page, font, value, { x: valueX, top: top - 0.8, width: valueWidth, height: 11, size: 7.8 });
-  line(page, valueX + 4, valueX + valueWidth - 4, top + 10.5, 0.45);
+  const labelSize = fitSize(font, label, labelWidth - 6, 7.8);
+  const labelTextWidth = font.widthOfTextAtSize(label, labelSize);
+  const labelTextX = labelX + labelWidth - labelTextWidth - 3;
+  const lineEnd = Math.max(valueX + valueWidth - 4, labelTextX - 3);
+  drawText(page, font, label, { x: labelX, top: top - 0.8, width: labelWidth, height: 11, align: "right", size: labelSize });
+  drawText(page, font, value, { x: valueX, top: top - 0.8, width: lineEnd - valueX, height: 11, size: 7.8 });
+  line(page, valueX + 4, lineEnd, top + 10.5, 0.45);
 }
 
 function sectionTitle(page: PDFPage, font: PDFFont, top: number, height: number, title: string) {
@@ -203,11 +207,11 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
   for (const row of signatureRows) {
     drawText(page, font, row.label, { x: 441, top: row.top, width: 80, height: 14, align: "right", size: 7.5, bold: true });
     drawText(page, font, "שם", { x: 407, top: row.top, width: 28, height: 14, align: "right", size: 7 });
-    drawText(page, font, ":", { x: 399, top: row.top, width: 8, height: 14, size: 7 });
-    drawText(page, font, row.name, { x: 290, top: row.top, width: 108, height: 14, align: "right", size: 7 });
+    drawText(page, font, ":", { x: 416, top: row.top, width: 5, height: 14, size: 7 });
+    drawText(page, font, row.name, { x: 290, top: row.top, width: 124, height: 14, align: "right", size: 7 });
     drawText(page, font, "תאריך", { x: 245, top: row.top, width: 34, height: 14, align: "right", size: 7 });
-    drawText(page, font, ":", { x: 237, top: row.top, width: 8, height: 14, size: 7 });
-    drawText(page, font, row.date, { x: 168, top: row.top, width: 68, height: 14, align: "right", size: 7 });
+    drawText(page, font, ":", { x: 250, top: row.top, width: 5, height: 14, size: 7 });
+    drawText(page, font, row.date, { x: 168, top: row.top, width: 80, height: 14, align: "right", size: 7 });
     await signature(page, pdf, font, row.image, 88, row.top, 78, 14);
   }
 
