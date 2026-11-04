@@ -52,8 +52,11 @@ function checked(text: string, label: string) {
 }
 
 function documentValue(rows: string[][], label: string) {
-  const row = rows.find((cells) => cells.some((cell) => cell.replace(/:$/, "") === label.replace(/:$/, "")));
-  return inputValue(row?.[0]);
+  const normalizedLabel = label.replace(/:$/, "");
+  const row = rows.find((cells) => cells.some((cell) => cell.replace(/:$/, "") === normalizedLabel));
+  if (!row) return "";
+  const labelIndex = row.findIndex((cell) => cell.replace(/:$/, "") === normalizedLabel);
+  return inputValue(row.find((_, index) => index !== labelIndex));
 }
 
 export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array) {
@@ -65,12 +68,19 @@ export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array)
   const tables = topLevelBlocks(documentXml, "w:tbl");
   if (tables.length < 5) throw new Error("מבנה טופס ביקורת הקבלה אינו תקין");
 
-  const details = tableRows(tables[0]);
-  const products = details[0]?.includes("שם מוצר מתקבל") && details[0]?.includes("#")
-    ? details.slice(1).filter((cells) => cells.length === 4 && /^\d+$/.test(cells[3] ?? "")).map((cells) => ({
-      quantity: inputValue(cells[0]),
-      catalogNumber: inputValue(cells[1]),
-      productName: inputValue(cells[2]),
+  const rowsByTable = tables.map(tableRows);
+  const productRows = rowsByTable.find((rows) => rows[0]?.includes("שם מוצר מתקבל") && rows[0]?.includes("#"));
+  const details = rowsByTable.find((rows) => rows.some((cells) => cells.some((cell) => cell.replace(/:$/, "") === "שם הספק"))) ?? rowsByTable[0];
+  const productHeader = productRows?.[0] ?? [];
+  const numberIndex = productHeader.indexOf("#");
+  const nameIndex = productHeader.indexOf("שם מוצר מתקבל");
+  const catalogIndex = productHeader.indexOf("מק״ט");
+  const quantityIndex = productHeader.indexOf("כמות");
+  const products = productRows && [numberIndex, nameIndex, catalogIndex, quantityIndex].every((index) => index >= 0)
+    ? productRows.slice(1).filter((cells) => cells.length === 4 && /^\d+$/.test(cells[numberIndex] ?? "")).map((cells) => ({
+      productName: inputValue(cells[nameIndex]),
+      catalogNumber: inputValue(cells[catalogIndex]),
+      quantity: inputValue(cells[quantityIndex]),
     }))
     : [{
       productName: documentValue(details, "שם מוצר מתקבל"),
@@ -79,10 +89,11 @@ export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array)
     }];
   const documentsText = documentValue(details, "מסמכים נלווים");
   const otherMatch = documentsText.match(/☒\s*אחר:\s*([^☐☒]+)/);
-  const inspectionRows = tableRows(tables[1]).slice(1, 1 + SHELF_INSPECTION_ITEMS.length);
-  const approvalRows = tableRows(tables[3]);
+  const inspectionTableRows = rowsByTable.find((rows) => rows[0]?.includes("פרמטר לבדיקה"));
+  const inspectionRows = (inspectionTableRows ?? []).slice(1, 1 + SHELF_INSPECTION_ITEMS.length);
+  const approvalRows = rowsByTable.find((rows) => rows.some((cells) => cells.some((cell) => cell.includes("אישור לשימוש")))) ?? [];
   const approvalText = approvalRows[0]?.[0] ?? "";
-  const signatureRows = tableRows(tables[4]);
+  const signatureRows = rowsByTable.find((rows) => rows.some((cells) => cells.some((cell) => cell.includes("נבדק על ידי")))) ?? [];
   const inspectorCells = signatureRows[1] ?? [];
   const approverCells = signatureRows[3] ?? [];
   const inspectorNameText = inspectorCells.find((cell) => cell.startsWith("שם:"))?.replace(/^שם:\s*/, "") ?? "";
