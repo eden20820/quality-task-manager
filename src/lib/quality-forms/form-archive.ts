@@ -2,6 +2,32 @@ export const ONLINE_FORM_CATEGORY = "טופס מקוון";
 export const RIR_ARCHIVE_EDIT_STORAGE_KEY = "quality-rir-archive-edit";
 export const SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY = "quality-shelf-inspection-archive-edit";
 export const ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY = "quality-adhesion-leak-test-archive-edit";
+export const ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY = "quality-adhesion-leak-test-archive-record";
+export const ADHESION_LEAK_TEST_FORM_TITLE = "טופס בדיקת אטימות – הדבקה";
+
+export type QualityFormStatus = "pending-signature" | "signed";
+
+const FORM_STATUS_TOKEN = "|||status:";
+
+export function buildArchivedFormDescription(title: string, status?: QualityFormStatus) {
+  return status ? `${title}${FORM_STATUS_TOKEN}${status}` : title;
+}
+
+export function parseArchivedFormDescription(description: string | null) {
+  const value = description ?? "טופס מקוון";
+  const [title, rawStatus] = value.split(FORM_STATUS_TOKEN, 2);
+  const status = rawStatus === "pending-signature" || rawStatus === "signed" ? rawStatus : null;
+  return { title, status: status as QualityFormStatus | null };
+}
+
+export function isAdhesionFormDescription(description: string | null) {
+  return parseArchivedFormDescription(description).title === ADHESION_LEAK_TEST_FORM_TITLE;
+}
+
+export function isPendingSignatureDescription(description: string | null) {
+  const parsed = parseArchivedFormDescription(description);
+  return parsed.status === "pending-signature" || (parsed.status === null && parsed.title === ADHESION_LEAK_TEST_FORM_TITLE);
+}
 
 function safeFilePart(value: string, fallback: string) {
   return value
