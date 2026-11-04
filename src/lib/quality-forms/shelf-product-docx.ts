@@ -15,8 +15,13 @@ function cell(text: string, width: number, options: { bold?: boolean; shade?: bo
 
 function detailsTable(payload: ShelfProductInspectionPayload) {
   const docs = [["COC", payload.documents.coc], ["COA", payload.documents.coa], ["COT", payload.documents.cot], [payload.otherDocument.trim() ? `אחר: ${payload.otherDocument.trim()}` : "אחר", payload.documents.other]] as const;
-  const rows = [["שם מוצר מתקבל", display(payload.productName)], ["מק״ט", display(payload.catalogNumber)], ["שם הספק:", display(payload.supplierName)], ["כמות:", display(payload.quantity)], ["מספר אצווה:", display(payload.batchNumber)], ["תאריך קליטה:", formatDate(payload.receiptDate)], ["מסמכים נלווים", docs.map(([label, checked]) => `${checked ? "☒" : "☐"} ${label}`).join("     ")]];
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: rows.map(([label, value]) => new TableRow({ children: [cell(value, 50, { bold: true }), cell(label, 50, { bold: true, shade: true, align: AlignmentType.RIGHT })] })) });
+  const products = payload.products?.length ? payload.products : [{ productName: payload.productName, catalogNumber: payload.catalogNumber, quantity: payload.quantity }];
+  const productRows = [
+    new TableRow({ tableHeader: true, children: [cell("כמות", 15, { bold: true, shade: true }), cell("מק״ט", 25, { bold: true, shade: true }), cell("שם מוצר מתקבל", 50, { bold: true, shade: true }), cell("#", 10, { bold: true, shade: true })] }),
+    ...products.map((product, index) => new TableRow({ children: [cell(display(product.quantity), 15, { bold: true }), cell(display(product.catalogNumber), 25, { bold: true }), cell(display(product.productName), 50, { bold: true }), cell(String(index + 1), 10, { bold: true })] })),
+  ];
+  const commonRows = [["שם הספק:", display(payload.supplierName)], ["מספר אצווה:", display(payload.batchNumber)], ["תאריך קליטה:", formatDate(payload.receiptDate)], ["מסמכים נלווים", docs.map(([label, checked]) => `${checked ? "☒" : "☐"} ${label}`).join("     ")]];
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [...productRows, ...commonRows.map(([label, value]) => new TableRow({ children: [cell(value, 75, { bold: true }), cell(label, 25, { bold: true, shade: true, align: AlignmentType.RIGHT })] }))] });
 }
 
 function inspectionTable(payload: ShelfProductInspectionPayload) {

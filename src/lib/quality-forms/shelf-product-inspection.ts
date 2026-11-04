@@ -1,6 +1,13 @@
 export type InspectionResult = "pass" | "fail" | "";
 
+export type ShelfProductItem = {
+  productName: string;
+  catalogNumber: string;
+  quantity: string;
+};
+
 export type ShelfProductInspectionPayload = {
+  products: ShelfProductItem[];
   productName: string;
   catalogNumber: string;
   supplierName: string;
@@ -17,6 +24,13 @@ export type ShelfProductInspectionPayload = {
   approverDate: string;
 };
 
+export function normalizeShelfInspection(payload: ShelfProductInspectionPayload): ShelfProductInspectionPayload {
+  const products = Array.isArray(payload.products) && payload.products.length
+    ? payload.products.map((item) => ({ productName: item.productName ?? "", catalogNumber: item.catalogNumber ?? "", quantity: item.quantity ?? "" }))
+    : [{ productName: payload.productName ?? "", catalogNumber: payload.catalogNumber ?? "", quantity: payload.quantity ?? "" }];
+  return { ...payload, products, productName: products[0].productName, catalogNumber: products[0].catalogNumber, quantity: products[0].quantity };
+}
+
 export const SHELF_INSPECTION_ITEMS = [
   "בדיקת שלמות האריזה (נזק פיזי, פתיחה, קרעים)",
   "בדיקת תווית/סימון על האריזה (מק״ט, מספר אצווה, תאריך ייצור/תפוגה)",
@@ -26,6 +40,7 @@ export const SHELF_INSPECTION_ITEMS = [
 
 export function createEmptyShelfInspection(today: string): ShelfProductInspectionPayload {
   return {
+    products: [{ productName: "", catalogNumber: "", quantity: "" }],
     productName: "",
     catalogNumber: "",
     supplierName: "",

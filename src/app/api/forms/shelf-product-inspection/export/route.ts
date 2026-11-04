@@ -11,7 +11,10 @@ function isValidPayload(value: unknown): value is ShelfProductInspectionPayload 
   if (!value || typeof value !== "object") return false;
   const payload = value as Partial<ShelfProductInspectionPayload>;
   return Boolean(
-    typeof payload.productName === "string"
+    Array.isArray(payload.products)
+    && payload.products.length > 0
+    && payload.products.every((product) => typeof product.productName === "string" && typeof product.catalogNumber === "string" && typeof product.quantity === "string")
+    && typeof payload.productName === "string"
     && typeof payload.catalogNumber === "string"
     && typeof payload.supplierName === "string"
     && typeof payload.quantity === "string"

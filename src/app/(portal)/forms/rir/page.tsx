@@ -2,13 +2,15 @@ import { RirForm } from "@/components/quality-forms/rir-form";
 import { buildFormAutocompleteSuggestions } from "@/lib/quality-forms/form-suggestions";
 import { ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
 import { createClient } from "@/lib/supabase/server";
+import { loadSupplierBinderDirectory } from "@/lib/quality-forms/supplier-binder-directory";
 
 export default async function RirFormPage() {
   const supabase = await createClient();
-  const [suppliersResult, formsResult, followupsResult] = await Promise.all([
+  const [suppliersResult, formsResult, followupsResult, binderDirectory] = await Promise.all([
     supabase.from("suppliers").select("supplier_name").order("supplier_name").limit(1000),
     supabase.from("quality_documents").select("file_name").eq("category", ONLINE_FORM_CATEGORY).order("created_at", { ascending: false }).limit(1000),
     supabase.from("quality_followups").select("name, notes").eq("category", "pka").order("created_at", { ascending: false }).limit(1000),
+    loadSupplierBinderDirectory(),
   ]);
   for (const result of [suppliersResult, formsResult, followupsResult]) {
     if (result.error) console.error("Load RIR autocomplete suggestions failed", result.error);
@@ -18,5 +20,5 @@ export default async function RirFormPage() {
     archivedForms: formsResult.data ?? [],
     followups: followupsResult.data ?? [],
   });
-  return <RirForm suggestions={suggestions} />;
+  return <RirForm suggestions={suggestions} binderDirectory={binderDirectory} />;
 }

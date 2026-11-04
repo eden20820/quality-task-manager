@@ -20,6 +20,12 @@ export type SupplierBinderRecord = {
   expiration_date: string | null;
 };
 
+export type SupplierBinderDirectoryEntry = {
+  binderLabel: string;
+  name: string;
+  aliases?: readonly string[];
+};
+
 export const supplierBinders: readonly SupplierBinder[] = [
   {
     id: "binder-1",
