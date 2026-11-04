@@ -1,7 +1,8 @@
 import { PDFDocument } from "pdf-lib";
+import { writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { buildAdhesionLeakTestPdf } from "./adhesion-leak-test-pdf";
+import { buildAdhesionLeakTestPdf, extractAdhesionLeakTestPayload } from "./adhesion-leak-test-pdf";
 import { createEmptyAdhesionLeakTest, isAdhesionLeakTestPayload } from "./adhesion-leak-test";
 
 describe("adhesion leak test form", () => {
@@ -18,11 +19,13 @@ describe("adhesion leak test form", () => {
     expect(isAdhesionLeakTestPayload(payload)).toBe(false);
   });
 
-  it("fills the supplied one-page PDF template", async () => {
-    const payload = { ...createEmptyAdhesionLeakTest("2026-11-04"), testerName: "Eden Aharon", testedProduct: "מכלול 101", decision: "pass" as const };
+  it("creates a clean one-page PDF that can be reopened for editing", async () => {
+    const payload = { ...createEmptyAdhesionLeakTest("2026-11-04"), testerName: "גל פסו", testLocation: "מעבדת QC", testedProduct: "מכלול 101", testMethod: "vacuum" as const, decision: "pass" as const };
     const bytes = await buildAdhesionLeakTestPdf(payload);
     const document = await PDFDocument.load(bytes);
     expect(document.getPageCount()).toBe(1);
     expect(bytes.subarray(0, 4).toString()).toBe("%PDF");
+    expect(await extractAdhesionLeakTestPayload(bytes)).toEqual(payload);
+    if (process.env.ADHESION_PDF_SAMPLE_PATH) await writeFile(process.env.ADHESION_PDF_SAMPLE_PATH, bytes);
   });
 });

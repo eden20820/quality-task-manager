@@ -2,117 +2,139 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import fontkit from "@pdf-lib/fontkit";
-import bidiFactory from "bidi-js";
-import { PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFFont, PDFHexString, PDFName, PDFPage, rgb } from "pdf-lib";
 
-import type { AdhesionLeakTestPayload } from "./adhesion-leak-test";
+import { isAdhesionLeakTestPayload, type AdhesionLeakTestPayload } from "./adhesion-leak-test";
 
-const bidi = bidiFactory();
 const black = rgb(0, 0, 0);
-const white = rgb(1, 1, 1);
+const gray = rgb(0.94, 0.94, 0.94);
+const payloadKey = PDFName.of("QualityFormPayload");
 
-function display(value: string) {
-  return value.trim() || "N/A";
-}
+function display(value: string) { return value.trim() || "N/A"; }
+function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : "N/A"; }
+function yesNo(value: string) { return value === "yes" ? "כן" : value === "no" ? "לא" : "N/A"; }
+function option(value: string, labels: Record<string, string>) { return labels[value] ?? "N/A"; }
 
-function formatDate(value: string) {
-  const [year, month, day] = value.split("-");
-  return year && month && day ? `${day}.${month}.${year}` : display(value);
-}
-
-function visualText(value: string) {
-  const text = display(value);
-  if (!/[\u0590-\u05ff]/.test(text)) return text;
-  return bidi.getReorderedString(text, bidi.getEmbeddingLevels(text, "rtl"));
-}
-
-function fitSize(font: PDFFont, text: string, maxWidth: number, preferred = 8.3, minimum = 6.2) {
+function fitSize(font: PDFFont, text: string, maxWidth: number, preferred = 8, minimum = 5.7) {
   let size = preferred;
   while (size > minimum && font.widthOfTextAtSize(text, size) > maxWidth) size -= 0.2;
   return size;
 }
 
-function drawValue(page: PDFPage, font: PDFFont, value: string, options: { x: number; top: number; width: number; size?: number; align?: "left" | "center"; clear?: boolean }) {
-  const text = visualText(value);
-  const size = fitSize(font, text, options.width, options.size ?? 8.3);
-  if (options.clear) page.drawRectangle({ x: options.x - 2, y: page.getHeight() - options.top - 11, width: options.width + 4, height: 12, color: white });
+function drawText(page: PDFPage, font: PDFFont, value: string, x: number, y: number, width: number, options: { align?: "left" | "center" | "right"; size?: number } = {}) {
+  const text = display(value);
+  const size = fitSize(font, text, width - 8, options.size ?? 8);
   const textWidth = font.widthOfTextAtSize(text, size);
-  const x = options.align === "left" ? options.x : options.x + Math.max(0, (options.width - textWidth) / 2);
-  page.drawText(text, { x, y: page.getHeight() - options.top - size, size, font, color: black });
+  const align = options.align ?? "center";
+  const textX = align === "right" ? x + width - textWidth - 4 : align === "left" ? x + 4 : x + Math.max(4, (width - textWidth) / 2);
+  page.drawText(text, { x: textX, y: y + 4.1, size, font, color: black });
 }
 
-function mark(page: PDFPage, font: PDFFont, active: boolean, x: number, top: number) {
-  if (!active) return;
-  page.drawText("X", { x, y: page.getHeight() - top - 8.2, size: 8.2, font, color: black });
+function drawCell(page: PDFPage, font: PDFFont, value: string, x: number, y: number, width: number, height: number, options: { fill?: boolean; align?: "left" | "center" | "right"; size?: number } = {}) {
+  page.drawRectangle({ x, y, width, height, borderColor: black, borderWidth: 0.75, color: options.fill ? gray : undefined });
+  drawText(page, font, value, x, y + Math.max(0, (height - 14) / 2), width, { align: options.align, size: options.size });
 }
 
-async function drawSignature(page: PDFPage, pdf: PDFDocument, dataUrl: string, top: number) {
+function drawRow(page: PDFPage, font: PDFFont, y: number, label: string, value: string, height = 18) {
+  drawCell(page, font, label, 365, y, 180, height, { fill: true, align: "right" });
+  drawCell(page, font, value, 50, y, 315, height);
+}
+
+function drawSectionRow(page: PDFPage, font: PDFFont, y: number, section: string, label: string, value: string, height = 18) {
+  drawCell(page, font, section, 445, y, 100, height, { fill: true, align: "right" });
+  drawCell(page, font, label, 285, y, 160, height, { fill: true, align: "right" });
+  drawCell(page, font, value, 50, y, 235, height);
+}
+
+async function drawSignature(page: PDFPage, pdf: PDFDocument, dataUrl: string, x: number, y: number, width: number, height: number, font: PDFFont) {
   const match = dataUrl.match(/^data:image\/png;base64,(.+)$/);
-  if (!match) return;
+  if (!match) { drawText(page, font, "N/A", x, y + (height - 14) / 2, width); return; }
   const image = await pdf.embedPng(Buffer.from(match[1], "base64"));
   const ratio = image.width / image.height;
-  const height = 9;
-  const width = Math.min(96, height * ratio);
-  page.drawImage(image, { x: 103 + (96 - width) / 2, y: page.getHeight() - top - height, width, height });
+  const imageHeight = Math.min(height - 4, 18);
+  const imageWidth = Math.min(width - 8, imageHeight * ratio);
+  page.drawImage(image, { x: x + (width - imageWidth) / 2, y: y + (height - imageHeight) / 2, width: imageWidth, height: imageHeight });
+}
+
+function storePayload(pdf: PDFDocument, payload: AdhesionLeakTestPayload) {
+  const info = pdf.context.lookup(pdf.context.trailerInfo.Info, PDFDict);
+  info.set(payloadKey, PDFHexString.fromText(JSON.stringify(payload)));
+}
+
+export async function extractAdhesionLeakTestPayload(bytes: Uint8Array) {
+  const pdf = await PDFDocument.load(bytes);
+  const infoRef = pdf.context.trailerInfo.Info;
+  if (!infoRef) throw new Error("הקובץ אינו טופס אטימות שנוצר במערכת");
+  const info = pdf.context.lookup(infoRef, PDFDict);
+  const encoded = info.get(payloadKey);
+  if (!(encoded instanceof PDFHexString)) throw new Error("הקובץ אינו כולל נתונים שניתן לערוך");
+  const payload: unknown = JSON.parse(encoded.decodeText());
+  if (!isAdhesionLeakTestPayload(payload)) throw new Error("נתוני הטופס בקובץ אינם תקינים");
+  return payload;
 }
 
 export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload) {
-  const [templateBytes, fontBytes] = await Promise.all([
-    readFile(path.join(process.cwd(), "public/templates/adhesion-leak-test-template.pdf")),
+  const [fontBytes, logoBytes] = await Promise.all([
     readFile(path.join(process.cwd(), "public/fonts/DejaVuSans.ttf")),
+    readFile(path.join(process.cwd(), "public/caeli-logo.png")),
   ]);
-  const pdf = await PDFDocument.load(templateBytes);
+  const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   const font = await pdf.embedFont(fontBytes, { subset: true });
-  const page = pdf.getPage(0);
+  const logo = await pdf.embedPng(logoBytes);
+  const page = pdf.addPage([595.28, 841.89]);
 
-  const firstRows: Array<[string, number]> = [
-    [formatDate(payload.testDate), 103], [payload.testerName, 115.3], [payload.testLocation, 127.6],
-    [payload.operationDescription, 139.9], [payload.testedProduct, 152.2], [payload.bondedProductMaterial, 164.5],
-    [payload.bondingArea, 176.8], [payload.adheringProductMaterial, 189.1], [payload.seamAreaOrLength, 201.5],
-    [payload.quantity, 213.7],
+  page.drawImage(logo, { x: 36, y: 775, width: 78, height: 50 });
+  drawText(page, font, "טופס בדיקת אטימות הדבקה", 150, 787, 395, { size: 15 });
+  page.drawLine({ start: { x: 230, y: 786 }, end: { x: 465, y: 786 }, thickness: 0.8, color: black });
+
+  let y = 758;
+  const firstRows: Array<[string, string]> = [
+    ["תאריך", formatDate(payload.testDate)], ["שם הבודק", payload.testerName], ["מיקום הבדיקה", payload.testLocation],
+    ["תיאור הפעולה", payload.operationDescription], ["המוצר הנבדק", payload.testedProduct], ["חומר המוצר המודבק", payload.bondedProductMaterial],
+    ["אזור ההדבקה", payload.bondingArea], ["חומר המוצר הנדבק", payload.adheringProductMaterial], ["שטח / אורך תפר ההדבקה", payload.seamAreaOrLength], ["כמות", payload.quantity],
   ];
-  firstRows.forEach(([value, top]) => drawValue(page, font, value, { x: 94, top, width: 235, align: "center" }));
+  for (const [label, value] of firstRows) { y -= 17; drawRow(page, font, y, label, value, 17); }
 
-  drawValue(page, font, payload.adhesiveType, { x: 140, top: 252.4, width: 124, align: "center", clear: true });
-  drawValue(page, font, payload.adhesiveManufacturerModel, { x: 140, top: 264.2, width: 148, align: "center", clear: true });
-  drawValue(page, font, formatDate(payload.adhesiveExpiryDate), { x: 140, top: 276, width: 138, align: "center", clear: true });
-  mark(page, font, payload.curingMethod === "epoxy", 313, 303.5);
-  mark(page, font, payload.curingMethod === "uv", 313, 319.5);
-  drawValue(page, font, payload.exposureTime, { x: 140, top: 331.6, width: 148, align: "center", clear: true });
-  drawValue(page, font, payload.waitingTime, { x: 140, top: 343.3, width: 98, align: "center", clear: true });
+  y -= 10;
+  const method = option(payload.curingMethod, { epoxy: "אפוקסי", uv: "UV" });
+  const testMethod = option(payload.testMethod, { "air-pressure": "בדיקת לחץ אוויר", vacuum: "בדיקת וואקום", bubbles: "בדיקת בועות (מים / סבון)", "dye-penetration": "בדיקת חדירות צבע" });
+  const decision = option(payload.decision, { pass: "תקין", fail: "לא תקין", repair: "נדרש תיקון ובדיקה חוזרת" });
+  const rows: Array<[string, string, string]> = [
+    ["פרטי הדבק", "סוג הדבק", payload.adhesiveType], ["פרטי הדבק", "יצרן ודגם", payload.adhesiveManufacturerModel],
+    ["פרטי הדבק", "תאריך תפוגה", formatDate(payload.adhesiveExpiryDate)], ["פרטי הדבק", "שיטת הקשיה", method],
+    ["פרטי הדבק", "זמן חשיפה", payload.exposureTime], ["פרטי הדבק", "זמן המתנה לפני בדיקה", payload.waitingTime],
+    ["תנאי סביבה", "טמפרטורה", payload.temperature], ["תנאי סביבה", "לחות", payload.humidity],
+    ["תנאי סביבה", "עבודה תחת מנדף", yesNo(payload.underHood)], ["תנאי סביבה", "הערות", payload.environmentNotes],
+    ["שיטת בדיקה", "שיטת בדיקת האטימות", testMethod], ["בדיקה ויזואלית", "סדקים", yesNo(payload.cracks)],
+    ["בדיקה ויזואלית", "בועות", yesNo(payload.bubbles)], ["בדיקה ויזואלית", "היפרדות חומר", yesNo(payload.materialSeparation)],
+    ["תוצאות בדיקה", "נצפתה דליפה", yesNo(payload.leakObserved)], ["תוצאות בדיקה", "מיקום הדליפה", payload.leakLocation],
+    ["תוצאות בדיקה", "ממצאים", payload.findings], ["סיכום והחלטות", "החלטה", decision],
+  ];
+  for (const [section, label, value] of rows) { y -= 17; drawSectionRow(page, font, y, section, label, value, 17); }
 
-  drawValue(page, font, payload.temperature, { x: 138, top: 355.7, width: 105, align: "center", clear: true });
-  drawValue(page, font, payload.humidity, { x: 138, top: 367.4, width: 105, align: "center", clear: true });
-  drawValue(page, font, payload.underHood === "yes" ? "כן" : payload.underHood === "no" ? "לא" : "", { x: 138, top: 379.2, width: 72, align: "center", clear: true });
-  drawValue(page, font, payload.environmentNotes, { x: 140, top: 391.1, width: 78, align: "center", clear: true });
+  y -= 22;
+  drawCell(page, font, "חתימה", 50, y, 110, 18, { fill: true });
+  drawCell(page, font, "תאריך", 160, y, 105, 18, { fill: true });
+  drawCell(page, font, "שם", 265, y, 170, 18, { fill: true });
+  drawCell(page, font, "אישור", 435, y, 110, 18, { fill: true });
+  y -= 24;
+  for (const row of [
+    [payload.checkedBySignature, formatDate(payload.checkedByDate), payload.checkedByName, "נבדק על ידי"],
+    [payload.approvedBySignature, formatDate(payload.approvedByDate), payload.approvedByName, "אושר על ידי"],
+  ] as const) {
+    page.drawRectangle({ x: 50, y, width: 110, height: 24, borderColor: black, borderWidth: 0.75 });
+    await drawSignature(page, pdf, row[0], 50, y, 110, 24, font);
+    drawCell(page, font, row[1], 160, y, 105, 24);
+    drawCell(page, font, row[2], 265, y, 170, 24);
+    drawCell(page, font, row[3], 435, y, 110, 24, { fill: true, align: "right" });
+    y -= 24;
+  }
 
-  mark(page, font, payload.testMethod === "air-pressure", 313, 407.4);
-  mark(page, font, payload.testMethod === "vacuum", 313, 423.4);
-  mark(page, font, payload.testMethod === "bubbles", 313, 439.4);
-  mark(page, font, payload.testMethod === "dye-penetration", 313, 451.2);
-  mark(page, font, payload.cracks === "yes", 313, 479.5);
-  mark(page, font, payload.cracks === "no", 313, 495.5);
-  mark(page, font, payload.bubbles === "yes", 313, 523.3);
-  mark(page, font, payload.bubbles === "no", 313, 539.3);
-  mark(page, font, payload.materialSeparation === "yes", 313, 567);
-  mark(page, font, payload.materialSeparation === "no", 313, 583);
-  mark(page, font, payload.leakObserved === "yes", 245, 599.2);
-  mark(page, font, payload.leakObserved === "no", 220, 599.2);
-  drawValue(page, font, payload.leakLocation, { x: 140, top: 611.2, width: 70, align: "center", clear: true });
-  drawValue(page, font, payload.findings, { x: 140, top: 623.1, width: 100, align: "center", clear: true });
-  mark(page, font, payload.decision === "pass", 313, 639.4);
-  mark(page, font, payload.decision === "fail", 276, 639.4);
-  mark(page, font, payload.decision === "repair", 224, 639.4);
-
-  drawValue(page, font, payload.checkedByName, { x: 326, top: 700.1, width: 82, align: "center" });
-  drawValue(page, font, formatDate(payload.checkedByDate), { x: 220, top: 700.1, width: 58, align: "center" });
-  drawValue(page, font, payload.approvedByName, { x: 326, top: 712.3, width: 82, align: "center" });
-  drawValue(page, font, formatDate(payload.approvedByDate), { x: 220, top: 712.3, width: 58, align: "center" });
-  await drawSignature(page, pdf, payload.checkedBySignature, 701.3);
-  await drawSignature(page, pdf, payload.approvedBySignature, 713.5);
-
+  drawText(page, font, "נספח", 38, 17, 44, { align: "left", size: 8 });
+  drawText(page, font, "8.4.2.4.0", 78, 17, 66, { align: "left", size: 8 });
   pdf.setTitle("טופס בדיקת אטימות הדבקה");
   pdf.setSubject("נספח 8.4.2.4.0");
+  storePayload(pdf, payload);
   return Buffer.from(await pdf.save());
 }
