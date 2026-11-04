@@ -2,12 +2,16 @@ import "server-only";
 
 import { createClient, type User } from "@supabase/supabase-js";
 
-const CAELI_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
+export const CAELI_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
 const AUTHORIZED_USERS = new Map([
   ["gal.pesso@caeli.pro", { role: "member" }],
 ]);
 
-export async function provisionAuthorizedPortalUser(user: User) {
+export function isAuthorizedPortalEmail(value: unknown): value is string {
+  return typeof value === "string" && AUTHORIZED_USERS.has(value.trim().toLowerCase());
+}
+
+export async function provisionAuthorizedPortalUser(user: Pick<User, "id" | "email" | "user_metadata">) {
   const email = user.email?.trim().toLowerCase();
   const authorization = email ? AUTHORIZED_USERS.get(email) : undefined;
   if (!email || !authorization) return;
