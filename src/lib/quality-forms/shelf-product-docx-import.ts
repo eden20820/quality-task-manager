@@ -88,7 +88,7 @@ export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array)
       quantity: documentValue(details, "כמות"),
     }];
   const documentsText = documentValue(details, "מסמכים נלווים");
-  const otherMatch = documentsText.match(/☒\s*אחר:\s*([^☐☒]+)/);
+  const otherMatch = documentsText.match(/☒\s*אחר(?:\s*[:—-]\s*|\s+)([^☐☒]+)/);
   const inspectionTableRows = rowsByTable.find((rows) => rows[0]?.includes("פרמטר לבדיקה"));
   const inspectionRows = (inspectionTableRows ?? []).slice(1, 1 + SHELF_INSPECTION_ITEMS.length);
   const approvalRows = rowsByTable.find((rows) => rows.some((cells) => cells.some((cell) => cell.includes("אישור לשימוש")))) ?? [];
@@ -96,7 +96,7 @@ export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array)
   const signatureRows = rowsByTable.find((rows) => rows.some((cells) => cells.some((cell) => cell.includes("נבדק על ידי")))) ?? [];
   const inspectorCells = signatureRows[1] ?? [];
   const approverCells = signatureRows[3] ?? [];
-  const inspectorNameText = inspectorCells.find((cell) => cell.startsWith("שם:"))?.replace(/^שם:\s*/, "") ?? "";
+  const inspectorNameText = inspectorCells.find((cell) => /^שם\s*:?[\s\u00a0]/.test(cell))?.replace(/^שם\s*:?\s*/, "") ?? "";
 
   return {
     products,

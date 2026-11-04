@@ -29,8 +29,8 @@ function productsTable(payload: ShelfProductInspectionPayload) {
 }
 
 function detailsTable(payload: ShelfProductInspectionPayload) {
-  const docs = [["COC", payload.documents.coc], ["COA", payload.documents.coa], ["COT", payload.documents.cot], [payload.otherDocument.trim() ? `אחר: ${payload.otherDocument.trim()}` : "אחר", payload.documents.other]] as const;
-  const commonRows = [["שם הספק:", display(payload.supplierName)], ["מספר אצווה:", display(payload.batchNumber)], ["תאריך קליטה:", formatDate(payload.receiptDate)], ["מסמכים נלווים", docs.map(([label, checked]) => `${checked ? "☒" : "☐"} ${label}`).join("     ")]];
+  const docs = [["COC", payload.documents.coc], ["COA", payload.documents.coa], ["COT", payload.documents.cot], [payload.otherDocument.trim() ? `אחר - ${payload.otherDocument.trim()}` : "אחר", payload.documents.other]] as const;
+  const commonRows = [["שם הספק", display(payload.supplierName)], ["מספר אצווה", display(payload.batchNumber)], ["תאריך קליטה", formatDate(payload.receiptDate)], ["מסמכים נלווים", docs.map(([label, checked]) => `${checked ? "☒" : "☐"} ${label}`).join("     ")]];
   return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, visuallyRightToLeft: true, borders, rows: commonRows.map(([label, value]) => new TableRow({ children: [cell(label, 25, { bold: true, shade: true, align: AlignmentType.RIGHT }), cell(value, 75, { bold: true })] })) });
 }
 
@@ -50,7 +50,7 @@ function approvalChoicesCell(payload: ShelfProductInspectionPayload) {
 }
 
 function approvalTable(payload: ShelfProductInspectionPayload) {
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [approvalChoicesCell(payload), cell("אישור לשימוש:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] }), new TableRow({ children: [cell(display(payload.notes), 80, { align: AlignmentType.RIGHT }), cell("הערות:", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [approvalChoicesCell(payload), cell("אישור לשימוש", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] }), new TableRow({ children: [cell(display(payload.notes), 80, { align: AlignmentType.RIGHT }), cell("הערות", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
 }
 
 function signatureImage(base64: string) { return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(base64, "base64"), type: "png", transformation: { width: 54, height: 28 } })] }); }
@@ -58,7 +58,7 @@ function signaturesTable(payload: ShelfProductInspectionPayload) {
   const inspectorSignature = payload.inspectorName === "Sergey Dror" ? SERGEY_DROR_SIGNATURE_PNG_BASE64 : EDEN_AHARON_SIGNATURE_PNG_BASE64;
   const signatureCell = (base64: string) => new TableCell({ width: { size: 20, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, margins: { top: 15, bottom: 15, left: 40, right: 40 }, children: [signatureImage(base64)] });
   const heading = (text: string) => new TableRow({ children: [new TableCell({ columnSpan: 4, shading: { type: ShadingType.CLEAR, fill: "F2F2F2" }, children: [paragraph(text, { bold: true })] })] });
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [heading("נבדק על ידי"), new TableRow({ children: [signatureCell(inspectorSignature), cell(formatDate(payload.inspectorDate), 20), cell("תפקיד: QC", 25), cell(`שם: ${payload.inspectorName}`, 35)] }), heading("אושר על ידי"), new TableRow({ children: [signatureCell(UZI_BARZILAY_SIGNATURE_PNG_BASE64), cell(formatDate(payload.approverDate), 20), cell("תפקיד: משנה למנכ״ל", 25), cell("שם: Uzi Barzilay", 35)] })] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [heading("נבדק על ידי"), new TableRow({ children: [signatureCell(inspectorSignature), cell(formatDate(payload.inspectorDate), 20), cell("תפקיד QC", 25), cell(`שם ${payload.inspectorName}`, 35)] }), heading("אושר על ידי"), new TableRow({ children: [signatureCell(UZI_BARZILAY_SIGNATURE_PNG_BASE64), cell(formatDate(payload.approverDate), 20), cell("תפקיד משנה למנכ״ל", 25), cell("שם Uzi Barzilay", 35)] })] });
 }
 
 export async function buildShelfProductInspectionDocx(payload: ShelfProductInspectionPayload) {
