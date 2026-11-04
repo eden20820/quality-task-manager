@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { ArrowRight, Download, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { SignaturePad } from "@/components/quality-forms/signature-pad";
-import { buildQualityFormDownloadName } from "@/lib/quality-forms/form-archive";
-import { createEmptyAdhesionLeakTest, type AdhesionLeakTestPayload, type FinalDecision, type LeakTestMethod, type YesNo } from "@/lib/quality-forms/adhesion-leak-test";
+import { ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY, buildQualityFormDownloadName } from "@/lib/quality-forms/form-archive";
+import { createEmptyAdhesionLeakTest, isAdhesionLeakTestPayload, type AdhesionLeakTestPayload, type FinalDecision, type LeakTestMethod, type YesNo } from "@/lib/quality-forms/adhesion-leak-test";
 
 function todayInIsrael() {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
@@ -18,8 +18,21 @@ function todayInIsrael() {
 
 const inputClass = "h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
+function moveWithKeyboard(event: KeyboardEvent<HTMLInputElement>) {
+  const keys = ["Enter", "ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"];
+  if (!keys.includes(event.key)) return;
+  const entries = Array.from(document.querySelectorAll<HTMLInputElement>("[data-adhesion-entry]"));
+  const current = entries.indexOf(event.currentTarget);
+  const backwards = event.key === "ArrowUp" || event.key === "ArrowRight";
+  const target = entries[current + (backwards ? -1 : 1)];
+  if (!target) return;
+  event.preventDefault();
+  target.focus();
+  target.select();
+}
+
 function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: "text" | "date" | "number" }) {
-  return <label className="grid min-h-14 grid-cols-[minmax(135px,0.9fr)_minmax(0,1.7fr)] border-b border-slate-300 last:border-b-0"><span className="flex items-center justify-center border-l border-slate-300 bg-slate-50 px-3 text-center text-sm font-black">{label}</span><span className="flex items-center p-2"><input type={type} min={type === "number" ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} className={inputClass} /></span></label>;
+  return <label className="grid min-h-14 grid-cols-[minmax(135px,0.9fr)_minmax(0,1.7fr)] border-b border-slate-300 last:border-b-0"><span className="flex items-center justify-center border-l border-slate-300 bg-slate-50 px-3 text-center text-sm font-black">{label}</span><span className="flex items-center p-2"><input data-adhesion-entry type={type} min={type === "number" ? 0 : undefined} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={moveWithKeyboard} className={inputClass} /></span></label>;
 }
 
 function Choice<T extends string>({ value, onChange, options }: { value: T; onChange: (value: T) => void; options: Array<[T, string]> }) {
@@ -34,6 +47,22 @@ export function AdhesionLeakTestForm() {
   const [form, setForm] = useState(() => createEmptyAdhesionLeakTest(todayInIsrael()));
   const [busy, setBusy] = useState<"download" | "save" | null>(null);
   const update = <K extends keyof AdhesionLeakTestPayload>(key: K, value: AdhesionLeakTestPayload[K]) => setForm((current) => ({ ...current, [key]: value }));
+
+  useEffect(() => {
+    const saved = window.sessionStorage.getItem(ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY);
+    if (!saved) return;
+    window.sessionStorage.removeItem(ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY);
+    try {
+      const payload: unknown = JSON.parse(saved);
+      if (!isAdhesionLeakTestPayload(payload)) throw new Error();
+      window.setTimeout(() => {
+        setForm(payload);
+        toast.success("הטופס נטען מהמאגר וניתן להשלים או לערוך אותו");
+      }, 0);
+    } catch {
+      toast.error("לא ניתן לטעון את הטופס השמור");
+    }
+  }, []);
 
   function clearForm() {
     if (!window.confirm("לנקות את כל השדות ולהתחיל טופס חדש?")) return;

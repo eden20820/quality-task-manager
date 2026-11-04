@@ -50,7 +50,12 @@ function inspectionTable(payload: ShelfProductInspectionPayload) {
 }
 
 function instructionTable() {
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders: noBorders, rows: [new TableRow({ children: [cell("2. יש לצרף טופס זה למסמכי הקליטה של החומר", 62, { align: AlignmentType.RIGHT }), cell("1. סמן X / V בהתאם לממצאים", 38, { align: AlignmentType.RIGHT })] })] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders: noBorders, rows: [new TableRow({ children: [
+    cell("יש לצרף טופס זה למסמכי הקליטה של החומר", 52, { align: AlignmentType.RIGHT }),
+    cell("2.", 6, { align: AlignmentType.CENTER }),
+    cell("סמן X / V בהתאם לממצאים", 36, { align: AlignmentType.RIGHT }),
+    cell("1.", 6, { align: AlignmentType.CENTER }),
+  ] })] });
 }
 
 function approvalChoicesCell(payload: ShelfProductInspectionPayload) {
