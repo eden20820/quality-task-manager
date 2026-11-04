@@ -4,6 +4,9 @@ export const SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY = "quality-shelf-inspecti
 export const ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY = "quality-adhesion-leak-test-archive-edit";
 export const ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY = "quality-adhesion-leak-test-archive-record";
 export const ADHESION_LEAK_TEST_FORM_TITLE = "טופס בדיקת אטימות – הדבקה";
+export const DEVELOPMENT_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY = "quality-development-inspection-archive-edit";
+export const DEVELOPMENT_INSPECTION_ARCHIVE_RECORD_STORAGE_KEY = "quality-development-inspection-archive-record";
+export const DEVELOPMENT_INSPECTION_FORM_TITLE = "טופס ביקורת קבלה – מוצרי פיתוח";
 
 export type QualityFormStatus = "pending-signature" | "signed";
 
@@ -22,6 +25,10 @@ export function parseArchivedFormDescription(description: string | null) {
 
 export function isAdhesionFormDescription(description: string | null) {
   return parseArchivedFormDescription(description).title === ADHESION_LEAK_TEST_FORM_TITLE;
+}
+
+export function isDevelopmentInspectionDescription(description: string | null) {
+  return parseArchivedFormDescription(description).title === DEVELOPMENT_INSPECTION_FORM_TITLE;
 }
 
 export function isPendingSignatureDescription(description: string | null) {
