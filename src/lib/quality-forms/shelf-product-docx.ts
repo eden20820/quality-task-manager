@@ -13,15 +13,25 @@ function formatDate(value: string) { const [year, month, day] = value.split("-")
 function paragraph(text: string, options: { bold?: boolean; size?: number; align?: Align } = {}) { return new Paragraph({ bidirectional: true, alignment: options.align ?? AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new TextRun({ text, bold: options.bold, size: options.size ?? 18, font: "Arial" })] }); }
 function cell(text: string, width: number, options: { bold?: boolean; shade?: boolean; align?: Align } = {}) { return new TableCell({ width: { size: width, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, shading: options.shade ? { type: ShadingType.CLEAR, fill: "F2F2F2" } : undefined, margins: { top: 30, bottom: 30, left: 70, right: 70 }, children: [paragraph(text, { bold: options.bold, align: options.align })] }); }
 
+function productsTable(payload: ShelfProductInspectionPayload) {
+  const products = payload.products?.length ? payload.products : [{ productName: payload.productName, catalogNumber: payload.catalogNumber, quantity: payload.quantity }];
+  return new Table({
+    width: { size: 92, type: WidthType.PERCENTAGE },
+    alignment: AlignmentType.CENTER,
+    layout: TableLayoutType.FIXED,
+    visuallyRightToLeft: true,
+    borders,
+    rows: [
+      new TableRow({ tableHeader: true, children: [cell("#", 10, { bold: true, shade: true }), cell("שם מוצר מתקבל", 50, { bold: true, shade: true }), cell("מק״ט", 25, { bold: true, shade: true }), cell("כמות", 15, { bold: true, shade: true })] }),
+      ...products.map((product, index) => new TableRow({ children: [cell(String(index + 1), 10, { bold: true }), cell(display(product.productName), 50, { bold: true }), cell(display(product.catalogNumber), 25, { bold: true }), cell(display(product.quantity), 15, { bold: true })] })),
+    ],
+  });
+}
+
 function detailsTable(payload: ShelfProductInspectionPayload) {
   const docs = [["COC", payload.documents.coc], ["COA", payload.documents.coa], ["COT", payload.documents.cot], [payload.otherDocument.trim() ? `אחר: ${payload.otherDocument.trim()}` : "אחר", payload.documents.other]] as const;
-  const products = payload.products?.length ? payload.products : [{ productName: payload.productName, catalogNumber: payload.catalogNumber, quantity: payload.quantity }];
-  const productRows = [
-    new TableRow({ tableHeader: true, children: [cell("כמות", 15, { bold: true, shade: true }), cell("מק״ט", 25, { bold: true, shade: true }), cell("שם מוצר מתקבל", 50, { bold: true, shade: true }), cell("#", 10, { bold: true, shade: true })] }),
-    ...products.map((product, index) => new TableRow({ children: [cell(display(product.quantity), 15, { bold: true }), cell(display(product.catalogNumber), 25, { bold: true }), cell(display(product.productName), 50, { bold: true }), cell(String(index + 1), 10, { bold: true })] })),
-  ];
   const commonRows = [["שם הספק:", display(payload.supplierName)], ["מספר אצווה:", display(payload.batchNumber)], ["תאריך קליטה:", formatDate(payload.receiptDate)], ["מסמכים נלווים", docs.map(([label, checked]) => `${checked ? "☒" : "☐"} ${label}`).join("     ")]];
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [...productRows, ...commonRows.map(([label, value]) => new TableRow({ children: [cell(value, 75, { bold: true }), cell(label, 25, { bold: true, shade: true, align: AlignmentType.RIGHT })] }))] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, visuallyRightToLeft: true, borders, rows: commonRows.map(([label, value]) => new TableRow({ children: [cell(label, 25, { bold: true, shade: true, align: AlignmentType.RIGHT }), cell(value, 75, { bold: true })] })) });
 }
 
 function inspectionTable(payload: ShelfProductInspectionPayload) {
@@ -55,7 +65,8 @@ export async function buildShelfProductInspectionDocx(payload: ShelfProductInspe
   const document = new Document({ sections: [{ properties: { page: { margin: { top: 320, right: 420, bottom: 320, left: 420 } } }, children: [
     new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(CAELI_LOGO_PNG_BASE64, "base64"), type: "png", transformation: { width: 78, height: 54 } })] }),
     new Paragraph({ bidirectional: true, alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120 }, children: [new TextRun({ text: "טופס ביקורת קבלה למוצר מדף", bold: true, underline: {}, size: 30, font: "Arial" })] }),
-    detailsTable(payload), new Paragraph({ spacing: { before: 80, after: 0 } }), inspectionTable(payload),
+    productsTable(payload), new Paragraph({ spacing: { before: 30, after: 0 } }), detailsTable(payload),
+    new Paragraph({ spacing: { before: 80, after: 0 } }), inspectionTable(payload),
     new Paragraph({ spacing: { before: 30, after: 0 } }), instructionTable(),
     new Paragraph({ spacing: { before: 50, after: 0 } }), approvalTable(payload),
     new Paragraph({ spacing: { before: 35, after: 0 } }), signaturesTable(payload),

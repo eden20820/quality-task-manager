@@ -41,7 +41,7 @@ describe("shelf product inspection DOCX", () => {
     expect(xml).toContain("המסמך נוצר בהצלחה.");
     expect(xml).toContain("יש לצרף טופס זה למסמכי הקליטה של החומר");
     expect(xml).toContain("מאושר מותנה (לפרטים בהערות)");
-    expect((xml?.match(/<w:tbl>/g) ?? []).length).toBe(6);
+    expect((xml?.match(/<w:tbl>/g) ?? []).length).toBe(7);
     expect(xml).toContain("Sergey Dror");
     expect(xml).not.toMatch(/\{\{[A-Z0-9_]+\}\}/);
     if (process.env.SHELF_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_DOCX_SAMPLE_PATH, buffer);
@@ -58,9 +58,12 @@ describe("shelf product inspection DOCX", () => {
       products: [
         sample.products[0],
         { productName: "מוצר נוסף", catalogNumber: "TEST-200", quantity: "12" },
+        { productName: "מוצר שלישי עם שם ארוך", catalogNumber: "LONG-CATALOG-300", quantity: "24" },
       ],
     };
-    expect(await parseShelfProductInspectionDocx(await buildShelfProductInspectionDocx(source))).toEqual(source);
+    const buffer = await buildShelfProductInspectionDocx(source);
+    expect(await parseShelfProductInspectionDocx(buffer)).toEqual(source);
+    if (process.env.SHELF_MULTI_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_MULTI_DOCX_SAMPLE_PATH, buffer);
   });
 
   it("restores failures, conditional approval, other documents and blank values", async () => {
