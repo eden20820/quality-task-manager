@@ -8,6 +8,7 @@ import { parseShelfProductInspectionDocx } from "./shelf-product-docx-import";
 import type { ShelfProductInspectionPayload } from "./shelf-product-inspection";
 
 const sample: ShelfProductInspectionPayload = {
+  products: [{ productName: "מוצר בדיקה", catalogNumber: "TEST-100", quantity: "5" }],
   productName: "מוצר בדיקה",
   catalogNumber: "TEST-100",
   supplierName: "ספק לדוגמה",
@@ -49,6 +50,17 @@ describe("shelf product inspection DOCX", () => {
   it("loads an exported document back into an editable form", async () => {
     const restored = await parseShelfProductInspectionDocx(await buildShelfProductInspectionDocx(sample));
     expect(restored).toEqual(sample);
+  });
+
+  it("keeps multiple numbered products when a document is reopened", async () => {
+    const source: ShelfProductInspectionPayload = {
+      ...sample,
+      products: [
+        sample.products[0],
+        { productName: "מוצר נוסף", catalogNumber: "TEST-200", quantity: "12" },
+      ],
+    };
+    expect(await parseShelfProductInspectionDocx(await buildShelfProductInspectionDocx(source))).toEqual(source);
   });
 
   it("restores failures, conditional approval, other documents and blank values", async () => {

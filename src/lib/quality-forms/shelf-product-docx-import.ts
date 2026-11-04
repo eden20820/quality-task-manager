@@ -66,6 +66,17 @@ export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array)
   if (tables.length < 5) throw new Error("מבנה טופס ביקורת הקבלה אינו תקין");
 
   const details = tableRows(tables[0]);
+  const products = details[0]?.includes("שם מוצר מתקבל") && details[0]?.includes("#")
+    ? details.slice(1).filter((cells) => cells.length === 4 && /^\d+$/.test(cells[3] ?? "")).map((cells) => ({
+      quantity: inputValue(cells[0]),
+      catalogNumber: inputValue(cells[1]),
+      productName: inputValue(cells[2]),
+    }))
+    : [{
+      productName: documentValue(details, "שם מוצר מתקבל"),
+      catalogNumber: documentValue(details, "מק״ט"),
+      quantity: documentValue(details, "כמות"),
+    }];
   const documentsText = documentValue(details, "מסמכים נלווים");
   const otherMatch = documentsText.match(/☒\s*אחר:\s*([^☐☒]+)/);
   const inspectionRows = tableRows(tables[1]).slice(1, 1 + SHELF_INSPECTION_ITEMS.length);
@@ -77,10 +88,11 @@ export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array)
   const inspectorNameText = inspectorCells.find((cell) => cell.startsWith("שם:"))?.replace(/^שם:\s*/, "") ?? "";
 
   return {
-    productName: documentValue(details, "שם מוצר מתקבל"),
-    catalogNumber: documentValue(details, "מק״ט"),
+    products,
+    productName: products[0]?.productName ?? "",
+    catalogNumber: products[0]?.catalogNumber ?? "",
     supplierName: documentValue(details, "שם הספק"),
-    quantity: documentValue(details, "כמות"),
+    quantity: products[0]?.quantity ?? "",
     batchNumber: documentValue(details, "מספר אצווה"),
     receiptDate: isoDate(documentValue(details, "תאריך קליטה")),
     documents: {
