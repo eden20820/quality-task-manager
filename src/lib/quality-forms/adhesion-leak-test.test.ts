@@ -20,7 +20,28 @@ describe("adhesion leak test form", () => {
   });
 
   it("creates a clean one-page PDF that can be reopened for editing", async () => {
-    const payload = { ...createEmptyAdhesionLeakTest("2026-11-04"), testerName: "גל פסו", testLocation: "מעבדת QC", testedProduct: "מכלול 101", testMethod: "vacuum" as const, decision: "pass" as const };
+    const payload = {
+      ...createEmptyAdhesionLeakTest("2026-11-04"),
+      testerName: "עדן אהרון",
+      testLocation: "מעבדת אלקטרוניקה",
+      operationDescription: "בדיקת אטימות",
+      testedProduct: "מכלול 101",
+      adhesiveManufacturerModel: "יצרן ודגם לדוגמה",
+      adhesiveExpiryDate: "2026-11-25",
+      curingMethod: "epoxy" as const,
+      exposureTime: "42 שעות",
+      temperature: "23°C",
+      humidity: "45%",
+      underHood: "no" as const,
+      testMethod: "vacuum" as const,
+      cracks: "no" as const,
+      bubbles: "no" as const,
+      materialSeparation: "no" as const,
+      leakObserved: "no" as const,
+      decision: "pass" as const,
+      checkedByName: "עדן",
+      approvedByName: "גל",
+    };
     const bytes = await buildAdhesionLeakTestPdf(payload);
     const document = await PDFDocument.load(bytes);
     expect(document.getPageCount()).toBe(1);
