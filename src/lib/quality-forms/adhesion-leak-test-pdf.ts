@@ -55,9 +55,9 @@ function fieldLine(page: PDFPage, font: PDFFont, top: number, label: string, val
   const valueWidth = options.valueWidth ?? 132;
   const labelX = options.labelX ?? 224;
   const labelWidth = options.labelWidth ?? 94;
-  drawText(page, font, label, { x: labelX, top, width: labelWidth, height: 12, align: "right", size: 7.8 });
-  drawText(page, font, value, { x: valueX, top, width: valueWidth, height: 12, size: 7.8 });
-  line(page, valueX + 4, valueX + valueWidth - 4, top + 11.5, 0.45);
+  drawText(page, font, label, { x: labelX, top: top - 0.8, width: labelWidth, height: 11, align: "right", size: 7.8 });
+  drawText(page, font, value, { x: valueX, top: top - 0.8, width: valueWidth, height: 11, size: 7.8 });
+  line(page, valueX + 4, valueX + valueWidth - 4, top + 10.5, 0.45);
 }
 
 function sectionTitle(page: PDFPage, font: PDFFont, top: number, height: number, title: string) {
@@ -134,79 +134,85 @@ export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload)
   choiceRow(page, font, 320, "UV", payload.curingMethod === "uv");
   if (!payload.curingMethod) drawText(page, font, "N/A", { x: 94, top: 307, width: 65, height: 24, size: 7.5 });
   fieldLine(page, font, 333, "זמן חשיפה", payload.exposureTime);
-  fieldLine(page, font, 345, "זמן המתנה לפני בדיקה", payload.waitingTime, { valueWidth: 116, labelX: 208, labelWidth: 110 });
+  fieldLine(page, font, 342.5, "זמן המתנה לפני בדיקה", payload.waitingTime, { valueWidth: 116, labelX: 208, labelWidth: 110 });
 
   rect(page, 88, 356, 233, 48);
   sectionTitle(page, font, 356, 48, "תנאי סביבה");
   fieldLine(page, font, 357, "טמפרטורה", payload.temperature);
   fieldLine(page, font, 369, "לחות", payload.humidity);
   fieldLine(page, font, 381, "עבודה תחת מנדף", yesNo(payload.underHood), { valueWidth: 105, labelX: 197, labelWidth: 121 });
-  fieldLine(page, font, 393, "הערות", payload.environmentNotes);
+  fieldLine(page, font, 390.5, "הערות", payload.environmentNotes);
 
   rect(page, 88, 404, 233, 59);
   sectionTitle(page, font, 404, 59, "שיטת בדיקת האטימות");
   const methods = [
     ["בדיקת לחץ אוויר", "air-pressure"], ["בדיקת וואקום", "vacuum"],
-    ["בדיקת בועות (מים/סבון)", "bubbles"], ["בדיקת חדירות צבע", "dye-penetration"],
+    ["בדיקת בועות )מים/סבון(", "bubbles"], ["בדיקת חדירות צבע", "dye-penetration"],
   ] as const;
   methods.forEach(([label, value], index) => choiceRow(page, font, 407 + index * 13, label, payload.testMethod === value));
   if (!payload.testMethod) drawText(page, font, "N/A", { x: 94, top: 425, width: 55, height: 12, size: 7.5 });
 
-  rect(page, 88, 463, 233, 132);
-  sectionTitle(page, font, 463, 132, "בדיקה ויזואלית");
+  rect(page, 88, 463, 233, 60);
+  sectionTitle(page, font, 463, 60, "בדיקה ויזואלית");
   const visualGroups = [
     ["סדקים", payload.cracks], ["בועות", payload.bubbles], ["היפרדות חומר", payload.materialSeparation],
   ] as const;
   visualGroups.forEach(([label, value], index) => {
-    const top = 466 + index * 43;
-    drawText(page, font, label, { x: 220, top, width: 98, height: 12, align: "right", size: 8 });
-    choiceRow(page, font, top + 14, "כן", value === "yes");
-    choiceRow(page, font, top + 27, "לא", value === "no");
-    if (!value) drawText(page, font, "N/A", { x: 94, top: top + 17, width: 55, height: 18, size: 7.5 });
+    const top = 466 + index * 18;
+    drawText(page, font, label, { x: 221, top, width: 96, height: 14, align: "right", size: 8 });
+    checkbox(page, value === "yes", 190, top + 3, 8);
+    drawText(page, font, "כן", { x: 166, top, width: 21, height: 14, align: "right", size: 7.5 });
+    checkbox(page, value === "no", 137, top + 3, 8);
+    drawText(page, font, "לא", { x: 113, top, width: 21, height: 14, align: "right", size: 7.5 });
+    if (!value) drawText(page, font, "N/A", { x: 91, top, width: 25, height: 14, size: 6.8 });
   });
 
-  rect(page, 88, 595, 233, 40);
-  sectionTitle(page, font, 595, 40, "תוצאות בדיקה");
-  drawText(page, font, "נצפתה דליפה", { x: 220, top: 596, width: 98, height: 12, align: "right", size: 7.8 });
-  checkbox(page, payload.leakObserved === "yes", 197, 598, 8);
-  drawText(page, font, "כן", { x: 176, top: 596, width: 20, height: 12, align: "right", size: 7.5 });
-  checkbox(page, payload.leakObserved === "no", 147, 598, 8);
-  drawText(page, font, "לא", { x: 126, top: 596, width: 20, height: 12, align: "right", size: 7.5 });
-  if (!payload.leakObserved) drawText(page, font, "N/A", { x: 94, top: 596, width: 35, height: 12, size: 7 });
-  fieldLine(page, font, 608, "מיקום הדליפה", payload.leakLocation, { valueWidth: 112, labelX: 204, labelWidth: 114 });
-  fieldLine(page, font, 621, "ממצאים", payload.findings);
+  rect(page, 88, 523, 233, 46);
+  sectionTitle(page, font, 523, 46, "תוצאות בדיקה");
+  drawText(page, font, "נצפתה דליפה", { x: 220, top: 524, width: 98, height: 12, align: "right", size: 7.8 });
+  checkbox(page, payload.leakObserved === "yes", 197, 526, 8);
+  drawText(page, font, "כן", { x: 176, top: 524, width: 20, height: 12, align: "right", size: 7.5 });
+  checkbox(page, payload.leakObserved === "no", 147, 526, 8);
+  drawText(page, font, "לא", { x: 126, top: 524, width: 20, height: 12, align: "right", size: 7.5 });
+  if (!payload.leakObserved) drawText(page, font, "N/A", { x: 94, top: 524, width: 35, height: 12, size: 7 });
+  fieldLine(page, font, 537.5, "מיקום הדליפה", payload.leakLocation, { valueWidth: 112, labelX: 204, labelWidth: 114 });
+  fieldLine(page, font, 552, "ממצאים", payload.findings);
 
-  rect(page, 88, 635, 233, 14);
-  sectionTitle(page, font, 635, 14, "סיכום והחלטות");
+  rect(page, 88, 569, 233, 22);
+  sectionTitle(page, font, 569, 22, "סיכום והחלטות");
   const decisions = [
-    ["תקין", "pass", 281], ["לא תקין", "fail", 218], ["נדרש תיקון ובדיקה חוזרת", "repair", 96],
+    ["נדרש תיקון ובדיקה חוזרת", "repair", 94, 102, 198],
+    ["לא תקין", "fail", 211, 45, 258],
+    ["תקין", "pass", 271, 30, 303],
   ] as const;
-  decisions.forEach(([label, value, x]) => {
-    checkbox(page, payload.decision === value, x, 638, 8);
-    drawText(page, font, label, { x: x - (value === "repair" ? 8 : 42), top: 636, width: value === "repair" ? 112 : 40, height: 12, align: "right", size: 6.8 });
+  decisions.forEach(([label, value, x, width, boxX]) => {
+    drawText(page, font, label, { x, top: 573, width, height: 12, align: "right", size: value === "repair" ? 6.3 : 6.8 });
+    checkbox(page, payload.decision === value, boxX, 575, 8);
   });
-  if (!payload.decision) drawText(page, font, "N/A", { x: 89, top: 636, width: 40, height: 12, size: 6.8 });
+  if (!payload.decision) drawText(page, font, "N/A", { x: 89, top: 573, width: 28, height: 12, size: 6.5 });
 
-  rect(page, 88, 681, 433, 42);
-  rect(page, 88, 681, 433, 13, true);
-  drawText(page, font, "חתימות", { x: 88, top: 681, width: 433, height: 13, size: 9, bold: true });
-  line(page, 88, 521, 708, 0.65);
-  for (const x of [166, 284, 441]) page.drawLine({ start: { x, y: pageHeight - 694 }, end: { x, y: pageHeight - 723 }, thickness: 0.65, color: black });
+  rect(page, 88, 625, 433, 42);
+  rect(page, 88, 625, 433, 13, true);
+  drawText(page, font, "חתימות", { x: 88, top: 625, width: 433, height: 13, size: 9, bold: true });
+  line(page, 88, 521, 652, 0.65);
+  for (const x of [166, 284, 441]) page.drawLine({ start: { x, y: pageHeight - 638 }, end: { x, y: pageHeight - 667 }, thickness: 0.65, color: black });
   const signatureRows = [
-    { top: 694, label: "נבדק ע״י", name: payload.checkedByName, date: formatDate(payload.checkedByDate), image: payload.checkedBySignature },
-    { top: 708, label: "אושר ע״י", name: payload.approvedByName, date: formatDate(payload.approvedByDate), image: payload.approvedBySignature },
+    { top: 638, label: "נבדק ע״י", name: payload.checkedByName, date: formatDate(payload.checkedByDate), image: payload.checkedBySignature },
+    { top: 652, label: "אושר ע״י", name: payload.approvedByName, date: formatDate(payload.approvedByDate), image: payload.approvedBySignature },
   ];
   for (const row of signatureRows) {
     drawText(page, font, row.label, { x: 441, top: row.top, width: 80, height: 14, align: "right", size: 7.5, bold: true });
-    drawText(page, font, "שם", { x: 401, top: row.top, width: 36, height: 14, align: "right", size: 7 });
-    drawText(page, font, row.name, { x: 288, top: row.top, width: 109, height: 14, size: 7 });
-    drawText(page, font, "תאריך", { x: 240, top: row.top, width: 40, height: 14, align: "right", size: 7 });
-    drawText(page, font, row.date, { x: 168, top: row.top, width: 68, height: 14, size: 7 });
+    drawText(page, font, "שם", { x: 407, top: row.top, width: 28, height: 14, align: "right", size: 7 });
+    drawText(page, font, ":", { x: 399, top: row.top, width: 8, height: 14, size: 7 });
+    drawText(page, font, row.name, { x: 290, top: row.top, width: 108, height: 14, align: "right", size: 7 });
+    drawText(page, font, "תאריך", { x: 245, top: row.top, width: 34, height: 14, align: "right", size: 7 });
+    drawText(page, font, ":", { x: 237, top: row.top, width: 8, height: 14, size: 7 });
+    drawText(page, font, row.date, { x: 168, top: row.top, width: 68, height: 14, align: "right", size: 7 });
     await signature(page, pdf, font, row.image, 88, row.top, 78, 14);
   }
 
-  drawText(page, font, "נספח", { x: 88, top: 793, width: 35, height: 12, align: "left", size: 8, bold: true });
-  drawText(page, font, "8.4.2.4.0", { x: 124, top: 793, width: 58, height: 12, align: "left", size: 8, bold: true });
+  drawText(page, font, "8.4.2.4.0", { x: 88, top: 793, width: 58, height: 12, align: "left", size: 8, bold: true });
+  drawText(page, font, "נספח", { x: 148, top: 793, width: 35, height: 12, align: "left", size: 8, bold: true });
   pdf.setTitle("טופס בדיקת אטימות הדבקה");
   pdf.setSubject("נספח 8.4.2.4.0");
   storePayload(pdf, payload);
