@@ -12,8 +12,14 @@ const gray = rgb(0.94, 0.94, 0.94);
 const pageHeight = 841.89;
 const payloadKey = PDFName.of("DevelopmentInspectionPayload");
 
-function display(value: string) { return value.trim() || "N/A"; }
-function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : "N/A"; }
+function display(value: string) { return value.trim(); }
+function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : ""; }
+// Fontkit reverses RTL glyph order but does not mirror paired punctuation.
+// Mirror only RTL runs for painting; editable payload values stay untouched.
+export function developmentPdfTextLayout(value: string) {
+  const layout = directionalTextLayout(value);
+  return { ...layout, runs: layout.runs.map((run) => ({ ...run, text: run.direction === "rtl" ? run.text.replace(/[()]/g, (character) => character === "(" ? ")" : "(") : run.text })) };
+}
 function fitSize(font: PDFFont, text: string, width: number, preferred = 7.4, minimum = 5.2) { let size = preferred; while (size > minimum && font.widthOfTextAtSize(text, size) > width) size -= 0.2; return size; }
 
 function drawText(page: PDFPage, font: PDFFont, value: string, options: { x: number; top: number; width: number; height?: number; size?: number; align?: "left" | "center" | "right"; bold?: boolean; empty?: "na" | "blank" }) {
@@ -24,9 +30,9 @@ function drawText(page: PDFPage, font: PDFFont, value: string, options: { x: num
   const align = options.align ?? "center";
   const x = align === "right" ? options.x + options.width - textWidth - 2.5 : align === "left" ? options.x + 2.5 : options.x + (options.width - textWidth) / 2;
   const y = pageHeight - options.top - ((options.height ?? 12) + size) / 2 + 1;
-  const layout = directionalTextLayout(text);
+  const layout = developmentPdfTextLayout(text);
   const paint = (offset: number) => {
-    if (layout.runs.length <= 1) return page.drawText(text, { x: x + offset, y, size, font, color: black });
+    if (layout.runs.length <= 1) return page.drawText(layout.runs[0]?.text ?? text, { x: x + offset, y, size, font, color: black });
     let cursor = layout.baseDirection === "rtl" ? x + textWidth : x;
     for (const run of layout.runs) {
       const runWidth = font.widthOfTextAtSize(run.text, size);
@@ -92,7 +98,14 @@ export async function buildDevelopmentInspectionPdf(payload: DevelopmentInspecti
 
   rect(page, 88, 694, 433, 51); rect(page, 88, 694, 433, 13, true); drawText(page, font, "חתימות", { x: 88, top: 694, width: 433, height: 13, size: 8.5, bold: true }); line(page, 88, 521, 726, 0.65); for (const cellX of [166, 274, 425]) page.drawLine({ start: { x: cellX, y: pageHeight - 707 }, end: { x: cellX, y: pageHeight - 745 }, thickness: 0.65, color: black });
   const signatureRows = [{ top: 707, role: "נבדק ע״י", name: payload.checkedByName, date: formatDate(payload.checkedByDate), image: payload.checkedBySignature }, { top: 726, role: "אושר ע״י", name: payload.approvedByName, date: formatDate(payload.approvedByDate), image: payload.approvedBySignature }];
-  for (const row of signatureRows) { drawText(page, font, row.role, { x: 425, top: row.top, width: 96, height: 19, align: "right", size: 7.2, bold: true }); drawText(page, font, "שם", { x: 386, top: row.top, width: 34, height: 19, align: "right", size: 6.8 }); drawText(page, font, row.name, { x: 280, top: row.top, width: 103, height: 19, size: 6.8 }); drawText(page, font, "תאריך", { x: 231, top: row.top, width: 38, height: 19, align: "right", size: 6.8 }); drawText(page, font, row.date, { x: 168, top: row.top, width: 60, height: 19, size: 6.7 }); await signature(page, pdf, row.image, 88, row.top, 78, 19); }
+  for (const row of signatureRows) {
+    drawText(page, font, row.role, { x: 425, top: row.top, width: 96, height: 19, align: "right", size: 7.2, bold: true });
+    drawText(page, font, "שם", { x: 405, top: row.top, width: 15, height: 19, align: "right", size: 6.8 });
+    drawText(page, font, row.name, { x: 280, top: row.top, width: 124, height: 19, align: "right", size: 6.8 });
+    drawText(page, font, "תאריך", { x: 246, top: row.top, width: 23, height: 19, align: "right", size: 6.8 });
+    drawText(page, font, row.date, { x: 168, top: row.top, width: 77, height: 19, align: "right", size: 6.7 });
+    await signature(page, pdf, row.image, 88, row.top, 78, 19);
+  }
   drawText(page, font, "נספח", { x: 148, top: 795, width: 38, height: 12, align: "right", size: 8, bold: true }); drawText(page, font, "8.4.2.3.2", { x: 88, top: 795, width: 58, height: 12, align: "left", size: 8, bold: true });
   pdf.setTitle("טופס ביקורת קבלה - מוצרי פיתוח"); pdf.setSubject("נספח 8.4.2.3.2"); storePayload(pdf, payload); return Buffer.from(await pdf.save());
 }
