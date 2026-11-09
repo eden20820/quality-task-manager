@@ -1,10 +1,20 @@
 import { writeFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { buildDevelopmentInspectionPdf, extractDevelopmentInspectionPayload } from "./development-inspection-pdf";
+import { buildDevelopmentInspectionPdf, developmentPdfTextLayout, extractDevelopmentInspectionPayload } from "./development-inspection-pdf";
 import { createEmptyDevelopmentInspection, isDevelopmentInspectionPayload } from "./development-inspection";
 
 describe("development inspection form", () => {
+  it("mirrors parentheses only in Hebrew paint runs", () => {
+    expect(developmentPdfTextLayout("תוקף (אם רלוונטי)").runs[0].text).toBe("תוקף )אם רלוונטי(");
+    expect(developmentPdfTextLayout("ABC (test)").runs[0].text).toBe("ABC (test)");
+  });
+  it("keeps blank fields blank when exporting and reopening", async () => {
+    const payload = createEmptyDevelopmentInspection("");
+    const bytes = await buildDevelopmentInspectionPdf(payload);
+    expect(await extractDevelopmentInspectionPayload(bytes)).toEqual(payload);
+    if (process.env.DEVELOPMENT_EMPTY_PDF_SAMPLE_PATH) await writeFile(process.env.DEVELOPMENT_EMPTY_PDF_SAMPLE_PATH, bytes);
+  });
   it("creates a valid empty payload", () => { const payload = createEmptyDevelopmentInspection("2026-11-04"); expect(payload.date).toBe("2026-11-04"); expect(payload.drawingRows).toHaveLength(3); expect(isDevelopmentInspectionPayload(payload)).toBe(true); });
   it("rejects malformed rows", () => { const payload = { ...createEmptyDevelopmentInspection("2026-11-04"), drawingRows: [] }; expect(isDevelopmentInspectionPayload(payload)).toBe(false); });
   it("creates a one-page editable PDF with mixed Hebrew and English", async () => {
