@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock3, Download, FilePenLine, FileSpreadsheet, FileText, Files, Search } from "lucide-react";
+import { Clock3, Download, FilePenLine, FileSpreadsheet, FileText, Files, Search, Trash2 } from "lucide-react";
 
 import {
   ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY,
@@ -17,6 +17,7 @@ import {
   RIR_ARCHIVE_EDIT_STORAGE_KEY,
   SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY,
 } from "@/lib/quality-forms/form-archive";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 export type QualityFormArchiveRow = { id: string; title: string; description: string | null; file_name: string; file_size: number; mime_type: string | null; storage_path: string; created_at: string };
@@ -39,12 +40,34 @@ export function QualityFormArchive({ initialForms }: { initialForms: QualityForm
   const [error, setError] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const pendingCount = useMemo(() => initialForms.filter((form) => isPendingSignatureDescription(form.description)).length, [initialForms]);
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const forms = useMemo(() => initialForms.filter((form) => !deletedIds.includes(form.id)), [initialForms, deletedIds]);
+  const pendingCount = useMemo(() => forms.filter((form) => isPendingSignatureDescription(form.description)).length, [forms]);
   const visibleForms = useMemo(() => {
-    const inTab = tab === "pending" ? initialForms.filter((form) => isPendingSignatureDescription(form.description)) : initialForms;
+    const inTab = tab === "pending" ? forms.filter((form) => isPendingSignatureDescription(form.description)) : forms;
     const query = search.trim().toLocaleLowerCase("he");
     return query ? inTab.filter((form) => `${form.title} ${parseArchivedFormDescription(form.description).title} ${form.file_name}`.toLocaleLowerCase("he").includes(query)) : inTab;
-  }, [initialForms, search, tab]);
+  }, [forms, search, tab]);
+
+  async function deleteForm(form: QualityFormArchiveRow) {
+    if (!window.confirm(`למחוק את הטופס "${form.file_name}"? הפעולה תמחק גם את הקובץ ואינה ניתנת לביטול.`)) return;
+    setDeletingId(form.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/forms/archive/${form.id}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "לא ניתן למחוק את הטופס");
+      setDeletedIds((ids) => [...ids, form.id]);
+      if (result.cleanupPending) toast.warning("הטופס הוסר מהמאגר, אך ניקוי הקובץ מהאחסון לא הושלם");
+      else toast.success("הטופס והקובץ נמחקו");
+      router.refresh();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "לא ניתן למחוק את הטופס");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function download(form: QualityFormArchiveRow) {
     setError("");
@@ -89,7 +112,7 @@ export function QualityFormArchive({ initialForms }: { initialForms: QualityForm
     <div className="grid gap-3 sm:grid-cols-2">
       <button type="button" onClick={() => setTab("all")} className={`flex items-center justify-between rounded-2xl border p-4 text-right transition ${tab === "all" ? "border-slate-950 bg-slate-950 text-white shadow-lg" : "border-slate-200 bg-white text-slate-800 hover:border-slate-400"}`}>
         <span><span className="block font-black">כל הטפסים</span><span className={`mt-1 block text-sm font-semibold ${tab === "all" ? "text-slate-300" : "text-slate-500"}`}>כל הטפסים שנשמרו במערכת</span></span>
-        <span className="flex items-center gap-2"><span className="text-2xl font-black">{initialForms.length}</span><Files className="h-6 w-6" /></span>
+        <span className="flex items-center gap-2"><span className="text-2xl font-black">{forms.length}</span><Files className="h-6 w-6" /></span>
       </button>
       <button type="button" onClick={() => setTab("pending")} className={`flex items-center justify-between rounded-2xl border p-4 text-right transition ${tab === "pending" ? "border-amber-500 bg-amber-500 text-white shadow-lg" : "border-amber-200 bg-amber-50 text-amber-950 hover:border-amber-400"}`}>
         <span><span className="block font-black">ממתינים לחתימה</span><span className={`mt-1 block text-sm font-semibold ${tab === "pending" ? "text-amber-50" : "text-amber-800"}`}>טפסים שעדיין חסרה בהם חתימה</span></span>
@@ -107,13 +130,13 @@ export function QualityFormArchive({ initialForms }: { initialForms: QualityForm
         const pending = isPendingSignatureDescription(form.description);
         const formTitle = parseArchivedFormDescription(form.description).title;
         const Icon = isExcel ? FileSpreadsheet : FileText;
-        return <article key={form.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_130px_240px] sm:items-center">
+        return <article key={form.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_110px_300px] sm:items-center">
           <div className="flex min-w-0 items-start gap-3"><span className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${pending ? "bg-amber-100 text-amber-700" : isExcel ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}><Icon className="h-5 w-5" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="break-words font-black text-slate-900">{form.file_name}</h2>{pending ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">ממתין לחתימה</span> : null}</div><p className="mt-1 text-sm font-semibold text-slate-500">{formTitle} · {formatSize(form.file_size)}</p></div></div>
           <time dir="ltr" className="text-left text-sm font-semibold text-slate-500" dateTime={form.created_at}>{formatDate(form.created_at)}</time>
-          <div className="flex gap-2">{isExcel || isWord || isAdhesion || isDevelopment ? <button type="button" disabled={openingId === form.id} onClick={() => openForEditing(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-sm font-extrabold text-white hover:bg-slate-800 disabled:opacity-50"><FilePenLine className="h-4 w-4" />{openingId === form.id ? "פותח..." : pending ? "השלמת חתימה" : "פתיחה ועריכה"}</button> : null}<button type="button" disabled={downloadingId === form.id} onClick={() => download(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Download className="h-4 w-4" />{downloadingId === form.id ? "מוריד..." : "הורדה"}</button></div>
+          <div className="flex flex-wrap gap-2">{isExcel || isWord || isAdhesion || isDevelopment ? <button type="button" disabled={openingId === form.id} onClick={() => openForEditing(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-sm font-extrabold text-white hover:bg-slate-800 disabled:opacity-50"><FilePenLine className="h-4 w-4" />{openingId === form.id ? "פותח..." : pending ? "השלמת חתימה" : "פתיחה ועריכה"}</button> : null}<button type="button" disabled={downloadingId === form.id} onClick={() => download(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Download className="h-4 w-4" />{downloadingId === form.id ? "מוריד..." : "הורדה"}</button>{pending ? <button type="button" disabled={deletingId !== null || openingId === form.id} onClick={() => deleteForm(form)} className="inline-flex h-10 shrink-0 items-center justify-center gap-1 rounded-xl border border-red-200 px-3 text-sm font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50" aria-label={`מחיקת הטופס ${form.file_name}`}><Trash2 className="h-4 w-4" />{deletingId === form.id ? "מוחק..." : "מחיקה"}</button> : null}</div>
         </article>;
-      })}</div> : <div className="flex min-h-64 flex-col items-center justify-center px-4 text-center text-slate-500"><FileText className="h-10 w-10" /><p className="mt-3 font-extrabold">{tab === "pending" ? "אין טפסים שממתינים לחתימה" : initialForms.length ? "לא נמצאו טפסים מתאימים" : "המאגר עדיין ריק"}</p><p className="mt-1 text-sm">{tab === "pending" ? "טפסים שטרם הושלמו יופיעו כאן אוטומטית." : "טופס יופיע כאן אוטומטית לאחר שמירתו או הורדתו."}</p></div>}
+      })}</div> : <div className="flex min-h-64 flex-col items-center justify-center px-4 text-center text-slate-500"><FileText className="h-10 w-10" /><p className="mt-3 font-extrabold">{tab === "pending" ? "אין טפסים שממתינים לחתימה" : forms.length ? "לא נמצאו טפסים מתאימים" : "המאגר עדיין ריק"}</p><p className="mt-1 text-sm">{tab === "pending" ? "טפסים שטרם הושלמו יופיעו כאן אוטומטית." : "טופס יופיע כאן אוטומטית לאחר שמירתו או הורדתו."}</p></div>}
     </section>
-    <p className="text-sm font-semibold text-slate-500">מוצגים {visibleForms.length} מתוך {tab === "pending" ? pendingCount : initialForms.length} טפסים</p>
+    <p className="text-sm font-semibold text-slate-500">מוצגים {visibleForms.length} מתוך {tab === "pending" ? pendingCount : forms.length} טפסים</p>
   </div>;
 }

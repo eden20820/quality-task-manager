@@ -4,7 +4,7 @@ import { sendAdhesionLeakTestAlerts } from "@/lib/email/adhesion-leak-test";
 import { archiveQualityFormExport } from "@/lib/quality-forms/form-archive-server";
 import { isAdhesionLeakTestPayload } from "@/lib/quality-forms/adhesion-leak-test";
 import { buildAdhesionLeakTestPdf } from "@/lib/quality-forms/adhesion-leak-test-pdf";
-import { ADHESION_LEAK_TEST_FORM_TITLE, ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
+import { ADHESION_LEAK_TEST_FORM_TITLE, isAdhesionFormDescription, ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -38,6 +38,13 @@ export async function POST(request: Request) {
     const payload: unknown = wrapper ? wrapper.payload : body;
     const archiveId = typeof wrapper?.archiveId === "string" ? wrapper.archiveId : null;
     if (!isAdhesionLeakTestPayload(payload)) return NextResponse.json({ error: "נתוני הטופס אינם תקינים" }, { status: 400 });
+    // Reopening an archived form completes an existing workflow: never resend
+    // its initial notification. Verify the source through the user's RLS first.
+    if (archiveId) {
+      const { data: source, error } = await supabase.from("quality_documents")
+        .select("id, description").eq("id", archiveId).eq("category", ONLINE_FORM_CATEGORY).maybeSingle();
+      if (error || !source || !isAdhesionFormDescription(source.description)) return NextResponse.json({ error: "הטופס המקורי אינו זמין לעריכה" }, { status: 404 });
+    }
     const formStatus = payload.checkedBySignature && payload.approvedBySignature ? "signed" : "pending-signature";
     const buffer = await buildAdhesionLeakTestPdf(payload);
     const archived = await archiveQualityFormExport({
@@ -51,6 +58,7 @@ export async function POST(request: Request) {
       formStatus,
     });
     if (archiveId) await removePreviousArchive(archiveId);
+    if (archiveId) return NextResponse.json({ saved: true, fileName: archived.fileName, emailStatus: "skipped", formStatus });
     const emails = await sendAdhesionLeakTestAlerts(payload);
     const sent = emails.filter((email) => email.status === "sent").length;
     const emailStatus = sent === emails.length ? "sent" : sent > 0 ? "partial" : "failed";
