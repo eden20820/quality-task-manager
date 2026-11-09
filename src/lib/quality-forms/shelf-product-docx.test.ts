@@ -36,6 +36,7 @@ describe("shelf product inspection DOCX", () => {
     const zip = await JSZip.loadAsync(buffer);
     const xml = await zip.file("word/document.xml")?.async("string");
     const footerXml = await zip.file("word/footer1.xml")?.async("string");
+    const plainText = xml?.replace(/<[^>]*>/g, "");
     expect(xml).toContain("TEST-100");
     expect(xml).toContain("מוצר בדיקה");
     expect(xml).toContain("15.01.2026");
@@ -47,10 +48,10 @@ describe("shelf product inspection DOCX", () => {
     expect(xml).toContain("Sergey Dror");
     expect(xml).not.toContain("שם הספק:");
     expect(xml).not.toContain("אישור לשימוש:");
-    expect(xml).toContain("תפקיד: QC");
+    expect(plainText).toContain("תפקיד: QC");
     expect(xml).toContain("תפקיד: משנה למנכ״ל");
-    expect(xml).toContain("שם: Sergey Dror");
-    expect(xml).toContain("שם: Uzi Barzilay");
+    expect(plainText).toContain("שם: Sergey Dror");
+    expect(plainText).toContain("שם: Uzi Barzilay");
     expect(xml).not.toMatch(/\{\{[A-Z0-9_]+\}\}/);
     if (process.env.SHELF_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_DOCX_SAMPLE_PATH, buffer);
   });
@@ -58,6 +59,18 @@ describe("shelf product inspection DOCX", () => {
   it("loads an exported document back into an editable form", async () => {
     const restored = await parseShelfProductInspectionDocx(await buildShelfProductInspectionDocx(sample));
     expect(restored).toEqual(sample);
+  });
+
+  it("separates Hebrew and Latin direction without changing editable values", async () => {
+    const productName = "BAR תוספת מגלים מאוורר 300";
+    const source = { ...sample, products: [{ ...sample.products[0], productName }], productName, notes: "", inspectorName: "Eden Aharon" as const, usageApproval: "conditional" as const };
+    const buffer = await buildShelfProductInspectionDocx(source);
+    const xml = await (await JSZip.loadAsync(buffer)).file("word/document.xml")!.async("string");
+    expect(xml).toContain('<w:rtl/>');
+    expect(xml).toContain('<w:rtl w:val="false"/>');
+    expect(xml).toMatch(/<w:jc w:val="center"\/>[^]*?<w:t[^>]*>N\/A<\/w:t>/);
+    expect(await parseShelfProductInspectionDocx(buffer)).toEqual(source);
+    if (process.env.SHELF_BIDI_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_BIDI_DOCX_SAMPLE_PATH, buffer);
   });
 
   it("keeps multiple numbered products when a document is reopened", async () => {

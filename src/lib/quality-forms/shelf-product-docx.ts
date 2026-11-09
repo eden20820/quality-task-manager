@@ -12,7 +12,24 @@ type Align = (typeof AlignmentType)[keyof typeof AlignmentType];
 
 function display(value: string) { return value.trim() || "N/A"; }
 function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : "N/A"; }
-function paragraph(text: string, options: { bold?: boolean; size?: number; align?: Align } = {}) { return new Paragraph({ bidirectional: true, alignment: options.align ?? AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new TextRun({ text, bold: options.bold, size: options.size ?? 18, font: "Arial" })] }); }
+// Word needs direction on each run as well as on the paragraph. Keeping Latin
+// names/part numbers out of RTL runs prevents mirrored punctuation and words.
+function paragraph(text: string, options: { bold?: boolean; size?: number; align?: Align } = {}) {
+  const rtl = /[\u0590-\u05ff]/.test(text);
+  const segments = text.split(/([A-Za-z0-9]+(?:[ .,/+%°_-]*[A-Za-z0-9]+)*)/g).filter(Boolean);
+  return new Paragraph({
+    bidirectional: rtl,
+    alignment: options.align ?? AlignmentType.CENTER,
+    spacing: { before: 0, after: 0 },
+    children: segments.map((segment) => new TextRun({
+      text: segment,
+      rightToLeft: rtl && !/[A-Za-z0-9]/.test(segment),
+      bold: options.bold,
+      size: options.size ?? 18,
+      font: "Arial",
+    })),
+  });
+}
 function cell(text: string, width: number, options: { bold?: boolean; shade?: boolean; align?: Align } = {}) { return new TableCell({ width: { size: width, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, shading: options.shade ? { type: ShadingType.CLEAR, fill: "F2F2F2" } : undefined, margins: { top: 30, bottom: 30, left: 70, right: 70 }, children: [paragraph(text, { bold: options.bold, align: options.align })] }); }
 
 function productsTable(payload: ShelfProductInspectionPayload) {
@@ -65,7 +82,7 @@ function approvalChoicesCell(payload: ShelfProductInspectionPayload) {
 }
 
 function approvalTable(payload: ShelfProductInspectionPayload) {
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [approvalChoicesCell(payload), cell("אישור לשימוש", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] }), new TableRow({ children: [cell(display(payload.notes), 80, { align: AlignmentType.RIGHT }), cell("הערות", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [new TableRow({ children: [approvalChoicesCell(payload), cell("אישור לשימוש", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] }), new TableRow({ children: [cell(display(payload.notes), 80, { align: payload.notes.trim() ? AlignmentType.RIGHT : AlignmentType.CENTER }), cell("הערות", 20, { bold: true, shade: true, align: AlignmentType.RIGHT })] })] });
 }
 
 function signatureImage(base64: string) { return new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(base64, "base64"), type: "png", transformation: { width: 54, height: 28 } })] }); }
