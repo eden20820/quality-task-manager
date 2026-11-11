@@ -58,7 +58,7 @@ export function emptyDevelopmentProduct(): DevelopmentInspectionProduct {
   return { catalogNumber: "", itemDescription: "", drawingNumber: "", revision: "", receivedQuantity: "", inspectedQuantity: "" };
 }
 
-const emptyDrawingRow = (): DevelopmentInspectionRow => ({ characteristic: "", requirement: "", inspectionMethod: "", actualResult: "", conformity: "" });
+export const emptyDrawingRow = (): DevelopmentInspectionRow => ({ characteristic: "", requirement: "", inspectionMethod: "", actualResult: "", conformity: "" });
 
 export function createEmptyDevelopmentInspection(today: string): DevelopmentInspectionPayload {
   return {
@@ -83,7 +83,7 @@ export function isDevelopmentInspectionPayload(value: unknown): value is Develop
     && booleanRecord(payload.documents, ["coc", "inspectionReport", "none"])
     && booleanRecord(payload.visualChecks, ["packageIntegrity", "marking", "validity"])
     && booleanRecord(payload.deviationActions, ["developmentUse", "rework", "returnToSupplier", "nonconformityOpened"])
-    && Array.isArray(payload.drawingRows) && payload.drawingRows.length === 3
+    && Array.isArray(payload.drawingRows) && payload.drawingRows.length <= 100
     && payload.drawingRows.every((row) => row && typeof row === "object" && ["characteristic", "requirement", "inspectionMethod", "actualResult"].every((key) => typeof (row as Record<string, unknown>)[key] === "string") && ["", "pass", "fail"].includes(String((row as Record<string, unknown>).conformity)))
     && ["", "conforms", "gap"].includes(String(payload.generalConformity))
     && ["", "yes", "no"].includes(String(payload.nonconformityFound))
