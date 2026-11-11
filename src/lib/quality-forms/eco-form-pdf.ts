@@ -1,4 +1,6 @@
-import { PDFDict, PDFDocument, PDFHexString, PDFName } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFRawStream } from "pdf-lib";
+import { inflateSync } from "node:zlib";
+import { ECO_MAX_ATTACHMENT_BYTES, type EcoAttachment } from "./eco-files";
 import { DavidFormPdf, type FormCell } from "./david-form-pdf";
 import { ECO_ACTIONS, ECO_CATEGORIES, isEcoFormPayload, type EcoFormPayload, type EcoSignature } from "./eco-form";
 const payloadKey = PDFName.of("EcoFormPayload");
@@ -6,7 +8,7 @@ const date = (value: string) => { const [y, m, d] = value.split("-"); return y &
 const mark = (checked: boolean) => checked ? "[X]" : "[ ]";
 const label = (text: string): FormCell => ({ text, bold: true, shade: true, align: "right" });
 export async function buildEcoFormPdf(payload: EcoFormPayload) {
-  const form = await DavidFormPdf.create("טופס בקשה לשינוי / Change Control", "8.5.6.1.0", { cellPadding: 7 });
+  const form = await DavidFormPdf.create("טופס בקשה לשינוי / Change Control", "8.5.6.1.0", { cellPadding: 7, titleSize: 20 });
   const paragraph = async (title: string, value: string, minHeight: number) => {
     form.gap(12); form.ensureSpace(29 + Math.min(minHeight, 150));
     await form.table([[{ text: title, bold: true, shade: true }]], [1]);
@@ -45,17 +47,20 @@ export async function buildEcoFormPdf(payload: EcoFormPayload) {
   form.startPage();
   await form.table([[{ text: "פעולות נלוות", bold: true, shade: true }], ["(בשינוי גרפיקה יש להתייחס לכל רמות האריזה)"]], [1]);
   const requirement = (value: string, completed: string) => `${mark(value === "required")} נדרש, בוצע בתאריך: ${date(completed)}    ${mark(value === "not-required")} לא נדרש`;
-  await form.table([[{ text: `${requirement(payload.risk.requirement, payload.risk.date)}\nסקר סיכונים\n${payload.risk.survey}`, align: "right", minHeight: 70 }, label("ביצוע ניהול סיכונים")], [
+  await form.table([[{ text: `${requirement(payload.risk.requirement, payload.risk.date)}\nסקר סיכונים\n${payload.risk.survey}`, align: "right", minHeight: 70, attachments: payload.risk.attachments }, label("ביצוע ניהול סיכונים")], [
     { text: `${mark(payload.inventory === "none")} אין   ${mark(payload.inventory === "use")} שימוש במלאי   ${mark(payload.inventory === "reject")} פסול   ${mark(payload.inventory === "other")} אחר (פרט): ${payload.inventoryOther}`, align: "right" }, label("מלאי נוכחי")], [
     { text: `${mark(payload.openOrders === "none")} אין   ${mark(payload.openOrders === "accept")} קבלה   ${mark(payload.openOrders === "cancel")} ביטול   ${mark(payload.openOrders === "other")} אחר (פרט): ${payload.openOrdersOther}`, align: "right" }, label("הזמנות פתוחות")],
-    ...payload.actions.map((action, index): FormCell[] => [{ text: requirement(action.requirement, action.date), align: "right" }, label(ECO_ACTIONS[index])]),
+    ...payload.actions.map((action, index): FormCell[] => [{ text: requirement(action.requirement, action.date), align: "right", attachments: action.attachments }, label(ECO_ACTIONS[index])]),
     [{ text: payload.additionalTasks, align: "right", minHeight: 60 }, label("הערות + משימות נוספות לביצוע")],
   ], [76, 24]);
   form.ensureSpace(175);
   await form.section("סגירת הטופס ע״י מנהל איכות");
   await form.table([[{ text: `${mark(payload.closure.decision === "approved")} מאושר    ${mark(payload.closure.decision === "rejected")} נדחה. הסבר: ${payload.closure.reason}`, align: "right" }]], [1]);
   await signature("אישור מנהל איכות", payload.closure);
-  form.pdf.context.lookup(form.pdf.context.trailerInfo.Info, PDFDict).set(payloadKey, PDFHexString.fromText(JSON.stringify(payload)));
+  // File bytes already exist as PDF embedded streams: don't duplicate them in metadata.
+  const refsOnly = (files?: EcoAttachment[]) => files?.map(file => ({ ...file, data: "" }));
+  const metadata = { ...payload, risk: { ...payload.risk, attachments: refsOnly(payload.risk.attachments) }, actions: payload.actions.map(action => ({ ...action, attachments: refsOnly(action.attachments) })) };
+  form.pdf.context.lookup(form.pdf.context.trailerInfo.Info, PDFDict).set(payloadKey, PDFHexString.fromText(JSON.stringify(metadata)));
   return form.finish();
 }
 export async function extractEcoFormPayload(bytes: Uint8Array) {
@@ -64,6 +69,26 @@ export async function extractEcoFormPayload(bytes: Uint8Array) {
   const encoded = ref ? pdf.context.lookup(ref, PDFDict).get(payloadKey) : null;
   if (!(encoded instanceof PDFHexString)) throw new Error("אפשר לפתוח לעריכה רק טופס ECO שהופק במערכת");
   const payload: unknown = JSON.parse(encoded.decodeText());
+  if (payload && typeof payload === "object") {
+    const draft = payload as EcoFormPayload;
+    const expected = [...(Array.isArray(draft.actions) ? draft.actions : []), draft.risk].flatMap(action => Array.isArray(action?.attachments) ? action.attachments : []);
+    if (expected.length > 60) throw new Error("מספר הקבצים בטופס אינו תקין");
+    const names = pdf.catalog.lookupMaybe(PDFName.of("Names"), PDFDict)?.lookupMaybe(PDFName.of("EmbeddedFiles"), PDFDict)?.lookupMaybe(PDFName.of("Names"), PDFArray);
+    let total = 0;
+    for (let i = 1; names && i < names.size(); i += 2) {
+      const spec = pdf.context.lookup(names.get(i), PDFDict), id = spec.get(PDFName.of("EcoAttachmentId"));
+      if (!(id instanceof PDFHexString)) continue;
+      const file = expected.find(file => file && file.id === id.decodeText() && file.data === "");
+      if (!file) continue;
+      const stream = spec.lookup(PDFName.of("EF"), PDFDict).lookup(PDFName.of("F"));
+      if (!(stream instanceof PDFRawStream)) throw new Error("קובץ מצורף אינו תקין");
+      const filter = stream.dict.get(PDFName.of("Filter"));
+      if (filter?.toString() !== "/FlateDecode") throw new Error("קובץ מצורף אינו תקין");
+      const decoded = inflateSync(stream.getContents(), { maxOutputLength: ECO_MAX_ATTACHMENT_BYTES });
+      total += decoded.byteLength; if (total > 2_500_000) throw new Error("הקבצים המצורפים גדולים מדי");
+      file.data = decoded.toString("base64");
+    }
+  }
   if (!isEcoFormPayload(payload)) throw new Error("נתוני טופס ECO אינם תקינים");
   return payload;
 }

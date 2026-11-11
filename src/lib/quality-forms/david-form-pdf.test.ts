@@ -7,6 +7,11 @@ import { createEmptyAdhesionLeakTest } from "./adhesion-leak-test";
 import { directionalTextLayout } from "./david-form-pdf";
 
 describe("David 12 export typography", () => {
+  it("places Hebrew list markers on the right, including mixed English and wrapped list items", () => {
+    for (const text of ["1. תיאור השינוי", "12) TEST-001 עדכון שרטוט", "2. בדיקה (ABC) לאחר שינוי"]) expect(directionalTextLayout(text).baseDirection).toBe("rtl");
+    expect(directionalTextLayout("1. English description").baseDirection).toBe("ltr");
+    expect(directionalTextLayout("12.50").baseDirection).toBe("ltr");
+  });
   it("keeps paired parentheses in the same direction around mixed Hebrew and numbers", () => {
     const layout = directionalTextLayout("תיקון (מהדורה 01).");
     expect(layout.runs.find(run => run.text.includes("("))?.direction).toBe("rtl");
