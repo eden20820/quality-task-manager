@@ -1,7 +1,7 @@
 import { RirForm } from "@/components/quality-forms/rir-form";
 import { buildFormAutocompleteSuggestions } from "@/lib/quality-forms/form-suggestions";
 import { ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 import { loadSupplierBinderDirectory } from "@/lib/quality-forms/supplier-binder-directory";
 import { loadPartsCatalog } from "@/lib/quality-forms/parts-catalog-server";
 

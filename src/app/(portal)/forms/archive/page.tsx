@@ -1,7 +1,7 @@
 import { FormsNavigation } from "@/components/quality-forms/forms-navigation";
 import { QualityFormArchive, type QualityFormArchiveRow } from "@/components/quality-forms/quality-form-archive";
 import { ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 export default async function QualityFormArchivePage() {
   const supabase = await createClient();

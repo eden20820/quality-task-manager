@@ -11,13 +11,11 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        try {
-          await provisionAuthorizedPortalUser(data.user);
-        } catch (provisionError) {
-          console.error("Authorized portal user provisioning failed", provisionError);
-        }
+      try {
+        await provisionAuthorizedPortalUser(supabase);
+      } catch (provisionError) {
+        console.error("Authorized portal user provisioning failed", provisionError);
+        return NextResponse.redirect(`${origin}/login?error=access-setup`);
       }
       return NextResponse.redirect(`${origin}/`);
     }

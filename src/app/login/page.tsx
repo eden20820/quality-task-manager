@@ -1,12 +1,19 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("error");
+    const messages: Record<string, string> = { "access-setup": "לא ניתן להשלים את שיוך החשבון לארגון. פנה לאחראי המערכת לבדיקת הגדרת הגישה האוטומטית.", "not-authorized": "לחשבון זה אין גישה פעילה למערכת.", auth: "ההתחברות לא הושלמה. נסה שוב." };
+    if (!code || !messages[code]) return;
+    const timer = setTimeout(() => setErrorMessage(messages[code]), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   async function signInWithGoogle() {
     setIsLoading(true);
@@ -64,7 +71,7 @@ export default function LoginPage() {
         )}
 
         <p className="mt-6 text-center text-sm text-slate-500">
-          הכניסה מותרת לחשבונות החברה בלבד
+          חשבון חברה מאומת בסיומת @caeli.pro מקבל גישה אוטומטית למידע המשותף
         </p>
       </section>
     </main>

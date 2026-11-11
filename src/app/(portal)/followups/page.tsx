@@ -4,7 +4,7 @@ import { pageRange, parsePage } from "@/lib/pagination";
 import { unpackLegacyEcoNotes, unpackLegacyOpenerNotes } from "@/lib/eco-import";
 import { unpackNonconformityNotes } from "@/lib/nonconformity-import";
 import { unpackPkaNotes } from "@/lib/pka-import";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 type Category = "pka" | "nonconformity" | "eco";
 type StatusFilter = "all" | "active" | "open" | "waiting" | "closed";

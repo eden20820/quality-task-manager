@@ -1,5 +1,5 @@
 import { SupplierBindersManager } from "@/components/suppliers/supplier-binders-manager";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 import { supplierBinders, type SupplierBinder, type SupplierBinderRecord } from "@/lib/supplier-binders";
 
 function todayInIsrael() {

@@ -6,7 +6,7 @@ import {
 import { UploadDialog } from "@/components/expiry/upload-dialog";
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 function daysBetween(date: Date) {
   const today = new Date();
