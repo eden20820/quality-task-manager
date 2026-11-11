@@ -11,6 +11,7 @@ const black = rgb(0, 0, 0);
 const gray = rgb(0.94, 0.94, 0.94);
 const pageHeight = 841.89;
 const payloadKey = PDFName.of("DevelopmentInspectionPayload");
+type FormFonts = { regular: PDFFont; bold: PDFFont };
 
 function display(value: string) { return value.trim(); }
 function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : ""; }
@@ -22,7 +23,8 @@ export function developmentPdfTextLayout(value: string) {
 }
 function fitSize(font: PDFFont, text: string, width: number, preferred = 7.4, minimum = 5.2) { let size = preferred; while (size > minimum && font.widthOfTextAtSize(text, size) > width) size -= 0.2; return size; }
 
-function drawText(page: PDFPage, font: PDFFont, value: string, options: { x: number; top: number; width: number; height?: number; size?: number; align?: "left" | "center" | "right"; bold?: boolean; empty?: "na" | "blank" }) {
+function drawText(page: PDFPage, fonts: FormFonts, value: string, options: { x: number; top: number; width: number; height?: number; size?: number; align?: "left" | "center" | "right"; bold?: boolean; empty?: "na" | "blank" }) {
+  const font = options.bold ? fonts.bold : fonts.regular;
   const text = options.empty === "blank" ? value.trim() : display(value);
   if (!text) return;
   const size = fitSize(font, text, options.width - 5, options.size ?? 7.4);
@@ -41,14 +43,14 @@ function drawText(page: PDFPage, font: PDFFont, value: string, options: { x: num
       cursor += layout.baseDirection === "rtl" ? -runWidth : runWidth;
     }
   };
-  paint(0); if (options.bold) paint(0.2);
+  paint(0);
 }
 
 function rect(page: PDFPage, x: number, top: number, width: number, height: number, fill = false, borderWidth = 0.65) { page.drawRectangle({ x, y: pageHeight - top - height, width, height, color: fill ? gray : undefined, borderColor: black, borderWidth }); }
 function line(page: PDFPage, x1: number, x2: number, top: number, thickness = 0.55) { page.drawLine({ start: { x: x1, y: pageHeight - top }, end: { x: x2, y: pageHeight - top }, thickness, color: black }); }
 function checkbox(page: PDFPage, checked: boolean, x: number, top: number, size = 7.5) { rect(page, x, top, size, size, false, 0.65); if (!checked) return; const y = pageHeight - top; page.drawLine({ start: { x: x + 1.4, y: y - 1.4 }, end: { x: x + size - 1.4, y: y - size + 1.4 }, thickness: 0.9, color: black }); page.drawLine({ start: { x: x + 1.4, y: y - size + 1.4 }, end: { x: x + size - 1.4, y: y - 1.4 }, thickness: 0.9, color: black }); }
-function choice(page: PDFPage, font: PDFFont, label: string, checked: boolean, x: number, top: number, width: number, size = 7.2) { checkbox(page, checked, x + width - 8, top + 1, 7); drawText(page, font, label, { x, top, width: width - 11, height: 10, align: "right", size, empty: "blank" }); }
-function sectionTitle(page: PDFPage, font: PDFFont, title: string, top: number, height: number) { rect(page, 391, top, 130, height, true); drawText(page, font, title, { x: 397, top: top + (height - 14) / 2, width: 118, height: 14, align: "right", size: 8.5, bold: true }); }
+function choice(page: PDFPage, font: FormFonts, label: string, checked: boolean, x: number, top: number, width: number, size = 7.2) { checkbox(page, checked, x + width - 8, top + 1, 7); drawText(page, font, label, { x, top, width: width - 11, height: 10, align: "right", size, empty: "blank" }); }
+function sectionTitle(page: PDFPage, font: FormFonts, title: string, top: number, height: number) { rect(page, 391, top, 130, height, true); drawText(page, font, title, { x: 397, top: top + (height - 14) / 2, width: 118, height: 14, align: "right", size: 8.5, bold: true }); }
 
 async function signature(page: PDFPage, pdf: PDFDocument, dataUrl: string, x: number, top: number, width: number, height: number) { const match = dataUrl.match(/^data:image\/png;base64,(.+)$/); if (!match) return; const image = await pdf.embedPng(Buffer.from(match[1], "base64")); const imageHeight = Math.min(height - 3, 11); const imageWidth = Math.min(width - 6, imageHeight * image.width / image.height); page.drawImage(image, { x: x + (width - imageWidth) / 2, y: pageHeight - top - (height + imageHeight) / 2, width: imageWidth, height: imageHeight }); }
 function storePayload(pdf: PDFDocument, payload: DevelopmentInspectionPayload) { const info = pdf.context.lookup(pdf.context.trailerInfo.Info, PDFDict); info.set(payloadKey, PDFHexString.fromText(JSON.stringify(payload))); }
@@ -64,8 +66,15 @@ export async function extractDevelopmentInspectionPayload(bytes: Uint8Array) {
 }
 
 export async function buildDevelopmentInspectionPdf(payload: DevelopmentInspectionPayload) {
-  const [fontBytes, logoBytes] = await Promise.all([readFile(path.join(process.cwd(), "public/fonts/DejaVuSans.ttf")), readFile(path.join(process.cwd(), "public/caeli-logo.png"))]);
-  const pdf = await PDFDocument.create(); pdf.registerFontkit(fontkit); const font = await pdf.embedFont(fontBytes, { subset: true }); const logo = await pdf.embedPng(logoBytes); const page = pdf.addPage([595.28, pageHeight]);
+  const [fontBytes, boldFontBytes, logoBytes] = await Promise.all([
+    readFile(path.join(process.cwd(), "assets/fonts/David.ttf")),
+    readFile(path.join(process.cwd(), "assets/fonts/David-Bold.ttf")),
+    readFile(path.join(process.cwd(), "public/caeli-logo.png")),
+  ]);
+  const pdf = await PDFDocument.create();
+  pdf.registerFontkit(fontkit);
+  const font: FormFonts = { regular: await pdf.embedFont(fontBytes, { subset: true }), bold: await pdf.embedFont(boldFontBytes, { subset: true }) };
+  const logo = await pdf.embedPng(logoBytes); const page = pdf.addPage([595.28, pageHeight]);
   page.drawImage(logo, { x: 28, y: pageHeight - 67, width: 74, height: 52 });
   drawText(page, font, "טופס ביקורת קבלה - מוצרי פיתוח", { x: 170, top: 65, width: 270, height: 21, size: 14.5, bold: true }); line(page, 177, 432, 87, 0.9);
 
