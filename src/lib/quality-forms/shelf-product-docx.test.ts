@@ -36,6 +36,15 @@ describe("shelf product inspection DOCX", () => {
     const zip = await JSZip.loadAsync(buffer);
     const xml = await zip.file("word/document.xml")?.async("string");
     const footerXml = await zip.file("word/footer1.xml")?.async("string");
+    const styles = await zip.file("word/styles.xml")?.async("string");
+    const fontTable = await zip.file("word/fontTable.xml")?.async("string");
+    expect(`${xml}${footerXml}${styles}`).not.toContain("Arial");
+    expect(xml).toContain('w:cs="David"');
+    expect(xml).toContain('w:ascii="David"');
+    expect(styles).toContain('w:cs="David"');
+    expect(fontTable).toContain('w:name="David"');
+    expect(fontTable).toContain("w:embedRegular");
+    expect(fontTable).toContain("w:embedBold");
     const plainText = xml?.replace(/<[^>]*>/g, "");
     expect(xml).toContain("TEST-100");
     expect(xml).toContain("מוצר בדיקה");
