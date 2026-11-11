@@ -116,7 +116,8 @@ export async function buildDevelopmentInspectionPdf(payload: DevelopmentInspecti
   rect(page, 88, 333, 303, 130); sectionTitle(page, font, "בדיקת התאמה לשרטוט / דרישה", 333, 130);
   const tableX = 94, tableTop = 338, widths = [58, 58, 60, 58, 59], headers = ["תקין/לא תקין", "תוצאה בפועל", "אמצעי בדיקה", "דרישה/טולרנס", "מאפיין שנבדק"];
   let x = tableX; headers.forEach((header, index) => { rect(page, x, tableTop, widths[index], 18, true); drawText(page, font, header, { x, top: tableTop, width: widths[index], height: 18, size: 5.8, bold: true }); x += widths[index]; });
-  payload.drawingRows.forEach((row, rowIndex) => { const top = tableTop + 18 + rowIndex * 15; const values = [row.conformity === "pass" ? "תקין" : row.conformity === "fail" ? "לא תקין" : "", row.actualResult, row.inspectionMethod, row.requirement, row.characteristic]; let cellX = tableX; values.forEach((value, index) => { rect(page, cellX, top, widths[index], 15); drawText(page, font, value, { x: cellX + 1, top, width: widths[index] - 2, height: 15, size: 5.9, empty: index === 0 ? "blank" : "na" }); cellX += widths[index]; }); });
+  payload.drawingRows.slice(0, 3).forEach((row, rowIndex) => { const top = tableTop + 18 + rowIndex * 15; const values = [row.conformity === "pass" ? "תקין" : row.conformity === "fail" ? "לא תקין" : "", row.actualResult, row.inspectionMethod, row.requirement, row.characteristic]; let cellX = tableX; values.forEach((value, index) => { rect(page, cellX, top, widths[index], 15); drawText(page, font, value, { x: cellX + 1, top, width: widths[index] - 2, height: 15, size: 5.9, empty: index === 0 ? "blank" : "na" }); cellX += widths[index]; }); });
+  if (payload.drawingRows.length > 3) drawText(page, font, "יתר שורות הבדיקה מופיעות בעמודי ההמשך", { x: 94, top: 448, width: 289, height: 11, size: 7, bold: true });
   drawText(page, font, "בדיקת התאמה כללית", { x: 240, top: 403, width: 140, height: 12, align: "right", size: 7.7, bold: true });
   choice(page, font, "תואם לדרישה ההנדסית", payload.generalConformity === "conforms", 197, 416, 183); choice(page, font, "קיים פער, פרט", payload.generalConformity === "gap", 254, 431, 126); drawText(page, font, payload.gapDetails, { x: 98, top: 431, width: 150, height: 11, size: 6.8 }); line(page, 100, 248, 442, 0.4);
 
@@ -150,6 +151,34 @@ export async function buildDevelopmentInspectionPdf(payload: DevelopmentInspecti
     drawText(continuation, font, `רשימת מוצרים - המשך · ${payload.supplierName} · ${formatDate(payload.date)}`, { x: 88, top: 97, width: 433, height: 18, size: 9, bold: true });
     productTable(continuation, font, products.slice(offset, offset + 32), 125, offset);
     drawText(continuation, font, "הבדיקות, הסטטוס והחתימות בעמוד הראשון חלים על המוצרים ברשימה זו", { x: 88, top: 740, width: 433, height: 18, size: 8 });
+    drawText(continuation, font, "נספח", { x: 148, top: 795, width: 38, height: 12, align: "right", size: 8, bold: true });
+    drawText(continuation, font, "8.4.2.3.2", { x: 88, top: 795, width: 58, height: 12, align: "left", size: 8, bold: true });
+  }
+  for (let offset = 3; offset < payload.drawingRows.length; offset += 26) {
+    const continuation = pdf.addPage([595.28, pageHeight]);
+    continuation.drawImage(logo, { x: 28, y: pageHeight - 67, width: 74, height: 52 });
+    drawText(continuation, font, "בדיקת התאמה לשרטוט / דרישה - המשך", { x: 120, top: 72, width: 401, height: 23, size: 13, bold: true });
+    drawText(continuation, font, payload.supplierName, { x: 200, top: 105, width: 321, height: 17, size: 9 });
+    drawText(continuation, font, formatDate(payload.date), { x: 88, top: 105, width: 100, height: 17, size: 9 });
+    const continuationWidths = [62, 82, 82, 90, 91, 26];
+    const continuationHeaders = ["תקין/לא תקין", "תוצאה בפועל", "אמצעי בדיקה", "דרישה/טולרנס", "מאפיין שנבדק", "#"];
+    let cellX = 88;
+    continuationHeaders.forEach((label, index) => {
+      rect(continuation, cellX, 134, continuationWidths[index], 22, true);
+      drawText(continuation, font, label, { x: cellX, top: 134, width: continuationWidths[index], height: 22, size: 7, bold: true });
+      cellX += continuationWidths[index];
+    });
+    payload.drawingRows.slice(offset, offset + 26).forEach((row, index) => {
+      const top = 156 + index * 22;
+      const values = [row.conformity === "pass" ? "תקין" : row.conformity === "fail" ? "לא תקין" : "", row.actualResult, row.inspectionMethod, row.requirement, row.characteristic, String(offset + index + 1)];
+      let x = 88;
+      values.forEach((value, column) => {
+        rect(continuation, x, top, continuationWidths[column], 22);
+        drawText(continuation, font, value, { x, top, width: continuationWidths[column], height: 22, size: 7 });
+        x += continuationWidths[column];
+      });
+    });
+    drawText(continuation, font, "הסטטוס והחתימות בעמוד הראשון חלים גם על שורות הבדיקה ברשימה זו", { x: 88, top: 745, width: 433, height: 18, size: 8 });
     drawText(continuation, font, "נספח", { x: 148, top: 795, width: 38, height: 12, align: "right", size: 8, bold: true });
     drawText(continuation, font, "8.4.2.3.2", { x: 88, top: 795, width: 58, height: 12, align: "left", size: 8, bold: true });
   }
