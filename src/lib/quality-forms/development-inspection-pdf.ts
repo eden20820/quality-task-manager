@@ -5,7 +5,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDict, PDFDocument, PDFFont, PDFHexString, PDFName, PDFPage, rgb } from "pdf-lib";
 
 import { directionalTextLayout } from "./adhesion-leak-test-pdf";
-import { isDevelopmentInspectionPayload, type DevelopmentInspectionPayload } from "./development-inspection";
+import { getDevelopmentProducts, isDevelopmentInspectionPayload, type DevelopmentInspectionPayload, type DevelopmentInspectionProduct } from "./development-inspection";
 
 const black = rgb(0, 0, 0);
 const gray = rgb(0.94, 0.94, 0.94);
@@ -55,6 +55,27 @@ function sectionTitle(page: PDFPage, font: FormFonts, title: string, top: number
 async function signature(page: PDFPage, pdf: PDFDocument, dataUrl: string, x: number, top: number, width: number, height: number) { const match = dataUrl.match(/^data:image\/png;base64,(.+)$/); if (!match) return; const image = await pdf.embedPng(Buffer.from(match[1], "base64")); const imageHeight = Math.min(height - 3, 11); const imageWidth = Math.min(width - 6, imageHeight * image.width / image.height); page.drawImage(image, { x: x + (width - imageWidth) / 2, y: pageHeight - top - (height + imageHeight) / 2, width: imageWidth, height: imageHeight }); }
 function storePayload(pdf: PDFDocument, payload: DevelopmentInspectionPayload) { const info = pdf.context.lookup(pdf.context.trailerInfo.Info, PDFDict); info.set(payloadKey, PDFHexString.fromText(JSON.stringify(payload))); }
 
+function productTable(page: PDFPage, font: FormFonts, products: DevelopmentInspectionProduct[], top: number, firstIndex = 0) {
+  const widths = [45, 45, 35, 72, 65, 145, 26];
+  const headers = ["נבדקה", "התקבלה", "גרסה", "מספר שרטוט", "מק״ט", "תיאור פריט", "#"];
+  let x = 88;
+  headers.forEach((label, index) => {
+    rect(page, x, top, widths[index], 18, true);
+    drawText(page, font, label, { x, top, width: widths[index], height: 18, size: 7, bold: true });
+    x += widths[index];
+  });
+  products.forEach((product, index) => {
+    const rowTop = top + 18 + index * 18;
+    const values = [product.inspectedQuantity, product.receivedQuantity, product.revision, product.drawingNumber, product.catalogNumber, product.itemDescription, String(firstIndex + index + 1)];
+    let cellX = 88;
+    values.forEach((value, column) => {
+      rect(page, cellX, rowTop, widths[column], 18);
+      drawText(page, font, value, { x: cellX, top: rowTop, width: widths[column], height: 18, size: 7 });
+      cellX += widths[column];
+    });
+  });
+}
+
 export async function extractDevelopmentInspectionPayload(bytes: Uint8Array) {
   const pdf = await PDFDocument.load(bytes); const infoRef = pdf.context.trailerInfo.Info;
   if (!infoRef) throw new Error("הקובץ אינו טופס ביקורת מוצרי פיתוח שנוצר במערכת");
@@ -78,8 +99,14 @@ export async function buildDevelopmentInspectionPdf(payload: DevelopmentInspecti
   page.drawImage(logo, { x: 28, y: pageHeight - 67, width: 74, height: 52 });
   drawText(page, font, "טופס ביקורת קבלה - מוצרי פיתוח", { x: 170, top: 65, width: 270, height: 21, size: 14.5, bold: true }); line(page, 177, 432, 87, 0.9);
 
-  const headerRows: Array<[string, string]> = [["תאריך", formatDate(payload.date)], ["שם הספק", payload.supplierName], ["מק״ט", payload.catalogNumber], ["תיאור פריט", payload.itemDescription], ["מספר שרטוט", payload.drawingNumber], ["גרסה", payload.revision], ["כמות שהתקבלה", payload.receivedQuantity], ["כמות שנבדקה", payload.inspectedQuantity]];
+  const products = getDevelopmentProducts(payload);
+  const firstProduct = products[0];
+  const headerRows: Array<[string, string]> = [["תאריך", formatDate(payload.date)], ["שם הספק", payload.supplierName], ...(products.length === 1 ? [["מק״ט", firstProduct.catalogNumber], ["תיאור פריט", firstProduct.itemDescription], ["מספר שרטוט", firstProduct.drawingNumber], ["גרסה", firstProduct.revision], ["כמות שהתקבלה", firstProduct.receivedQuantity], ["כמות שנבדקה", firstProduct.inspectedQuantity]] as Array<[string, string]> : [])];
   headerRows.forEach(([label, value], index) => { const top = 100 + index * 13; rect(page, 88, top, 307, 13); rect(page, 395, top, 126, 13, true); drawText(page, font, value, { x: 91, top, width: 301, height: 13, size: 7.3 }); drawText(page, font, label, { x: 401, top, width: 114, height: 13, align: "right", size: 8, bold: true }); });
+  if (products.length > 1) {
+    productTable(page, font, products.slice(0, 3), 130);
+    if (products.length > 3) drawText(page, font, "יתר המוצרים מופיעים בעמודי ההמשך; הבדיקות והאישור משותפים לכל המוצרים בטופס", { x: 88, top: 205, width: 433, height: 12, size: 6.5 });
+  }
 
   rect(page, 88, 220, 303, 49); sectionTitle(page, font, "בדיקת מסמכים", 220, 49);
   choice(page, font, "התקבל COC", payload.documents.coc, 210, 224, 170); choice(page, font, "התקבל דו״ח בדיקה", payload.documents.inspectionReport, 210, 238, 170); choice(page, font, "אין מסמכים נלווים", payload.documents.none, 210, 252, 170);
@@ -116,5 +143,18 @@ export async function buildDevelopmentInspectionPdf(payload: DevelopmentInspecti
     await signature(page, pdf, row.image, 88, row.top, 78, 19);
   }
   drawText(page, font, "נספח", { x: 148, top: 795, width: 38, height: 12, align: "right", size: 8, bold: true }); drawText(page, font, "8.4.2.3.2", { x: 88, top: 795, width: 58, height: 12, align: "left", size: 8, bold: true });
+  for (let offset = 3; offset < products.length; offset += 32) {
+    const continuation = pdf.addPage([595.28, pageHeight]);
+    continuation.drawImage(logo, { x: 28, y: pageHeight - 67, width: 74, height: 52 });
+    drawText(continuation, font, "טופס ביקורת קבלה - מוצרי פיתוח", { x: 170, top: 65, width: 270, height: 21, size: 14.5, bold: true });
+    drawText(continuation, font, `רשימת מוצרים - המשך · ${payload.supplierName} · ${formatDate(payload.date)}`, { x: 88, top: 97, width: 433, height: 18, size: 9, bold: true });
+    productTable(continuation, font, products.slice(offset, offset + 32), 125, offset);
+    drawText(continuation, font, "הבדיקות, הסטטוס והחתימות בעמוד הראשון חלים על המוצרים ברשימה זו", { x: 88, top: 740, width: 433, height: 18, size: 8 });
+    drawText(continuation, font, "נספח", { x: 148, top: 795, width: 38, height: 12, align: "right", size: 8, bold: true });
+    drawText(continuation, font, "8.4.2.3.2", { x: 88, top: 795, width: 58, height: 12, align: "left", size: 8, bold: true });
+  }
+  pdf.getPages().forEach((item, index, pages) => {
+    if (pages.length > 1) drawText(item, font, `${index + 1} / ${pages.length}`, { x: 460, top: 795, width: 61, height: 12, size: 8 });
+  });
   pdf.setTitle("טופס ביקורת קבלה - מוצרי פיתוח"); pdf.setSubject("נספח 8.4.2.3.2"); storePayload(pdf, payload); return Buffer.from(await pdf.save());
 }

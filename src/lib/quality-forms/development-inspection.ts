@@ -12,6 +12,7 @@ export type DevelopmentInspectionRow = {
 };
 
 export type DevelopmentInspectionPayload = {
+  products?: DevelopmentInspectionProduct[];
   date: string;
   supplierName: string;
   catalogNumber: string;
@@ -40,6 +41,23 @@ export type DevelopmentInspectionPayload = {
   approvedBySignature: string;
 };
 
+export type DevelopmentInspectionProduct = Pick<DevelopmentInspectionPayload,
+  "catalogNumber" | "itemDescription" | "drawingNumber" | "revision" | "receivedQuantity" | "inspectedQuantity">;
+
+export function getDevelopmentProducts(payload: DevelopmentInspectionPayload): DevelopmentInspectionProduct[] {
+  return payload.products ?? [{ catalogNumber: payload.catalogNumber, itemDescription: payload.itemDescription,
+    drawingNumber: payload.drawingNumber, revision: payload.revision, receivedQuantity: payload.receivedQuantity, inspectedQuantity: payload.inspectedQuantity }];
+}
+
+export function withDevelopmentProducts(payload: DevelopmentInspectionPayload, products: DevelopmentInspectionProduct[]): DevelopmentInspectionPayload {
+  if (!products.length) return payload;
+  return { ...payload, ...products[0], products };
+}
+
+export function emptyDevelopmentProduct(): DevelopmentInspectionProduct {
+  return { catalogNumber: "", itemDescription: "", drawingNumber: "", revision: "", receivedQuantity: "", inspectedQuantity: "" };
+}
+
 const emptyDrawingRow = (): DevelopmentInspectionRow => ({ characteristic: "", requirement: "", inspectionMethod: "", actualResult: "", conformity: "" });
 
 export function createEmptyDevelopmentInspection(today: string): DevelopmentInspectionPayload {
@@ -60,6 +78,8 @@ export function isDevelopmentInspectionPayload(value: unknown): value is Develop
   const strings = ["date", "supplierName", "catalogNumber", "itemDescription", "drawingNumber", "revision", "receivedQuantity", "inspectedQuantity", "visualNotes", "gapDetails", "nonconformityNumber", "designImprovementDetails", "otherStatusDetails", "checkedByName", "checkedByDate", "checkedBySignature", "approvedByName", "approvedByDate", "approvedBySignature"];
   const booleanRecord = (item: unknown, keys: string[]) => Boolean(item && typeof item === "object" && keys.every((key) => typeof (item as Record<string, unknown>)[key] === "boolean"));
   return strings.every((field) => typeof payload[field] === "string")
+    && (payload.products === undefined || (Array.isArray(payload.products) && payload.products.length > 0 && payload.products.length <= 100
+      && payload.products.every((product) => product && typeof product === "object" && ["catalogNumber", "itemDescription", "drawingNumber", "revision", "receivedQuantity", "inspectedQuantity"].every((key) => typeof product[key] === "string"))))
     && booleanRecord(payload.documents, ["coc", "inspectionReport", "none"])
     && booleanRecord(payload.visualChecks, ["packageIntegrity", "marking", "validity"])
     && booleanRecord(payload.deviationActions, ["developmentUse", "rework", "returnToSupplier", "nonconformityOpened"])
