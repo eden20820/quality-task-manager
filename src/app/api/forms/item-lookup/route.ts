@@ -5,6 +5,8 @@ import { catalogNumbersMatch, parseArchivedFormFileName } from "@/lib/quality-fo
 import { parseRirWorkbook } from "@/lib/quality-forms/rir-excel-import";
 import { parseShelfProductInspectionDocx } from "@/lib/quality-forms/shelf-product-docx-import";
 import { createClient } from "@/lib/supabase/server";
+import { loadPartsCatalog } from "@/lib/quality-forms/parts-catalog-server";
+import { matchingCatalogItems, resolveCatalogItem } from "@/lib/quality-forms/parts-catalog";
 
 export const runtime = "nodejs";
 
@@ -34,6 +36,11 @@ export async function GET(request: Request) {
   if (catalogNumber.length < 2 || catalogNumber.length > 120) {
     return NextResponse.json({ error: "יש להזין מק״ט תקין" }, { status: 400 });
   }
+
+  const catalog = await loadPartsCatalog();
+  const known = resolveCatalogItem(catalog, "catalogNumber", catalogNumber);
+  if (known) return NextResponse.json({ partName: known.partName, catalogNumber: known.catalogNumber, revision: known.revision ?? null }, { headers: { "Cache-Control": "private, no-store" } });
+  if (matchingCatalogItems(catalog, "catalogNumber", catalogNumber, true).length) return NextResponse.json({ partName: null, ambiguous: true });
 
   const { data, error } = await supabase
     .from("quality_documents")

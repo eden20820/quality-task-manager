@@ -5,7 +5,7 @@ import { PDFDocument, type PDFFont, type PDFImage, type PDFPage, rgb } from "pdf
 
 export const FORM_FONT_SIZE = 12;
 const height = 841.89, left = 36, width = 523.28, bottom = 778, lineHeight = 15;
-type Cell = { text: string; bold?: boolean; shade?: boolean; image?: string };
+type Cell = { text: string; bold?: boolean; shade?: boolean; image?: string; minHeight?: number; align?: "center" | "right" };
 export type FormCell = string | Cell;
 type Direction = "rtl" | "ltr";
 function tokens(text: string) { return text.split(/(\[X\]|\[ \])/).filter(Boolean); }
@@ -20,17 +20,26 @@ function textWidth(font: PDFFont, value: string) {
 }
 function layoutUnits(font: PDFFont, text: string) {
   return tokens(text).flatMap(token => /^\[(X| )\]$/.test(token)
-    ? [{ text: token, checkbox: true, width: 12 }]
+    ? [{ text: token, checkbox: true, width: 12, leading: false, trailing: false }]
     : directionalTextLayout(token).runs.filter(run => run.text.trim()).map(run => {
       const value = run.text.trim();
-      return { text: run.direction === "rtl" ? value.replace(/[()]/g, character => character === "(" ? ")" : "(") : value, checkbox: false, width: textWidth(font, value) };
+      return { text: run.direction === "rtl" ? value.replace(/[()]/g, character => character === "(" ? ")" : "(") : value, checkbox: false, width: textWidth(font, value), leading: /^\s/.test(run.text), trailing: /\s$/.test(run.text) };
     }));
 }
-function measure(font: PDFFont, text: string) { const units = layoutUnits(font, text); return units.reduce((total, unit) => total + unit.width, 0) + Math.max(0, units.length - 1) * 3.5; }
+function measure(font: PDFFont, text: string) { const units = layoutUnits(font, text); return units.reduce((total, unit, index) => total + unit.width + (index < units.length - 1 && (unit.trailing || units[index + 1].leading) ? 3.5 : 0), 0); }
 export function directionalTextLayout(value: string) {
   const characters = Array.from(value);
   const strong = characters.map((character): Direction | null => /\p{Script=Hebrew}/u.test(character) ? "rtl" : /[A-Za-z0-9]/.test(character) ? "ltr" : null);
   const baseDirection = strong.find((direction): direction is Direction => direction !== null) ?? "ltr";
+  const parentheses: number[] = [];
+  characters.forEach((character, index) => {
+    if (character === "(") parentheses.push(index);
+    else if (character === ")" && parentheses.length) {
+      const opening = parentheses.pop()!;
+      const direction = strong.slice(opening + 1, index).find(value => value !== null) ?? baseDirection;
+      strong[opening] = direction; strong[index] = direction;
+    }
+  });
   const resolved = strong.map((direction, index) => {
     if (direction) return direction;
     for (let previous = index - 1; previous >= 0; previous--) if (strong[previous]) return strong[previous] as Direction;
@@ -58,22 +67,23 @@ export class DavidFormPdf {
     this.page.drawImage(this.logo, { x: left, y: height - 70, width: 74, height: 52 });
     this.paint(this.title, left + 84, 58, width - 84, true);
   }
-  private paint(text: string, x: number, top: number, available: number, bold = false) {
+  private paint(text: string, x: number, top: number, available: number, bold = false, align = "center") {
     if (!text) return;
     const font = bold ? this.bold : this.regular;
     const layout = directionalTextLayout(text.replace(/\[(X| )\]/g, ""));
     const units = layoutUnits(font, text);
     const total = measure(font, text);
-    const start = x + Math.max(0, (available - total) / 2);
+    const start = x + Math.max(0, align === "right" ? available - total : (available - total) / 2);
     let cursor = layout.baseDirection === "rtl" ? start + total : start;
-    for (const unit of units) {
+    for (const [index, unit] of units.entries()) {
         const unitX = layout.baseDirection === "rtl" ? cursor - unit.width : cursor;
         if (unit.checkbox) {
           const y = height - top - 12;
           this.page.drawRectangle({ x: unitX + 1, y, width: 10, height: 10, borderColor: rgb(0, 0, 0), borderWidth: 0.7 });
           if (unit.text === "[X]") for (const reverse of [false, true]) this.page.drawLine({ start: { x: unitX + 3, y: y + (reverse ? 2 : 8) }, end: { x: unitX + 9, y: y + (reverse ? 8 : 2) }, thickness: 0.8 });
         } else this.page.drawText(unit.text, { x: unitX, y: height - top - FORM_FONT_SIZE, font, size: FORM_FONT_SIZE, color: rgb(0, 0, 0) });
-      cursor += (layout.baseDirection === "rtl" ? -1 : 1) * (unit.width + 3.5);
+      const gap = index < units.length - 1 && (unit.trailing || units[index + 1].leading) ? 3.5 : 0;
+      cursor += (layout.baseDirection === "rtl" ? -1 : 1) * (unit.width + gap);
     }
   }
   private wrap(text: string, available: number, bold = false): string[] {
@@ -102,19 +112,20 @@ export class DavidFormPdf {
       for (let offset = 0; offset < lineCount;) {
         const remaining = lineCount - offset;
         let count = Math.min(remaining, 40);
-        const required = Math.max(cells.some(cell => cell.image) ? 38 : 25, count * lineHeight + 10);
+        const minimumHeight = offset === 0 ? Math.min(630, Math.max(0, ...cells.map(cell => cell.minHeight ?? 0))) : 0;
+        const required = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + 10);
         if (this.top + required > bottom) {
           this.newPage();
           if (!header && headers) await render(headers, true);
           count = Math.min(remaining, Math.floor((bottom - this.top - 10) / lineHeight));
         }
-        const rowHeight = Math.max(cells.some(cell => cell.image) ? 38 : 25, count * lineHeight + 10);
+        const rowHeight = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + 10);
         let x = left;
         for (let index = 0; index < cells.length; index++) {
           const cell = cells[index];
           this.page.drawRectangle({ x, y: height - this.top - rowHeight, width: widths[index], height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.6, color: header || cell.shade ? rgb(0.94, 0.94, 0.94) : undefined });
           const lines = wrapped[index].slice(offset, offset + count);
-          lines.forEach((line, lineIndex) => this.paint(line, x + 6, this.top + 5 + lineIndex * lineHeight, widths[index] - 12, cell.bold || header));
+          lines.forEach((line, lineIndex) => this.paint(line, x + 6, this.top + 5 + lineIndex * lineHeight, widths[index] - 12, cell.bold || header, cell.align));
           if (cell.image && offset === 0) {
             const match = cell.image.match(/^data:image\/png;base64,(.+)$/);
             if (match) { const image = await this.pdf.embedPng(Buffer.from(match[1], "base64")); const imageHeight = 18, imageWidth = Math.min(widths[index] - 12, imageHeight * image.width / image.height); this.page.drawImage(image, { x: x + (widths[index] - imageWidth) / 2, y: height - this.top - (rowHeight + imageHeight) / 2, width: imageWidth, height: imageHeight }); }
@@ -128,6 +139,7 @@ export class DavidFormPdf {
     for (const row of rows) await render(row);
   }
   async section(title: string) { this.top += 10; if (this.top + 70 > bottom) this.newPage(); await this.table([[{ text: title, bold: true, shade: true }]], [1]); }
+  startPage() { this.newPage(); }
   async finish() {
     const pages = this.pdf.getPages();
     pages.forEach((page, index) => {

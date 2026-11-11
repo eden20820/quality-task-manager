@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Private company data and generated QA files must never enter the public repo.
+/tmp/
+/private/
+*.private.sql
+/src/lib/quality-forms/data/caeli-parts.json

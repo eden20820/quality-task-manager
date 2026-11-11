@@ -1,2 +1,3 @@
 import { DevelopmentInspectionForm } from "@/components/quality-forms/development-inspection-form";
-export default function DevelopmentInspectionPage() { return <DevelopmentInspectionForm />; }
+import { loadPartsCatalog } from "@/lib/quality-forms/parts-catalog-server";
+export default async function DevelopmentInspectionPage() { return <DevelopmentInspectionForm catalogItems={await loadPartsCatalog()} />; }

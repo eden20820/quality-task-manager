@@ -1,4 +1,8 @@
 export const ONLINE_FORM_CATEGORY = "טופס מקוון";
+export const ECO_ARCHIVE_EDIT_STORAGE_KEY = "quality-eco-archive-edit";
+export const ECO_ARCHIVE_RECORD_STORAGE_KEY = "quality-eco-archive-record";
+export const ECO_FORM_TITLE = "טופס ECO";
+export function isEcoFormDescription(description: string | null) { return parseArchivedFormDescription(description).title === ECO_FORM_TITLE; }
 export const RIR_ARCHIVE_EDIT_STORAGE_KEY = "quality-rir-archive-edit";
 export const SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY = "quality-shelf-inspection-archive-edit";
 export const ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY = "quality-adhesion-leak-test-archive-edit";

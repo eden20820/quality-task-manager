@@ -1,6 +1,7 @@
+import { resolveCatalogItem, type CatalogItem } from "./parts-catalog";
 export type FormAutocompleteSuggestions = {
   catalogNumbers: string[];
-  catalogItems: Array<{ catalogNumber: string; partName: string }>;
+  catalogItems: CatalogItem[];
   supplierNames: string[];
   partNames: string[];
   orderNumbers: string[];
@@ -28,7 +29,7 @@ export function catalogNumbersMatch(left: string, right: string) {
 
 export function findKnownPartName(catalogNumber: string, catalogItems: FormAutocompleteSuggestions["catalogItems"]) {
   if (!suggestionKey(clean(catalogNumber))) return "";
-  return catalogItems.find((item) => catalogNumbersMatch(item.catalogNumber, catalogNumber))?.partName ?? "";
+  return resolveCatalogItem(catalogItems, "catalogNumber", catalogNumber)?.partName ?? "";
 }
 
 function uniqueSuggestions(values: unknown[]) {
@@ -70,6 +71,7 @@ export function buildFormAutocompleteSuggestions(input: {
   suppliers: SupplierSource[];
   archivedForms: ArchivedFormSource[];
   followups: FollowupSource[];
+  catalogItems?: CatalogItem[];
 }): FormAutocompleteSuggestions {
   const archived = input.archivedForms.flatMap((form) => {
     const parsed = parseArchivedFormFileName(form.file_name ?? "");
@@ -84,7 +86,7 @@ export function buildFormAutocompleteSuggestions(input: {
     if (items.some((entry) => suggestionKey(entry.catalogNumber) === suggestionKey(item.partNumber))) return items;
     items.push({ catalogNumber: item.partNumber, partName: item.productName });
     return items;
-  }, []);
+  }, [...(input.catalogItems ?? [])]);
 
   return {
     supplierNames: uniqueSuggestions([
@@ -92,12 +94,13 @@ export function buildFormAutocompleteSuggestions(input: {
       ...archived.map((form) => form.supplierName),
     ]),
     catalogNumbers: uniqueSuggestions([
+      ...(input.catalogItems ?? []).map(item => item.catalogNumber),
       ...archived.map((form) => form.catalogNumber),
       ...pka.map((item) => item.partNumber),
     ]),
     catalogItems,
-    partNames: uniqueSuggestions(pka.map((item) => item.productName || item.fallbackName)),
+    partNames: uniqueSuggestions([...catalogItems.map(item => item.partName), ...pka.map((item) => item.productName || item.fallbackName)]),
     orderNumbers: uniqueSuggestions(pka.map((item) => item.customerOrder)),
-    revisions: uniqueSuggestions(pka.map((item) => item.revision)),
+    revisions: uniqueSuggestions([...catalogItems.map(item => item.revision), ...pka.map((item) => item.revision)]),
   };
 }

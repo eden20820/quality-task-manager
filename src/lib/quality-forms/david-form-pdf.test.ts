@@ -4,8 +4,15 @@ import { buildDevelopmentInspectionPdf, extractDevelopmentInspectionPayload } fr
 import { buildAdhesionLeakTestPdf } from "./adhesion-leak-test-pdf";
 import { createEmptyDevelopmentInspection } from "./development-inspection";
 import { createEmptyAdhesionLeakTest } from "./adhesion-leak-test";
+import { directionalTextLayout } from "./david-form-pdf";
 
 describe("David 12 export typography", () => {
+  it("keeps paired parentheses in the same direction around mixed Hebrew and numbers", () => {
+    const layout = directionalTextLayout("תיקון (מהדורה 01).");
+    expect(layout.runs.find(run => run.text.includes("("))?.direction).toBe("rtl");
+    expect(layout.runs.find(run => run.text.includes(")"))?.direction).toBe("rtl");
+    expect(layout.runs.find(run => run.text.includes("01"))?.direction).toBe("ltr");
+  });
   it.each(["development", "adhesion"])("uses embedded David and exactly 12pt for every %s PDF text operation", async (kind) => {
     const bytes = kind === "development" ? await buildDevelopmentInspectionPdf(createEmptyDevelopmentInspection("2026-11-11")) : await buildAdhesionLeakTestPdf(createEmptyAdhesionLeakTest("2026-11-11"));
     const pdf = await PDFDocument.load(bytes);
