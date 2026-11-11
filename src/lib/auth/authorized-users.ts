@@ -1,47 +1,28 @@
 import "server-only";
-
-import { createClient, type User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const CAELI_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
-const AUTHORIZED_USERS = new Map([
-  ["gal.pesso@caeli.pro", { role: "member" }],
-]);
-
 export function isAuthorizedPortalEmail(value: unknown): value is string {
-  return typeof value === "string" && AUTHORIZED_USERS.has(value.trim().toLowerCase());
+  if (typeof value !== "string") return false;
+  const parts = value.trim().toLowerCase().split("@");
+  return parts.length === 2 && Boolean(parts[0]) && !/\s/.test(parts[0]) && parts[1] === "caeli.pro";
 }
 
-export async function provisionAuthorizedPortalUser(user: Pick<User, "id" | "email" | "user_metadata">) {
-  const email = user.email?.trim().toLowerCase();
-  const authorization = email ? AUTHORIZED_USERS.get(email) : undefined;
-  if (!email || !authorization) return;
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) throw new Error("Supabase admin configuration is missing");
-
-  const admin = createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-  const fullName = typeof user.user_metadata?.full_name === "string"
-    ? user.user_metadata.full_name.trim()
-    : typeof user.user_metadata?.name === "string"
-      ? user.user_metadata.name.trim()
-      : email;
-
-  const { error: profileError } = await admin.from("profiles").upsert({
-    id: user.id,
-    email,
-    full_name: fullName || email,
-    is_active: true,
-    active_organization_id: CAELI_ORGANIZATION_ID,
-  }, { onConflict: "id" });
-  if (profileError) throw new Error(`Authorized profile provisioning failed: ${profileError.message}`);
-
-  const { error: membershipError } = await admin.from("organization_members").upsert({
-    organization_id: CAELI_ORGANIZATION_ID,
-    user_id: user.id,
-    role: authorization.role,
-    is_active: true,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "organization_id,user_id" });
-  if (membershipError) throw new Error(`Authorized membership provisioning failed: ${membershipError.message}`);
+// The database decides using auth.uid() and confirmed auth.users email.
+// No service key or editable user metadata participates in authorization.
+export async function provisionAuthorizedPortalUser(supabase: SupabaseClient) {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error("Company access requires a verified session");
+  if (!isAuthorizedPortalEmail(data.user.email)) return false;
+  if (!data.user.email_confirmed_at) throw new Error("Company email is not confirmed");
+  // Keep already-authorized employees working during the one-time DB rollout.
+  const [{ data: profile }, { data: member }] = await Promise.all([
+    supabase.from("profiles").select("is_active,active_organization_id").eq("id", data.user.id).maybeSingle(),
+    supabase.from("organization_members").select("is_active").eq("organization_id", CAELI_ORGANIZATION_ID).eq("user_id", data.user.id).eq("is_active", true).maybeSingle(),
+  ]);
+  if (profile?.is_active && profile.active_organization_id === CAELI_ORGANIZATION_ID && member?.is_active) return true;
+  const { data: organizationId, error: joinError } = await supabase.rpc("join_caeli_workspace");
+  if (joinError) throw new Error(`Company workspace provisioning failed: ${joinError.code ?? "unknown"}`);
+  if (organizationId !== CAELI_ORGANIZATION_ID) throw new Error("Company workspace provisioning did not complete");
+  return true;
 }

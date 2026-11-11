@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PaginationControls } from "@/components/pagination-controls";
 import { TaskTable, type TaskRow } from "@/components/tasks/task-table";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const page = parsePage((await searchParams).page);

@@ -1,7 +1,7 @@
 import { SuppliersManager, type SupplierRow } from "@/components/suppliers/suppliers-manager";
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, parsePage } from "@/lib/pagination";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 export default async function SuppliersPage({ searchParams }: { searchParams: Promise<{ page?: string; q?: string; filter?: string }> }) {
   const params = await searchParams;

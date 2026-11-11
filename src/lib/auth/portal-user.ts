@@ -39,15 +39,13 @@ export const getPortalUser = cache(async () => {
 
     if (!profile?.is_active || profile.active_organization_id !== CAELI_ORGANIZATION_ID || !membership) {
       try {
-        const metadata = typeof data.claims.user_metadata === "object" && data.claims.user_metadata !== null
-          ? data.claims.user_metadata
-          : {};
-        await provisionAuthorizedPortalUser({ id: userId, email, user_metadata: metadata });
+        await provisionAuthorizedPortalUser(supabase);
         const refreshed = await loadProfile();
         profile = refreshed.data;
         profileError = refreshed.error;
       } catch (provisionError) {
         console.error("Authorized portal access repair failed", provisionError);
+        return null;
       }
     }
   }

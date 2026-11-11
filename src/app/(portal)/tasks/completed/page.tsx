@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
 
 function formatCompletedDate(value: string | null) {

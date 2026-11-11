@@ -1,7 +1,7 @@
 import { CalibrationsManager, type CalibrationRow } from "@/components/calibrations/calibrations-manager";
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 export default async function CalibrationsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const page = parsePage((await searchParams).page);

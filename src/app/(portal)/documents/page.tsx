@@ -2,7 +2,7 @@ import { DocumentsCenter, type DocumentRow } from "@/components/documents/docume
 import { PaginationControls } from "@/components/pagination-controls";
 import { PAGE_SIZE, pageRange, parsePage } from "@/lib/pagination";
 import { ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const page = parsePage((await searchParams).page);

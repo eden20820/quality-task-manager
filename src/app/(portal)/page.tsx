@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 import { reminderOccursOn } from "@/lib/reminders/recurrence";
 
 function formatDateForDatabase(date: Date) {

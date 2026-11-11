@@ -1,5 +1,5 @@
 import { CalendarView, type CalendarTask, type Reminder, type CalendarCalibration, type CalendarExpiryItem, type CalendarFollowup, type CalendarSupplier } from "@/components/calendar/calendar-view";
-import { createClient } from "@/lib/supabase/server";
+import { createPortalClient as createClient } from "@/lib/auth/portal-client";
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
