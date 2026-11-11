@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/forms/development-inspection/*": ["./assets/fonts/*.ttf"],
+    "/api/forms/shelf-product-inspection/export": ["./assets/fonts/*.ttf"],
   },
   experimental: {
     optimizePackageImports: ["lucide-react"],

@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
 import { AlignmentType, BorderStyle, Document, Footer, ImageRun, Packer, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, VerticalAlign, WidthType } from "docx";
 
 import { CAELI_LOGO_PNG_BASE64 } from "./rir-assets";
@@ -8,6 +11,8 @@ const border = { style: BorderStyle.SINGLE, size: 8, color: "000000" };
 const borders = { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border };
 const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
 const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder };
+const formFont = { ascii: "David", hAnsi: "David", cs: "David", eastAsia: "David" };
+
 type Align = (typeof AlignmentType)[keyof typeof AlignmentType];
 
 function display(value: string) { return value.trim() || "N/A"; }
@@ -26,7 +31,7 @@ function paragraph(text: string, options: { bold?: boolean; size?: number; align
       rightToLeft: rtl && !/[A-Za-z0-9]/.test(segment),
       bold: options.bold,
       size: options.size ?? 18,
-      font: "Arial",
+      font: formFont,
     })),
   });
 }
@@ -95,9 +100,16 @@ function signaturesTable(payload: ShelfProductInspectionPayload) {
 
 export async function buildShelfProductInspectionDocx(payload: ShelfProductInspectionPayload) {
   const products = payload.products?.length ? payload.products : [{ productName: payload.productName, catalogNumber: payload.catalogNumber, quantity: payload.quantity }];
-  const document = new Document({ sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 360, right: 500, bottom: 650, left: 500 } } }, footers: { default: new Footer({ children: [new Paragraph({ bidirectional: true, alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: "נספח 8.4.2.1.0", bold: true, size: 18, font: "Arial" })] })] }) }, children: [
+  const [regularFont, boldFont] = await Promise.all([
+    readFile(path.join(process.cwd(), "assets/fonts/David.ttf")),
+    readFile(path.join(process.cwd(), "assets/fonts/David-Bold.ttf")),
+  ]);
+  const document = new Document({
+    fonts: [{ name: "David", data: regularFont, bold: boldFont }],
+    styles: { default: { document: { run: { font: formFont } } } },
+    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 360, right: 500, bottom: 650, left: 500 } } }, footers: { default: new Footer({ children: [new Paragraph({ bidirectional: true, alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: "נספח 8.4.2.1.0", bold: true, size: 18, font: formFont })] })] }) }, children: [
     new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(CAELI_LOGO_PNG_BASE64, "base64"), type: "png", transformation: { width: 108, height: 76 } })] }),
-    new Paragraph({ bidirectional: true, alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120 }, children: [new TextRun({ text: "טופס ביקורת קבלה למוצר מדף", bold: true, underline: {}, size: 30, font: "Arial" })] }),
+    new Paragraph({ bidirectional: true, alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120 }, children: [new TextRun({ text: "טופס ביקורת קבלה למוצר מדף", bold: true, underline: {}, size: 30, font: formFont })] }),
     ...(products.length > 1 ? [productsTable(payload), new Paragraph({ spacing: { before: 30, after: 0 } })] : []), detailsTable(payload),
     new Paragraph({ spacing: { before: 80, after: 0 } }), inspectionTable(payload),
     new Paragraph({ spacing: { before: 30, after: 0 } }), instructionTable(),
