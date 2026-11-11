@@ -41,6 +41,8 @@ describe("shelf product inspection DOCX", () => {
     expect(`${xml}${footerXml}${styles}`).not.toContain("Arial");
     expect(xml).toContain('w:cs="David"');
     expect(xml).toContain('w:ascii="David"');
+    expect(Array.from((`${xml}${footerXml}`).matchAll(/<w:sz w:val="(\d+)"/g), match => Number(match[1])).every(size => size === 24)).toBe(true);
+    expect(styles).toContain('<w:szCs w:val="24"/>');
     expect(styles).toContain('w:cs="David"');
     expect(fontTable).toContain('w:name="David"');
     expect(fontTable).toContain("w:embedRegular");

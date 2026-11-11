@@ -1,133 +1,10 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
-import fontkit from "@pdf-lib/fontkit";
-import { PDFDict, PDFDocument, PDFFont, PDFHexString, PDFName, PDFPage, rgb } from "pdf-lib";
-
+import { PDFDict, PDFDocument, PDFHexString, PDFName } from "pdf-lib";
+import { DavidFormPdf, type FormCell } from "./david-form-pdf";
+export { directionalTextLayout } from "./david-form-pdf";
 import { isAdhesionLeakTestPayload, type AdhesionLeakTestPayload } from "./adhesion-leak-test";
-
-const black = rgb(0, 0, 0);
-const gray = rgb(0.94, 0.94, 0.94);
 const payloadKey = PDFName.of("QualityFormPayload");
-const pageHeight = 841.89;
-type TextDirection = "rtl" | "ltr";
-
 function display(value: string) { return value.trim() || "N/A"; }
-function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : "N/A"; }
-function yesNo(value: string) { return value === "yes" ? "כן" : value === "no" ? "לא" : ""; }
-
-function strongDirection(character: string): TextDirection | null {
-  if (/\p{Script=Hebrew}/u.test(character)) return "rtl";
-  if (/[A-Za-z0-9]/.test(character)) return "ltr";
-  return null;
-}
-
-export function directionalTextLayout(value: string) {
-  const characters = Array.from(value);
-  const strong = characters.map(strongDirection);
-  const baseDirection = strong.find((direction): direction is TextDirection => direction !== null) ?? "ltr";
-  const resolved = strong.map((direction, index) => {
-    if (direction) return direction;
-    for (let previous = index - 1; previous >= 0; previous -= 1) if (strong[previous]) return strong[previous] as TextDirection;
-    for (let next = index + 1; next < strong.length; next += 1) if (strong[next]) return strong[next] as TextDirection;
-    return baseDirection;
-  });
-  const runs: Array<{ direction: TextDirection; text: string }> = [];
-  characters.forEach((character, index) => {
-    const direction = resolved[index];
-    const last = runs.at(-1);
-    if (last?.direction === direction) last.text += character;
-    else runs.push({ direction, text: character });
-  });
-  return { baseDirection, runs };
-}
-
-function fitSize(font: PDFFont, text: string, maxWidth: number, preferred = 8, minimum = 5.8) {
-  let size = preferred;
-  while (size > minimum && font.widthOfTextAtSize(text, size) > maxWidth) size -= 0.2;
-  return size;
-}
-
-function drawText(page: PDFPage, font: PDFFont, value: string, options: { x: number; top: number; width: number; height?: number; size?: number; align?: "left" | "center" | "right"; bold?: boolean; empty?: "na" | "blank" }) {
-  const text = options.empty === "blank" ? value.trim() : display(value);
-  if (!text) return;
-  const size = fitSize(font, text, options.width - 6, options.size ?? 8);
-  const height = options.height ?? 12;
-  const textWidth = font.widthOfTextAtSize(text, size);
-  const align = options.align ?? "center";
-  const x = align === "right" ? options.x + options.width - textWidth - 3 : align === "left" ? options.x + 3 : options.x + (options.width - textWidth) / 2;
-  const y = pageHeight - options.top - (height + size) / 2 + 1;
-  const layout = directionalTextLayout(text);
-  if (layout.runs.length <= 1) {
-    page.drawText(text, { x, y, size, font, color: black });
-    if (options.bold) page.drawText(text, { x: x + 0.22, y, size, font, color: black });
-    return;
-  }
-  let cursor = layout.baseDirection === "rtl" ? x + textWidth : x;
-  for (const run of layout.runs) {
-    const runWidth = font.widthOfTextAtSize(run.text, size);
-    const runX = layout.baseDirection === "rtl" ? cursor - runWidth : cursor;
-    page.drawText(run.text, { x: runX, y, size, font, color: black });
-    if (options.bold) page.drawText(run.text, { x: runX + 0.22, y, size, font, color: black });
-    cursor += layout.baseDirection === "rtl" ? -runWidth : runWidth;
-  }
-}
-
-function rect(page: PDFPage, x: number, top: number, width: number, height: number, fill = false, borderWidth = 0.65) {
-  page.drawRectangle({ x, y: pageHeight - top - height, width, height, color: fill ? gray : undefined, borderColor: black, borderWidth });
-}
-
-function line(page: PDFPage, x1: number, x2: number, top: number, thickness = 0.55) {
-  page.drawLine({ start: { x: x1, y: pageHeight - top }, end: { x: x2, y: pageHeight - top }, thickness, color: black });
-}
-
-function checkbox(page: PDFPage, checked: boolean, x: number, top: number, size = 8) {
-  rect(page, x, top, size, size, false, 0.7);
-  if (!checked) return;
-  const inset = 1.6;
-  const yTop = pageHeight - top;
-  page.drawLine({ start: { x: x + inset, y: yTop - inset }, end: { x: x + size - inset, y: yTop - size + inset }, thickness: 1, color: black });
-  page.drawLine({ start: { x: x + inset, y: yTop - size + inset }, end: { x: x + size - inset, y: yTop - inset }, thickness: 1, color: black });
-}
-
-function fieldLine(page: PDFPage, font: PDFFont, top: number, label: string, value: string, options: { valueX?: number; valueWidth?: number; labelX?: number; labelWidth?: number; emptyValue?: "na" | "blank" } = {}) {
-  const valueX = options.valueX ?? 92;
-  const valueWidth = options.valueWidth ?? 132;
-  const labelX = options.labelX ?? 224;
-  const labelWidth = options.labelWidth ?? 94;
-  const labelSize = fitSize(font, label, labelWidth - 6, 7.8);
-  const labelTextWidth = font.widthOfTextAtSize(label, labelSize);
-  const labelTextX = labelX + labelWidth - labelTextWidth - 3;
-  const lineEnd = Math.max(valueX + valueWidth - 4, labelTextX - 3);
-  drawText(page, font, label, { x: labelX, top: top - 0.8, width: labelWidth, height: 11, align: "right", size: labelSize });
-  drawText(page, font, value, { x: valueX, top: top - 0.8, width: lineEnd - valueX, height: 11, size: 7.8, empty: options.emptyValue });
-  line(page, valueX + 4, lineEnd, top + 10.5, 0.45);
-}
-
-function sectionTitle(page: PDFPage, font: PDFFont, top: number, height: number, title: string) {
-  rect(page, 321, top, 200, height, true);
-  drawText(page, font, title, { x: 329, top: top + 4, width: 184, height: 13, align: "right", size: 9, bold: true });
-}
-
-function choiceRow(page: PDFPage, font: PDFFont, top: number, label: string, checked: boolean, x = 305) {
-  checkbox(page, checked, x, top + 2, 8);
-  drawText(page, font, label, { x: 126, top, width: x - 134, height: 12, align: "right", size: 8 });
-}
-
-async function signature(page: PDFPage, pdf: PDFDocument, dataUrl: string, x: number, top: number, width: number, height: number) {
-  const match = dataUrl.match(/^data:image\/png;base64,(.+)$/);
-  if (!match) return;
-  const image = await pdf.embedPng(Buffer.from(match[1], "base64"));
-  const imageHeight = Math.min(height - 3, 10);
-  const imageWidth = Math.min(width - 8, imageHeight * image.width / image.height);
-  page.drawImage(image, { x: x + (width - imageWidth) / 2, y: pageHeight - top - (height + imageHeight) / 2, width: imageWidth, height: imageHeight });
-}
-
-function storePayload(pdf: PDFDocument, payload: AdhesionLeakTestPayload) {
-  const info = pdf.context.lookup(pdf.context.trailerInfo.Info, PDFDict);
-  info.set(payloadKey, PDFHexString.fromText(JSON.stringify(payload)));
-}
-
+function formatDate(value: string) { const [y, m, d] = value.split("-"); return y && m && d ? `${d}.${m}.${y}` : "N/A"; }
 export async function extractAdhesionLeakTestPayload(bytes: Uint8Array) {
   const pdf = await PDFDocument.load(bytes);
   const infoRef = pdf.context.trailerInfo.Info;
@@ -140,120 +17,40 @@ export async function extractAdhesionLeakTestPayload(bytes: Uint8Array) {
   return payload;
 }
 
+
 export async function buildAdhesionLeakTestPdf(payload: AdhesionLeakTestPayload) {
-  const [fontBytes, logoBytes] = await Promise.all([
-    readFile(path.join(process.cwd(), "public/fonts/DejaVuSans.ttf")),
-    readFile(path.join(process.cwd(), "public/caeli-logo.png")),
-  ]);
-  const pdf = await PDFDocument.create();
-  pdf.registerFontkit(fontkit);
-  const font = await pdf.embedFont(fontBytes, { subset: true });
-  const logo = await pdf.embedPng(logoBytes);
-  const page = pdf.addPage([595.28, pageHeight]);
-
-  page.drawImage(logo, { x: 29, y: pageHeight - 68, width: 74, height: 52 });
-  drawText(page, font, "טופס בדיקת אטימות - הדבקה", { x: 190, top: 68, width: 220, height: 20, size: 15, bold: true });
-  line(page, 192, 408, 88, 0.9);
-
-  const topRows: Array<[string, string]> = [
+  const form = await DavidFormPdf.create("טופס בדיקת אטימות - הדבקה", "8.4.2.4.0");
+  const field = (name: string, value: string): FormCell[] => [display(value), { text: name, bold: true, shade: true }];
+  const fields = (rows: Array<[string, string]>) => form.table(rows.map(([name, value]) => field(name, value)), [65, 35]);
+  const mark = (checked: boolean) => checked ? "[X]" : "[ ]";
+  const yesNo = (value: string) => `${mark(value === "yes")} כן    ${mark(value === "no")} לא`;
+  await fields([
     ["תאריך", formatDate(payload.testDate)], ["שם הבודק", payload.testerName], ["מיקום הבדיקה", payload.testLocation],
     ["תיאור הפעולה", payload.operationDescription], ["המוצר הנבדק", payload.testedProduct], ["חומר המוצר המודבק", payload.bondedProductMaterial],
     ["אזור ההדבקה", payload.bondingArea], ["חומר המוצר הנדבק", payload.adheringProductMaterial], ["שטח / אורך תפר ההדבקה", payload.seamAreaOrLength], ["כמות", payload.quantity],
-  ];
-  topRows.forEach(([label, value], index) => {
-    const top = 101 + index * 12.3;
-    rect(page, 88, top, 233, 12.3);
-    rect(page, 321, top, 200, 12.3, true);
-    drawText(page, font, value, { x: 91, top, width: 227, height: 12.3, size: 7.5 });
-    drawText(page, font, label, { x: 328, top, width: 186, height: 12.3, align: "right", size: 8, bold: true });
-  });
-
-  rect(page, 88, 252, 233, 104);
-  sectionTitle(page, font, 252, 104, "פרטי הדבק");
-  fieldLine(page, font, 254, "סוג הדבק", payload.adhesiveType);
-  fieldLine(page, font, 267, "יצרן ודגם", payload.adhesiveManufacturerModel);
-  fieldLine(page, font, 280, "תאריך תפוגה", formatDate(payload.adhesiveExpiryDate));
-  drawText(page, font, "שיטת הקשיה", { x: 224, top: 293, width: 94, height: 12, align: "right", size: 7.8 });
-  choiceRow(page, font, 307, "אפוקסי", payload.curingMethod === "epoxy");
-  choiceRow(page, font, 320, "UV", payload.curingMethod === "uv");
-  fieldLine(page, font, 333, "זמן חשיפה", payload.exposureTime);
-  fieldLine(page, font, 342.5, "זמן המתנה לפני בדיקה", payload.waitingTime, { valueWidth: 116, labelX: 208, labelWidth: 110 });
-
-  rect(page, 88, 356, 233, 48);
-  sectionTitle(page, font, 356, 48, "תנאי סביבה");
-  fieldLine(page, font, 357, "טמפרטורה", payload.temperature);
-  fieldLine(page, font, 369, "לחות", payload.humidity);
-  fieldLine(page, font, 381, "עבודה תחת מנדף", yesNo(payload.underHood), { valueWidth: 105, labelX: 197, labelWidth: 121, emptyValue: "blank" });
-  fieldLine(page, font, 390.5, "הערות", payload.environmentNotes);
-
-  rect(page, 88, 404, 233, 59);
-  sectionTitle(page, font, 404, 59, "שיטת בדיקת האטימות");
-  const methods = [
-    ["בדיקת לחץ אוויר", "air-pressure"], ["בדיקת וואקום", "vacuum"],
-    ["בדיקת בועות )מים/סבון(", "bubbles"], ["בדיקת חדירות צבע", "dye-penetration"],
-  ] as const;
-  methods.forEach(([label, value], index) => choiceRow(page, font, 407 + index * 13, label, payload.testMethod === value));
-
-  rect(page, 88, 463, 233, 60);
-  sectionTitle(page, font, 463, 60, "בדיקה ויזואלית");
-  const visualGroups = [
-    ["סדקים", payload.cracks], ["בועות", payload.bubbles], ["היפרדות חומר", payload.materialSeparation],
-  ] as const;
-  visualGroups.forEach(([label, value], index) => {
-    const top = 466 + index * 18;
-    drawText(page, font, label, { x: 221, top, width: 96, height: 14, align: "right", size: 8 });
-    checkbox(page, value === "yes", 190, top + 3, 8);
-    drawText(page, font, "כן", { x: 166, top, width: 21, height: 14, align: "right", size: 7.5 });
-    checkbox(page, value === "no", 137, top + 3, 8);
-    drawText(page, font, "לא", { x: 113, top, width: 21, height: 14, align: "right", size: 7.5 });
-  });
-
-  rect(page, 88, 523, 233, 46);
-  sectionTitle(page, font, 523, 46, "תוצאות בדיקה");
-  drawText(page, font, "נצפתה דליפה", { x: 220, top: 524, width: 98, height: 12, align: "right", size: 7.8 });
-  checkbox(page, payload.leakObserved === "yes", 197, 526, 8);
-  drawText(page, font, "כן", { x: 176, top: 524, width: 20, height: 12, align: "right", size: 7.5 });
-  checkbox(page, payload.leakObserved === "no", 147, 526, 8);
-  drawText(page, font, "לא", { x: 126, top: 524, width: 20, height: 12, align: "right", size: 7.5 });
-  fieldLine(page, font, 537.5, "מיקום הדליפה", payload.leakLocation, { valueWidth: 112, labelX: 204, labelWidth: 114 });
-  fieldLine(page, font, 552, "ממצאים", payload.findings);
-
-  rect(page, 88, 569, 233, 22);
-  sectionTitle(page, font, 569, 22, "סיכום והחלטות");
-  const decisions = [
-    ["נדרש תיקון ובדיקה חוזרת", "repair", 94, 102, 198],
-    ["לא תקין", "fail", 211, 45, 258],
-    ["תקין", "pass", 271, 30, 303],
-  ] as const;
-  decisions.forEach(([label, value, x, width, boxX]) => {
-    drawText(page, font, label, { x, top: 573, width, height: 12, align: "right", size: value === "repair" ? 6.3 : 6.8 });
-    checkbox(page, payload.decision === value, boxX, 575, 8);
-  });
-
-  rect(page, 88, 625, 433, 42);
-  rect(page, 88, 625, 433, 13, true);
-  drawText(page, font, "חתימות", { x: 88, top: 625, width: 433, height: 13, size: 9, bold: true });
-  line(page, 88, 521, 652, 0.65);
-  for (const x of [166, 284, 441]) page.drawLine({ start: { x, y: pageHeight - 638 }, end: { x, y: pageHeight - 667 }, thickness: 0.65, color: black });
-  const signatureRows = [
-    { top: 638, label: "נבדק ע״י", name: payload.checkedByName, date: formatDate(payload.checkedByDate), image: payload.checkedBySignature },
-    { top: 652, label: "אושר ע״י", name: payload.approvedByName, date: formatDate(payload.approvedByDate), image: payload.approvedBySignature },
-  ];
-  for (const row of signatureRows) {
-    drawText(page, font, row.label, { x: 441, top: row.top, width: 80, height: 14, align: "right", size: 7.5, bold: true });
-    drawText(page, font, "שם", { x: 407, top: row.top, width: 28, height: 14, align: "right", size: 7 });
-    drawText(page, font, ":", { x: 416, top: row.top, width: 5, height: 14, size: 7 });
-    drawText(page, font, row.name, { x: 290, top: row.top, width: 124, height: 14, align: "right", size: 7 });
-    drawText(page, font, "תאריך", { x: 245, top: row.top, width: 34, height: 14, align: "right", size: 7 });
-    drawText(page, font, ":", { x: 250, top: row.top, width: 5, height: 14, size: 7 });
-    drawText(page, font, row.date, { x: 168, top: row.top, width: 80, height: 14, align: "right", size: 7 });
-    await signature(page, pdf, row.image, 88, row.top, 78, 14);
-  }
-
-  drawText(page, font, "8.4.2.4.0", { x: 88, top: 793, width: 58, height: 12, align: "left", size: 8, bold: true });
-  drawText(page, font, "נספח", { x: 148, top: 793, width: 35, height: 12, align: "left", size: 8, bold: true });
-  pdf.setTitle("טופס בדיקת אטימות הדבקה");
-  pdf.setSubject("נספח 8.4.2.4.0");
-  storePayload(pdf, payload);
-  return Buffer.from(await pdf.save());
+  ]);
+  await form.section("פרטי הדבק");
+  await fields([["סוג הדבק", payload.adhesiveType], ["יצרן ודגם", payload.adhesiveManufacturerModel], ["תאריך תפוגה", formatDate(payload.adhesiveExpiryDate)],
+    ["שיטת הקשיה", `${mark(payload.curingMethod === "epoxy")} אפוקסי    ${mark(payload.curingMethod === "uv")} UV`],
+    ["זמן חשיפה", payload.exposureTime], ["זמן המתנה לפני בדיקה", payload.waitingTime]]);
+  await form.section("תנאי סביבה");
+  await fields([["טמפרטורה", payload.temperature], ["לחות", payload.humidity], ["עבודה תחת מנדף", yesNo(payload.underHood)], ["הערות", payload.environmentNotes]]);
+  await form.section("שיטת בדיקת האטימות");
+  const methods = [["בדיקת לחץ אוויר", "air-pressure"], ["בדיקת וואקום", "vacuum"], ["בדיקת בועות (מים/סבון)", "bubbles"], ["בדיקת חדירות צבע", "dye-penetration"]] as const;
+  await form.table([[methods.map(([name, value]) => `${mark(payload.testMethod === value)} ${name}`).join("\n")]], [1]);
+  await form.section("בדיקה ויזואלית");
+  await fields([["סדקים", yesNo(payload.cracks)], ["בועות", yesNo(payload.bubbles)], ["היפרדות חומר", yesNo(payload.materialSeparation)]]);
+  await form.section("תוצאות בדיקה");
+  await fields([["נצפתה דליפה", yesNo(payload.leakObserved)], ["מיקום הדליפה", payload.leakLocation], ["ממצאים", payload.findings]]);
+  await form.section("סיכום והחלטות");
+  await form.table([[[
+    `${mark(payload.decision === "pass")} תקין`, `${mark(payload.decision === "fail")} לא תקין`, `${mark(payload.decision === "repair")} נדרש תיקון ובדיקה חוזרת`,
+  ].join("\n")]], [1]);
+  await form.section("חתימות");
+  await form.table([
+    [{ text: "", image: payload.checkedBySignature }, formatDate(payload.checkedByDate), payload.checkedByName.trim(), "נבדק ע״י"],
+    [{ text: "", image: payload.approvedBySignature }, formatDate(payload.approvedByDate), payload.approvedByName.trim(), "אושר ע״י"],
+  ], [20, 24, 36, 20], ["חתימה", "תאריך", "שם", "אישור"]);
+  form.pdf.context.lookup(form.pdf.context.trailerInfo.Info, PDFDict).set(payloadKey, PDFHexString.fromText(JSON.stringify(payload)));
+  return form.finish();
 }
