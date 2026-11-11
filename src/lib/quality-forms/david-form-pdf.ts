@@ -5,7 +5,7 @@ import { PDFDocument, type PDFFont, type PDFImage, type PDFPage, rgb } from "pdf
 
 export const FORM_FONT_SIZE = 12;
 const height = 841.89, left = 36, width = 523.28, bottom = 778, lineHeight = 15;
-type Cell = { text: string; bold?: boolean; shade?: boolean; image?: string; minHeight?: number; align?: "center" | "right" };
+type Cell = { text: string; bold?: boolean; shade?: boolean; image?: string; imageHeight?: number; minHeight?: number; align?: "center" | "right" };
 export type FormCell = string | Cell;
 type Direction = "rtl" | "ltr";
 function tokens(text: string) { return text.split(/(\[X\]|\[ \])/).filter(Boolean); }
@@ -55,11 +55,13 @@ export function directionalTextLayout(value: string) {
 export class DavidFormPdf {
   private page!: PDFPage;
   private top = 96;
+  private padding = 5;
   private constructor(readonly pdf: PDFDocument, private regular: PDFFont, private bold: PDFFont, private logo: PDFImage, private title: string, private annex: string) { this.newPage(); }
-  static async create(title: string, annex: string) {
+  static async create(title: string, annex: string, options: { cellPadding?: number } = {}) {
     const pdf = await PDFDocument.create(); pdf.registerFontkit(fontkit);
     const [regular, bold, logo] = await Promise.all([readFile(path.join(process.cwd(), "assets/fonts/David.ttf")), readFile(path.join(process.cwd(), "assets/fonts/David-Bold.ttf")), readFile(path.join(process.cwd(), "public/caeli-logo.png"))]);
     const form = new DavidFormPdf(pdf, await pdf.embedFont(regular, { subset: true }), await pdf.embedFont(bold, { subset: true }), await pdf.embedPng(logo), title, annex);
+    form.padding = Math.max(5, Math.min(12, options.cellPadding ?? 5));
     pdf.setTitle(title); pdf.setSubject(`נספח ${annex}`); return form;
   }
   private newPage() {
@@ -113,22 +115,29 @@ export class DavidFormPdf {
         const remaining = lineCount - offset;
         let count = Math.min(remaining, 40);
         const minimumHeight = offset === 0 ? Math.min(630, Math.max(0, ...cells.map(cell => cell.minHeight ?? 0))) : 0;
-        const required = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + 10);
+        const required = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + this.padding * 2);
         if (this.top + required > bottom) {
           this.newPage();
           if (!header && headers) await render(headers, true);
-          count = Math.min(remaining, Math.floor((bottom - this.top - 10) / lineHeight));
+          count = Math.min(remaining, Math.floor((bottom - this.top - this.padding * 2) / lineHeight));
         }
-        const rowHeight = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + 10);
+        const rowHeight = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + this.padding * 2);
         let x = left;
         for (let index = 0; index < cells.length; index++) {
           const cell = cells[index];
           this.page.drawRectangle({ x, y: height - this.top - rowHeight, width: widths[index], height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.6, color: header || cell.shade ? rgb(0.94, 0.94, 0.94) : undefined });
           const lines = wrapped[index].slice(offset, offset + count);
-          lines.forEach((line, lineIndex) => this.paint(line, x + 6, this.top + 5 + lineIndex * lineHeight, widths[index] - 12, cell.bold || header, cell.align));
+          lines.forEach((line, lineIndex) => this.paint(line, x + 6, this.top + this.padding + lineIndex * lineHeight, widths[index] - 12, cell.bold || header, cell.align));
           if (cell.image && offset === 0) {
-            const match = cell.image.match(/^data:image\/png;base64,(.+)$/);
-            if (match) { const image = await this.pdf.embedPng(Buffer.from(match[1], "base64")); const imageHeight = 18, imageWidth = Math.min(widths[index] - 12, imageHeight * image.width / image.height); this.page.drawImage(image, { x: x + (widths[index] - imageWidth) / 2, y: height - this.top - (rowHeight + imageHeight) / 2, width: imageWidth, height: imageHeight }); }
+            const match = cell.image.match(/^data:image\/(png|jpeg);base64,(.+)$/);
+            if (match) {
+              // pdf-lib's JPEG reader uses the backing ArrayBuffer, so avoid pooled Buffer offsets.
+              const bytes = new Uint8Array(Buffer.from(match[2], "base64"));
+              const image = await (match[1] === "jpeg" ? this.pdf.embedJpg(bytes) : this.pdf.embedPng(bytes));
+              const scale = Math.min((widths[index] - 16) / image.width, Math.min(cell.imageHeight ?? 18, rowHeight - this.padding * 2) / image.height);
+              const imageHeight = image.height * scale, imageWidth = image.width * scale;
+              this.page.drawImage(image, { x: x + (widths[index] - imageWidth) / 2, y: height - this.top - (rowHeight + imageHeight) / 2, width: imageWidth, height: imageHeight });
+            }
           }
           x += widths[index];
         }
@@ -140,6 +149,8 @@ export class DavidFormPdf {
   }
   async section(title: string) { this.top += 10; if (this.top + 70 > bottom) this.newPage(); await this.table([[{ text: title, bold: true, shade: true }]], [1]); }
   startPage() { this.newPage(); }
+  gap(points = 12) { this.top += points; }
+  ensureSpace(points: number) { if (this.top + points > bottom) this.newPage(); }
   async finish() {
     const pages = this.pdf.getPages();
     pages.forEach((page, index) => {
