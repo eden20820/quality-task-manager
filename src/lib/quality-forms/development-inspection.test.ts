@@ -2,9 +2,28 @@ import { writeFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildDevelopmentInspectionPdf, developmentPdfTextLayout, extractDevelopmentInspectionPayload } from "./development-inspection-pdf";
-import { createEmptyDevelopmentInspection, isDevelopmentInspectionPayload } from "./development-inspection";
+import { createEmptyDevelopmentInspection, emptyDevelopmentProduct, getDevelopmentProducts, isDevelopmentInspectionPayload, withDevelopmentProducts } from "./development-inspection";
 
 describe("development inspection form", () => {
+  it("loads legacy single-product forms and synchronizes archive identifiers after edits", () => {
+    const legacy = { ...createEmptyDevelopmentInspection("2026-11-11"), catalogNumber: "OLD-1", itemDescription: "פריט קודם" };
+    expect(getDevelopmentProducts(legacy)[0].catalogNumber).toBe("OLD-1");
+    const updated = withDevelopmentProducts(legacy, [{ ...emptyDevelopmentProduct(), catalogNumber: "NEW-1" }, emptyDevelopmentProduct()]);
+    expect(updated.catalogNumber).toBe("NEW-1");
+    expect(getDevelopmentProducts(updated)).toHaveLength(2);
+    expect(isDevelopmentInspectionPayload(updated)).toBe(true);
+    expect(isDevelopmentInspectionPayload({ ...updated, products: [] })).toBe(false);
+    expect(isDevelopmentInspectionPayload({ ...updated, products: [{ catalogNumber: "invalid" }] })).toBe(false);
+    expect(isDevelopmentInspectionPayload({ ...updated, products: Array.from({ length: 101 }, emptyDevelopmentProduct) })).toBe(false);
+  });
+  it.each([[3, 1], [4, 2], [36, 3]])("preserves all %i products across %i PDF pages and reopening", async (count, pages) => {
+    const products = Array.from({ length: count }, (_, index) => ({ ...emptyDevelopmentProduct(), catalogNumber: `DEV-${index + 1}`, itemDescription: `מכלול פיתוח AL-6061 ${index + 1}`, drawingNumber: `DG-${index + 1}`, revision: "01", receivedQuantity: "12", inspectedQuantity: "3" }));
+    const payload = withDevelopmentProducts({ ...createEmptyDevelopmentInspection("2026-11-11"), supplierName: "Nautec נאותק" }, products);
+    const bytes = await buildDevelopmentInspectionPdf(payload);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(pages);
+    expect(await extractDevelopmentInspectionPayload(bytes)).toEqual(payload);
+    if (count === 4 && process.env.DEVELOPMENT_MULTI_PDF_SAMPLE_PATH) await writeFile(process.env.DEVELOPMENT_MULTI_PDF_SAMPLE_PATH, bytes);
+  });
   it("mirrors parentheses only in Hebrew paint runs", () => {
     expect(developmentPdfTextLayout("תוקף (אם רלוונטי)").runs[0].text).toBe("תוקף )אם רלוונטי(");
     expect(developmentPdfTextLayout("ABC (test)").runs[0].text).toBe("ABC (test)");

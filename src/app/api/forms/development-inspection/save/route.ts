@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { archiveQualityFormExport } from "@/lib/quality-forms/form-archive-server";
 import { DEVELOPMENT_INSPECTION_FORM_TITLE, ONLINE_FORM_CATEGORY } from "@/lib/quality-forms/form-archive";
-import { isDevelopmentInspectionPayload } from "@/lib/quality-forms/development-inspection";
+import { getDevelopmentProducts, isDevelopmentInspectionPayload } from "@/lib/quality-forms/development-inspection";
 import { buildDevelopmentInspectionPdf } from "@/lib/quality-forms/development-inspection-pdf";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     if (!isDevelopmentInspectionPayload(payload)) return NextResponse.json({ error: "נתוני הטופס אינם תקינים" }, { status: 400 });
     const status = payload.checkedBySignature && payload.approvedBySignature ? "signed" : "pending-signature";
     const bytes = await buildDevelopmentInspectionPdf(payload);
-    const archived = await archiveQualityFormExport({ bytes: new Uint8Array(bytes), supplierName: payload.supplierName, date: payload.date, catalogNumber: payload.catalogNumber, extension: "pdf", mimeType: "application/pdf", formTitle: DEVELOPMENT_INSPECTION_FORM_TITLE, formStatus: status });
+    const archived = await archiveQualityFormExport({ bytes: new Uint8Array(bytes), supplierName: payload.supplierName, date: payload.date, catalogNumber: getDevelopmentProducts(payload)[0].catalogNumber, extension: "pdf", mimeType: "application/pdf", formTitle: DEVELOPMENT_INSPECTION_FORM_TITLE, formStatus: status });
     if (typeof wrapper?.archiveId === "string") await removePreviousArchive(wrapper.archiveId);
     return NextResponse.json({ saved: true, fileName: archived.fileName, formStatus: status });
   } catch (error) { console.error("Development inspection save failed", error); return NextResponse.json({ error: "לא ניתן לשמור את הטופס כרגע" }, { status: 500 }); }
