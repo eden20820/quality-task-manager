@@ -1,4 +1,6 @@
 "use client";
+import { CatalogInput } from "./catalog-input";
+import { matchingCatalogItems, resolveCatalogItem, type CatalogItem } from "@/lib/quality-forms/parts-catalog";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -34,7 +36,7 @@ import {
   type RirPassFail,
 } from "@/lib/quality-forms/rir";
 import { buildQualityFormDownloadName, RIR_ARCHIVE_EDIT_STORAGE_KEY } from "@/lib/quality-forms/form-archive";
-import { catalogNumbersMatch, findKnownPartName, type FormAutocompleteSuggestions } from "@/lib/quality-forms/form-suggestions";
+import { catalogNumbersMatch, type FormAutocompleteSuggestions } from "@/lib/quality-forms/form-suggestions";
 import { automaticMeasurementTarget, measurementNavigationTarget, type MeasurementNavigationKey } from "@/lib/quality-forms/keyboard-navigation";
 import { parseDimensionTolerance } from "@/lib/quality-forms/dimension-tolerance";
 import { SupplierBinderNotice } from "@/components/quality-forms/supplier-binder-notice";
@@ -182,17 +184,21 @@ function PassFailControl({ value, onChange, label }: { value: RirPassFail; onCha
 function DetailsStep({ details, suggestions, onChange }: { details: RirDetails; suggestions: FormAutocompleteSuggestions; onChange: (details: RirDetails) => void }) {
   const update = (key: keyof Omit<RirDetails, "documents">, value: string) => onChange({ ...details, [key]: value });
   const updateCatalogNumber = (value: string) => {
-    const knownPartName = findKnownPartName(value, suggestions.catalogItems);
+    const known = resolveCatalogItem(suggestions.catalogItems, "catalogNumber", value);
+    const knownPartName = known?.partName;
     onChange({
       ...details,
       catalogNumber: value,
       partName: knownPartName || details.partName,
       drawingNumber: drawingNumberForCatalog(value),
+      drawingRevision: known?.revision || details.drawingRevision,
     });
   };
+  const selectPart = (item: CatalogItem) => onChange({ ...details, catalogNumber: item.catalogNumber, partName: item.partName, drawingRevision: item.revision || details.drawingRevision, drawingNumber: drawingNumberForCatalog(item.catalogNumber) });
+  const updatePartName = (value: string) => { const known = resolveCatalogItem(suggestions.catalogItems, "partName", value); if (known) selectPart(known); else update("partName", value); };
   const toggleDocument = (key: keyof RirDetails["documents"]) => onChange({ ...details, documents: { ...details.documents, [key]: !details.documents[key] } });
 
-  return <div className="space-y-6"><section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5"><h2 className="text-xl font-black">פרטי קבלה ופריט</h2><p className="mt-1 text-sm text-slate-500">הפרטים שיופיעו בראש דוח ביקורת הקבלה.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><AutocompleteField label="מק״ט / מספר קטלוגי" value={details.catalogNumber} suggestions={suggestions.catalogNumbers} onChange={updateCatalogNumber} /><AutocompleteField label="שם הפריט" value={details.partName} suggestions={suggestions.partNames} onChange={(value) => update("partName", value)} /><AutocompleteField label="שם הספק" value={details.supplierName} suggestions={suggestions.supplierNames} onChange={(value) => update("supplierName", value)} /><Field label="כמות שהתקבלה" type="number" min={0} value={details.receivedQuantity} onChange={(value) => update("receivedQuantity", value)} /><AutocompleteField label="מספר הזמנה" value={details.orderNumber} suggestions={suggestions.orderNumbers} onChange={(value) => update("orderNumber", value)} /><Field label="מספר אצווה" value={details.lotNumber} onChange={(value) => update("lotNumber", value)} /><Field label="מספר שרטוט" value={details.drawingNumber} onChange={(value) => update("drawingNumber", value)} /><AutocompleteField label="רוויזיית שרטוט" value={details.drawingRevision} suggestions={suggestions.revisions} onChange={(value) => update("drawingRevision", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">הערות<textarea value={details.comments} onChange={(event) => update("comments", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label></section>
+  return <div className="space-y-6"><section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><div className="mb-5"><h2 className="text-xl font-black">פרטי קבלה ופריט</h2><p className="mt-1 text-sm text-slate-500">הפרטים שיופיעו בראש דוח ביקורת הקבלה.</p></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><CatalogInput data-rir-entry label="מק״ט / מספר קטלוגי" field="catalogNumber" value={details.catalogNumber} items={suggestions.catalogItems} onInputValue={updateCatalogNumber} onPick={selectPart} onKeyDown={focusNextRirEntry} /><CatalogInput data-rir-entry label="שם הפריט" field="partName" value={details.partName} items={suggestions.catalogItems} onInputValue={updatePartName} onPick={selectPart} onKeyDown={focusNextRirEntry} /><AutocompleteField label="שם הספק" value={details.supplierName} suggestions={suggestions.supplierNames} onChange={(value) => update("supplierName", value)} /><Field label="כמות שהתקבלה" type="number" min={0} value={details.receivedQuantity} onChange={(value) => update("receivedQuantity", value)} /><AutocompleteField label="מספר הזמנה" value={details.orderNumber} suggestions={suggestions.orderNumbers} onChange={(value) => update("orderNumber", value)} /><Field label="מספר אצווה" value={details.lotNumber} onChange={(value) => update("lotNumber", value)} /><Field label="מספר שרטוט" value={details.drawingNumber} onChange={(value) => update("drawingNumber", value)} /><AutocompleteField label="רוויזיית שרטוט" value={details.drawingRevision} suggestions={suggestions.revisions} onChange={(value) => update("drawingRevision", value)} /></div><label className="mt-4 block text-sm font-bold text-slate-700">הערות<textarea value={details.comments} onChange={(event) => update("comments", event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" /></label></section>
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"><h2 className="text-lg font-black">מסמכים מצורפים</h2><div className="mt-4 flex flex-wrap gap-3">{([['coc', 'COC'], ['cot', 'COT'], ['coa', 'COA'], ['other', 'אחר']] as const).map(([key, label]) => <label key={key} className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-4 font-bold transition ${details.documents[key] ? "border-blue-500 bg-blue-50 text-blue-900" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}><input type="checkbox" checked={details.documents[key]} onChange={() => toggleDocument(key)} className="h-4 w-4 accent-blue-600" />{label}</label>)}</div>{details.documents.other ? <div className="mt-4 max-w-md"><Field label="שם המסמך האחר" value={details.otherDocument} onChange={(value) => update("otherDocument", value)} /></div> : null}</section></div>;
 }
 
@@ -338,7 +344,7 @@ export function RirForm({ suggestions, binderDirectory }: { suggestions: FormAut
 
   useEffect(() => {
     const catalogNumber = details.catalogNumber.trim();
-    if (catalogNumber.length < 2 || findKnownPartName(catalogNumber, suggestions.catalogItems)) return;
+    if (catalogNumber.length < 2 || matchingCatalogItems(suggestions.catalogItems, "catalogNumber", catalogNumber, true).length) return;
     const partNameAtStart = partNameRef.current;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {

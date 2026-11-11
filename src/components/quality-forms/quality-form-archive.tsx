@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Clock3, Download, FilePenLine, FileSpreadsheet, FileText, Files, Search, Trash2 } from "lucide-react";
 
 import {
+  ECO_ARCHIVE_EDIT_STORAGE_KEY,
+  ECO_ARCHIVE_RECORD_STORAGE_KEY,
+  isEcoFormDescription,
   ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY,
   ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY,
   DEVELOPMENT_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY,
@@ -91,17 +94,19 @@ export function QualityFormArchive({ initialForms }: { initialForms: QualityForm
       if (downloadError || !data) throw new Error("לא ניתן לפתוח את הטופס כרגע");
       const isExcel = form.file_name.toLowerCase().endsWith(".xlsx");
       const isAdhesion = form.file_name.toLowerCase().endsWith(".pdf") && isAdhesionFormDescription(form.description);
+      const isEco = form.file_name.toLowerCase().endsWith(".pdf") && isEcoFormDescription(form.description);
       const isDevelopment = form.file_name.toLowerCase().endsWith(".pdf") && isDevelopmentInspectionDescription(form.description);
       const formData = new FormData();
       formData.append("file", data, form.file_name);
-      const response = await fetch(isExcel ? "/api/forms/rir/import" : isAdhesion ? "/api/forms/adhesion-leak-test/import" : isDevelopment ? "/api/forms/development-inspection/import" : "/api/forms/shelf-product-inspection/import", { method: "POST", body: formData });
+      const response = await fetch(isEco ? "/api/forms/eco/import" : isExcel ? "/api/forms/rir/import" : isAdhesion ? "/api/forms/adhesion-leak-test/import" : isDevelopment ? "/api/forms/development-inspection/import" : "/api/forms/shelf-product-inspection/import", { method: "POST", body: formData });
       const result = await response.json().catch(() => ({})) as { payload?: unknown; error?: string };
       if (!response.ok || !result.payload) throw new Error(result.error || "לא ניתן לטעון את הטופס לעריכה");
-      const storageKey = isExcel ? RIR_ARCHIVE_EDIT_STORAGE_KEY : isAdhesion ? ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY : isDevelopment ? DEVELOPMENT_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY : SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY;
+      const storageKey = isEco ? ECO_ARCHIVE_EDIT_STORAGE_KEY : isExcel ? RIR_ARCHIVE_EDIT_STORAGE_KEY : isAdhesion ? ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY : isDevelopment ? DEVELOPMENT_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY : SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY;
       window.sessionStorage.setItem(storageKey, JSON.stringify(result.payload));
       if (isAdhesion) window.sessionStorage.setItem(ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY, form.id);
+      if (isEco) window.sessionStorage.setItem(ECO_ARCHIVE_RECORD_STORAGE_KEY, form.id);
       if (isDevelopment) window.sessionStorage.setItem(DEVELOPMENT_INSPECTION_ARCHIVE_RECORD_STORAGE_KEY, form.id);
-      router.push(isExcel ? "/forms/rir?source=archive" : isAdhesion ? "/forms/adhesion-leak-test?source=archive" : isDevelopment ? "/forms/development-inspection?source=archive" : "/forms/shelf-product-inspection?source=archive");
+      router.push(isEco ? "/forms/eco?source=archive" : isExcel ? "/forms/rir?source=archive" : isAdhesion ? "/forms/adhesion-leak-test?source=archive" : isDevelopment ? "/forms/development-inspection?source=archive" : "/forms/shelf-product-inspection?source=archive");
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : "לא ניתן לפתוח את הטופס כרגע");
       setOpeningId(null);
@@ -126,14 +131,15 @@ export function QualityFormArchive({ initialForms }: { initialForms: QualityForm
         const isExcel = form.file_name.toLowerCase().endsWith(".xlsx");
         const isWord = form.file_name.toLowerCase().endsWith(".docx");
         const isAdhesion = form.file_name.toLowerCase().endsWith(".pdf") && isAdhesionFormDescription(form.description);
-        const isDevelopment = form.file_name.toLowerCase().endsWith(".pdf") && isDevelopmentInspectionDescription(form.description);
+        const isEco = form.file_name.toLowerCase().endsWith(".pdf") && isEcoFormDescription(form.description);
+      const isDevelopment = form.file_name.toLowerCase().endsWith(".pdf") && isDevelopmentInspectionDescription(form.description);
         const pending = isPendingSignatureDescription(form.description);
         const formTitle = parseArchivedFormDescription(form.description).title;
         const Icon = isExcel ? FileSpreadsheet : FileText;
         return <article key={form.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_110px_300px] sm:items-center">
           <div className="flex min-w-0 items-start gap-3"><span className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${pending ? "bg-amber-100 text-amber-700" : isExcel ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}><Icon className="h-5 w-5" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="break-words font-black text-slate-900">{form.file_name}</h2>{pending ? <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">ממתין לחתימה</span> : null}</div><p className="mt-1 text-sm font-semibold text-slate-500">{formTitle} · {formatSize(form.file_size)}</p></div></div>
           <time dir="ltr" className="text-left text-sm font-semibold text-slate-500" dateTime={form.created_at}>{formatDate(form.created_at)}</time>
-          <div className="flex flex-wrap gap-2">{isExcel || isWord || isAdhesion || isDevelopment ? <button type="button" disabled={openingId === form.id} onClick={() => openForEditing(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-sm font-extrabold text-white hover:bg-slate-800 disabled:opacity-50"><FilePenLine className="h-4 w-4" />{openingId === form.id ? "פותח..." : pending ? "השלמת חתימה" : "פתיחה ועריכה"}</button> : null}<button type="button" disabled={downloadingId === form.id} onClick={() => download(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Download className="h-4 w-4" />{downloadingId === form.id ? "מוריד..." : "הורדה"}</button>{pending ? <button type="button" disabled={deletingId !== null || openingId === form.id} onClick={() => deleteForm(form)} className="inline-flex h-10 shrink-0 items-center justify-center gap-1 rounded-xl border border-red-200 px-3 text-sm font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50" aria-label={`מחיקת הטופס ${form.file_name}`}><Trash2 className="h-4 w-4" />{deletingId === form.id ? "מוחק..." : "מחיקה"}</button> : null}</div>
+          <div className="flex flex-wrap gap-2">{isExcel || isWord || isAdhesion || isDevelopment || isEco ? <button type="button" disabled={openingId === form.id} onClick={() => openForEditing(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-3 text-sm font-extrabold text-white hover:bg-slate-800 disabled:opacity-50"><FilePenLine className="h-4 w-4" />{openingId === form.id ? "פותח..." : pending ? "השלמת חתימה" : "פתיחה ועריכה"}</button> : null}<button type="button" disabled={downloadingId === form.id} onClick={() => download(form)} className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-300 px-3 text-sm font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Download className="h-4 w-4" />{downloadingId === form.id ? "מוריד..." : "הורדה"}</button>{pending ? <button type="button" disabled={deletingId !== null || openingId === form.id} onClick={() => deleteForm(form)} className="inline-flex h-10 shrink-0 items-center justify-center gap-1 rounded-xl border border-red-200 px-3 text-sm font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50" aria-label={`מחיקת הטופס ${form.file_name}`}><Trash2 className="h-4 w-4" />{deletingId === form.id ? "מוחק..." : "מחיקה"}</button> : null}</div>
         </article>;
       })}</div> : <div className="flex min-h-64 flex-col items-center justify-center px-4 text-center text-slate-500"><FileText className="h-10 w-10" /><p className="mt-3 font-extrabold">{tab === "pending" ? "אין טפסים שממתינים לחתימה" : forms.length ? "לא נמצאו טפסים מתאימים" : "המאגר עדיין ריק"}</p><p className="mt-1 text-sm">{tab === "pending" ? "טפסים שטרם הושלמו יופיעו כאן אוטומטית." : "טופס יופיע כאן אוטומטית לאחר שמירתו או הורדתו."}</p></div>}
     </section>
