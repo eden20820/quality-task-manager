@@ -30,7 +30,8 @@ function paragraph(text: string, options: { bold?: boolean; size?: number; align
       text: segment,
       rightToLeft: rtl && !/[A-Za-z0-9]/.test(segment),
       bold: options.bold,
-      size: options.size ?? 18,
+      size: 24,
+      sizeComplexScript: 24,
       font: formFont,
     })),
   });
@@ -106,10 +107,10 @@ export async function buildShelfProductInspectionDocx(payload: ShelfProductInspe
   ]);
   const document = new Document({
     fonts: [{ name: "David", data: regularFont, bold: boldFont }],
-    styles: { default: { document: { run: { font: formFont } } } },
-    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 360, right: 500, bottom: 650, left: 500 } } }, footers: { default: new Footer({ children: [new Paragraph({ bidirectional: true, alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: "נספח 8.4.2.1.0", bold: true, size: 18, font: formFont })] })] }) }, children: [
+    styles: { default: { document: { run: { font: formFont, size: 24, sizeComplexScript: 24 } } } },
+    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 360, right: 500, bottom: 650, left: 500 } } }, footers: { default: new Footer({ children: [new Paragraph({ bidirectional: true, alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new TextRun({ text: "נספח 8.4.2.1.0", bold: true, size: 24, font: formFont })] })] }) }, children: [
     new Paragraph({ alignment: AlignmentType.LEFT, spacing: { before: 0, after: 0 }, children: [new ImageRun({ data: Buffer.from(CAELI_LOGO_PNG_BASE64, "base64"), type: "png", transformation: { width: 108, height: 76 } })] }),
-    new Paragraph({ bidirectional: true, alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120 }, children: [new TextRun({ text: "טופס ביקורת קבלה למוצר מדף", bold: true, underline: {}, size: 30, font: formFont })] }),
+    new Paragraph({ bidirectional: true, alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120 }, children: [new TextRun({ text: "טופס ביקורת קבלה למוצר מדף", bold: true, underline: {}, size: 24, font: formFont })] }),
     ...(products.length > 1 ? [productsTable(payload), new Paragraph({ spacing: { before: 30, after: 0 } })] : []), detailsTable(payload),
     new Paragraph({ spacing: { before: 80, after: 0 } }), inspectionTable(payload),
     new Paragraph({ spacing: { before: 30, after: 0 } }), instructionTable(),
