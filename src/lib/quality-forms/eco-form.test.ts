@@ -51,7 +51,8 @@ describe("online ECO form", () => {
       const contents = page.node.Contents(); const streams = contents instanceof PDFArray ? contents.asArray().map(ref => pdf.context.lookup(ref)) : [contents];
       const operators = streams.filter((stream): stream is PDFRawStream => stream instanceof PDFRawStream).map(stream => Buffer.from(decodePDFRawStream(stream).decode()).toString()).join("\n");
       const sizes = Array.from(operators.matchAll(/\/[^\s]+\s+([\d.]+)\s+Tf/g), match => Number(match[1]));
-      expect(new Set(sizes)).toEqual(new Set([12]));
+      expect(new Set(sizes)).toEqual(new Set([12, 20]));
+      expect(sizes.filter(size => size === 20).length).toBeGreaterThan(0);
     }
     if (process.env.ECO_PDF_SAMPLE_PATH) await writeFile(process.env.ECO_PDF_SAMPLE_PATH, bytes);
   });
