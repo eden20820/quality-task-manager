@@ -1,12 +1,35 @@
-import { decodePDFRawStream, PDFArray, PDFDocument, PDFRawStream } from "pdf-lib";
-import { describe, expect, it } from "vitest";
+import { decodePDFRawStream, PDFArray, PDFDocument, PDFPage, PDFRawStream } from "pdf-lib";
+import { describe, expect, it, vi } from "vitest";
 import { buildDevelopmentInspectionPdf, extractDevelopmentInspectionPayload } from "./development-inspection-pdf";
 import { buildAdhesionLeakTestPdf } from "./adhesion-leak-test-pdf";
 import { createEmptyDevelopmentInspection } from "./development-inspection";
 import { createEmptyAdhesionLeakTest } from "./adhesion-leak-test";
-import { directionalTextLayout } from "./david-form-pdf";
+import { DavidFormPdf, directionalTextLayout, justifiedTextLayout } from "./david-form-pdf";
 
 describe("David 12 export typography", () => {
+  it("renders full PDF lines against both margins but does not stretch a paragraph's final line", async () => {
+    const spy=vi.spyOn(PDFPage.prototype,"drawText");
+    try {
+      const form=await DavidFormPdf.create("בדיקת יישור","TEST");
+      await form.table([[{text:"התאמה ABC DEF בהתאם לדרישות השרטוט ".repeat(12)+"\nסיום קצר",align:"justify"}]],[1]);
+      const words=spy.mock.calls.filter(([text])=>text==="התאמה"); expect(words.length).toBeGreaterThan(0);
+      const y=words[0][1]!.y;
+      const row=spy.mock.calls.filter(([,options])=>options?.y===y);
+      expect(Math.min(...row.map(([,options])=>options!.x!))).toBeCloseTo(42);
+      expect(Math.max(...row.map(([text,options])=>options!.x!+options!.font!.widthOfTextAtSize(text,12)))).toBeCloseTo(553.28);
+      const last=spy.mock.calls.find(([text])=>text==="סיום קצר")![1]!;
+      expect(last.x).toBeGreaterThan(450); expect(last.x!+last.font!.widthOfTextAtSize("סיום קצר",12)).toBeCloseTo(553.28);
+    } finally {spy.mockRestore();}
+  });
+  it("justifies actual word gaps to both edges without reversing mixed English phrases", () => {
+    const measure=(value:string)=>Array.from(value).length*6;
+    const words=justifiedTextLayout("בדיקה ABC DEF לפני השינוי",300,measure,"rtl")!;
+    expect(words[0].x).toBe(0); expect(words.at(-1)!.x+words.at(-1)!.width).toBeCloseTo(300);
+    const english=words.filter(word=>/ABC|DEF/.test(word.text)); expect(english.map(word=>word.text)).toEqual(["ABC","DEF"]);
+    const numbered=justifiedTextLayout("1. הסבר ABC לאחר השינוי",300,measure,"rtl")!; expect(numbered.at(-1)!.text).toBe("1.");
+    expect(justifiedTextLayout("מילה",300,measure)).toBeNull(); expect(justifiedTextLayout("מילה [X]",300,measure)).toBeNull();
+    const englishOnly=justifiedTextLayout("FIRST SECOND THIRD",200,measure)!;expect(englishOnly.map(word=>word.text)).toEqual(["FIRST","SECOND","THIRD"]);
+  });
   it("places Hebrew list markers on the right, including mixed English and wrapped list items", () => {
     for (const text of ["1. תיאור השינוי", "12) TEST-001 עדכון שרטוט", "2. בדיקה (ABC) לאחר שינוי"]) expect(directionalTextLayout(text).baseDirection).toBe("rtl");
     expect(directionalTextLayout("1. English description").baseDirection).toBe("ltr");

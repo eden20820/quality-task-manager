@@ -6,7 +6,7 @@ import { ecoFileLabel, type EcoAttachment } from "./eco-files";
 
 export const FORM_FONT_SIZE = 12;
 const height = 841.89, left = 36, width = 523.28, bottom = 778, lineHeight = 15;
-type Cell = { text: string; bold?: boolean; shade?: boolean; image?: string; imageHeight?: number; minHeight?: number; align?: "center" | "right"; attachments?: EcoAttachment[] };
+type Cell = { text: string; bold?: boolean; shade?: boolean; image?: string; imageHeight?: number; minHeight?: number; align?: "center" | "right" | "justify"; attachments?: EcoAttachment[] };
 export type FormCell = string | Cell;
 type Direction = "rtl" | "ltr";
 function tokens(text: string) { return text.split(/(\[X\]|\[ \])/).filter(Boolean); }
@@ -53,6 +53,31 @@ export function directionalTextLayout(value: string) {
   return { baseDirection, runs };
 }
 
+// Return visual left-to-right word positions while preserving whole LTR phrases
+// inside RTL paragraphs. Expand real word gaps only, never glyphs or a last line.
+export function justifiedTextLayout(text: string, available: number, measureWord: (value: string) => number, direction?: Direction) {
+  if (/\[(X| )\]/.test(text)) return null;
+  const layout = directionalTextLayout(text), groups: Array<{space: true} | {direction: Direction; text: string}> = [];
+  layout.runs.forEach((run,index) => {
+    if (index && (/\s$/.test(layout.runs[index-1].text) || /^\s/.test(run.text))) groups.push({space:true});
+    if (run.text.trim()) groups.push({direction:run.direction,text:run.text.trim()});
+  });
+  if ((direction ?? layout.baseDirection) === "rtl") groups.reverse();
+  const units = groups.flatMap(group => {
+    if ("space" in group) return [" "];
+    const words=group.text.match(/\S+|\s+/g) ?? [];
+    if (group.direction === "rtl") words.reverse();
+    return words.map(word=>group.direction==="rtl" ? word.replace(/[()]/g,c=>c==="("?")":"(") : word);
+  });
+  const spaces=units.filter(unit=>/^\s+$/.test(unit)).length;
+  if (!spaces) return null;
+  const widths=units.map(unit=>measureWord(/^\s+$/.test(unit)?" ":unit)), natural=widths.reduce((sum,width)=>sum+width,0);
+  if (natural > available) return null;
+  const extra=(available-natural)/spaces, words:Array<{text:string;x:number;width:number}>=[]; let x=0;
+  units.forEach((unit,index)=>{if(/^\s+$/.test(unit))x+=widths[index]+extra;else{words.push({text:unit,x,width:widths[index]});x+=widths[index];}});
+  return words;
+}
+
 // Every text operation uses exactly 12 pt. Cells grow and wrap instead of shrinking.
 export class DavidFormPdf {
   private page!: PDFPage;
@@ -73,13 +98,15 @@ export class DavidFormPdf {
     this.paint(this.title, this.titleSize > 12 ? left : left + 84, this.titleSize > 12 ? 76 : 58, this.titleSize > 12 ? width : width - 84, true, "center", this.titleSize);
     if (this.titleSize > 12) this.top = 116;
   }
-  private paint(text: string, x: number, top: number, available: number, bold = false, align = "center", size = FORM_FONT_SIZE) {
+  private paint(text: string, x: number, top: number, available: number, bold = false, align = "center", size = FORM_FONT_SIZE, direction?: Direction) {
     if (!text) return;
     const font = bold ? this.bold : this.regular;
     const layout = directionalTextLayout(text.replace(/\[(X| )\]/g, ""));
+    if (direction) layout.baseDirection = direction;
     const units = layoutUnits(font, text).map(unit => ({ ...unit, width: unit.width * size / FORM_FONT_SIZE }));
     const total = measure(font, text) * size / FORM_FONT_SIZE;
-    const start = x + Math.max(0, align === "right" ? available - total : (available - total) / 2);
+    const effectiveAlign = align === "start" ? layout.baseDirection === "rtl" ? "right" : "left" : align;
+    const start = x + Math.max(0, effectiveAlign === "right" ? available - total : effectiveAlign === "left" ? 0 : (available - total) / 2);
     let cursor = layout.baseDirection === "rtl" ? start + total : start;
     for (const [index, unit] of units.entries()) {
         const unitX = layout.baseDirection === "rtl" ? cursor - unit.width : cursor;
@@ -92,23 +119,30 @@ export class DavidFormPdf {
       cursor += (layout.baseDirection === "rtl" ? -1 : 1) * (unit.width + gap);
     }
   }
-  private wrap(text: string, available: number, bold = false): string[] {
+  private paintJustified(text: string, x: number, top: number, available: number, bold: boolean, direction: Direction) {
+    const font=bold?this.bold:this.regular, words=justifiedTextLayout(text,available,value=>textWidth(font,value),direction);
+    if (!words) {this.paint(text,x,top,available,bold,"start",FORM_FONT_SIZE,direction);return;}
+    for(const word of words)this.page.drawText(word.text,{x:x+word.x,y:height-top-FORM_FONT_SIZE,font,size:FORM_FONT_SIZE,color:rgb(0,0,0)});
+  }
+  private wrapLines(text: string, available: number, bold = false) {
     const font = bold ? this.bold : this.regular;
-    const lines: string[] = [];
+    const lines: Array<{text:string;last:boolean;direction:Direction}> = [];
     for (const paragraph of text.split(/\r?\n/)) {
+      const direction=directionalTextLayout(paragraph).baseDirection;
       let current = "";
       for (const word of paragraph.match(/\[(X| )\]|\S+/g) ?? []) {
         if (current && measure(font, `${current} ${word}`) <= available) { current += ` ${word}`; continue; }
-        if (current) { lines.push(current); current = ""; }
+        if (current) { lines.push({text:current,last:false,direction}); current = ""; }
         for (const character of Array.from(word)) {
-          if (current && measure(font, current + character) > available) { lines.push(current); current = ""; }
+          if (current && measure(font, current + character) > available) { lines.push({text:current,last:false,direction}); current = ""; }
           current += character;
         }
       }
-      lines.push(current);
+      lines.push({text:current,last:true,direction});
     }
     return lines;
   }
+  private wrap(text:string,available:number,bold=false) {return this.wrapLines(text,available,bold).map(line=>line.text);}
   private attachmentRows(files: EcoAttachment[], available: number) {
     const columns = Math.min(2, files.length), cardWidth = available / Math.max(1, columns);
     const rows = [];
@@ -141,7 +175,8 @@ export class DavidFormPdf {
     const sum = weights.reduce((a, b) => a + b, 0), widths = weights.map(weight => width * weight / sum);
     const render = async (source: FormCell[], header = false) => {
       const cells = source.map(cell => typeof cell === "string" ? { text: cell } : cell);
-      const wrapped = cells.map((cell, index) => this.wrap(cell.text, widths[index] - 12, cell.bold || header));
+      const lineLayouts = cells.map((cell, index) => this.wrapLines(cell.text, widths[index] - 12, cell.bold || header));
+      const wrapped = lineLayouts.map(lines=>lines.map(line=>line.text));
       const fileRows = cells.map((cell, index) => this.attachmentRows(cell.attachments ?? [], widths[index] - 12));
       const filesHeight = Math.max(0, ...fileRows.map(rows => rows.reduce((sum, row) => sum + row.height, 0)));
       const lineCount = Math.max(1, ...wrapped.map(lines => lines.length));
@@ -162,7 +197,11 @@ export class DavidFormPdf {
           const cell = cells[index];
           this.page.drawRectangle({ x, y: height - this.top - rowHeight, width: widths[index], height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.6, color: header || cell.shade ? rgb(0.94, 0.94, 0.94) : undefined });
           const lines = wrapped[index].slice(offset, offset + count);
-          lines.forEach((line, lineIndex) => this.paint(line, x + 6, this.top + this.padding + lineIndex * lineHeight, widths[index] - 12, cell.bold || header, cell.align));
+          lines.forEach((line, lineIndex) => {
+            const top=this.top+this.padding+lineIndex*lineHeight, layout=lineLayouts[index][offset+lineIndex];
+            if(cell.align === "justify" && !layout.last)this.paintJustified(line,x+6,top,widths[index]-12,Boolean(cell.bold||header),layout.direction);
+            else this.paint(line,x+6,top,widths[index]-12,cell.bold||header,cell.align==="justify"?"start":cell.align,FORM_FONT_SIZE,cell.align==="justify"?layout.direction:undefined);
+          });
           if (offset === 0 && fileRows[index].length) {
             let fileTop = this.top + rowHeight - attachmentHeight;
             for (const row of fileRows[index]) {
