@@ -8,7 +8,11 @@ describe("ECO modular editor rendering", () => {
     expect(html.match(/id="eco-document-/g)).toHaveLength(9);
     expect(html.match(/aria-label="הוספת מקטע במיקום זה"/g)).toHaveLength(10);
     for(const label of ["מספר טופס","גרסה חדשה","תיאור השינוי","אישורים נדרשים","פעולות נלוות","סגירת הטופס"])expect(html).toContain(label);
-    expect(html.match(/draggable="true"/g)).toHaveLength(9);
+    // Editor stays inert until archive handoff / local recovery has completed.
+    expect(html.match(/draggable="false"/g)).toHaveLength(9);
+    expect(html).toContain("inert=");
     expect(html).toContain("text-justify"); expect(html).toContain("מיקום");
+    for (const label of ["תצוגה מקדימה", "ביטול פעולה", "שחזור פעולה", "מקטעי המסמך", "במכשיר זה בלבד"]) expect(html).toContain(label);
+    expect(html).toContain('aria-label="ניווט וסידור מקטעי ECO"');
   });
 });
