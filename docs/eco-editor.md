@@ -18,7 +18,7 @@ The modal uses the shared accessible dialog with focus management. Requests abor
 
 ## Navigation and history
 
-- Desktop sticky section navigation supports jump and reorder; mobile uses a compact section picker. Existing inline reorder controls remain available.
+- The editor is a centered single column without a section sidebar or mobile section picker. Existing inline reorder controls remain available on each document block.
 - Undo/redo is one document-wide, immutable history bounded to 50 steps. Consecutive typing within one field is grouped within 700 ms; structural edits, catalog fills, image/signature changes and checkbox operations remain distinct.
 - Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z and Ctrl+Y work inside the editor. Loading/recovering a document and confirmed New/Clear establish a new history boundary.
 - No database migrations or new production credentials are needed for these features.

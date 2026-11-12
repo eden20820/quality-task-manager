@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
-import { ArrowRight, ArrowUp, ArrowDown, Download, Eye, List, Loader2, Plus, RotateCcw, Save, Trash2, PenLine, Undo2, Redo2 } from "lucide-react";
+import { ArrowRight, Download, Eye, Loader2, Plus, RotateCcw, Save, Trash2, PenLine, Undo2, Redo2 } from "lucide-react";
 import { toast } from "sonner";
 import { CatalogInput } from "./catalog-input";
 import { EcoAttachments } from "./eco-attachments";
@@ -36,7 +36,6 @@ export function EcoForm({ catalogItems, draftScope = "" }: { catalogItems: Catal
   const editor = useEcoEditor(draftScope);
   const { form, setForm, archiveId } = editor;
   const [preview, setPreview] = useState<EcoFormPayload | null>(null);
-  const [activeSection, setActiveSection] = useState("");
   const [busy, setBusy] = useState<"download" | "save" | "reset" | null>(null);
   const [signatureRow, setSignatureRow] = useState<number | null>(null);
   const [pendingMedia, setPendingMedia] = useState(0);
@@ -95,16 +94,6 @@ export function EcoForm({ catalogItems, draftScope = "" }: { catalogItems: Catal
     root?.addEventListener("keydown", shortcut as EventListener);
     return () => root?.removeEventListener("keydown", shortcut as EventListener);
   }, [locked, editor.undo, editor.redo]);
-  const sectionIds = layout.map(block => block.id).join("|");
-  useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(entries => {
-      const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-      if (visible[0]) setActiveSection(visible[0].target.id.slice("eco-document-".length));
-    }, { rootMargin: "-5% 0px -65% 0px", threshold: 0 });
-    for (const id of sectionIds.split("|")) { const section = document.getElementById(`eco-document-${id}`); if (section) observer.observe(section); }
-    return () => observer.disconnect();
-  }, [sectionIds]);
   const canText = layout.filter(block => block.kind === "text").length < 30, canImage = (form.illustrations?.length ?? 0) < 10;
   const [announcement, setAnnouncement] = useState("");
   function scrollToBlock(id: string, focus = false) { setTimeout(() => { const element = document.getElementById(`eco-document-${id}`); element?.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start"}); if (focus) element?.querySelector<HTMLInputElement | HTMLTextAreaElement>("input,textarea")?.focus({preventScroll:true}); },0); }
@@ -127,17 +116,7 @@ closure: (<Section title="סגירת הטופס ע״י מנהל איכות"><lab
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"><p role="status" aria-live="polite" className="font-bold text-slate-700">{editor.status}</p><span className="text-xs text-slate-500">טיוטה במכשיר זה בלבד · לשמירה במערכת יש ללחוץ על שמירה</span></div>
     {editor.error ? <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950"><p>{editor.error}</p>{editor.conflict ? <span className="text-sm">אפשר לשמור ידנית במערכת לפני רענון כדי לשמור את השינויים שלך.</span> : <button type="button" onClick={() => void editor.retryAutosave()} className="rounded-lg border border-amber-400 px-3 py-2 font-bold">ניסיון שמירה נוסף</button>}</div> : null}
     {editor.recovery ? <section aria-label="שחזור טיוטה" className="rounded-xl border border-blue-300 bg-blue-50 p-4"><h2 className="font-black text-blue-950">נמצאה טיוטה שלא הושלמה</h2><p className="mt-2 text-sm text-blue-900">נשמרה במכשיר זה ב־{new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" }).format(new Date(editor.recovery.updatedAt))}. לשחזר אותה או להמשיך בלעדיה?</p><div className="mt-3 flex flex-wrap gap-3"><button type="button" onClick={() => void editor.resolveRecovery(true)} className="rounded-lg bg-blue-700 px-4 py-3 font-bold text-white">שחזור טיוטה</button><button type="button" onClick={() => { if (window.confirm("להסיר את הטיוטה המקומית ולהמשיך בלעדיה?")) void editor.resolveRecovery(false); }} className={controlClass}>המשך ללא הטיוטה</button></div></section> : null}
-    <div className="mx-auto grid max-w-[1600px] items-start gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-      <aside className="rounded-xl border border-slate-200 bg-white p-3 xl:sticky xl:top-5">
-        <h2 className="mb-3 flex items-center gap-2 font-black"><List className="h-5 w-5 text-blue-700" />מקטעי המסמך</h2>
-        <label className="block text-sm font-bold xl:hidden">מעבר למקטע<select value={positions.some(position => position.id === activeSection) ? activeSection : positions[0]?.id} disabled={locked} onChange={event => { setActiveSection(event.target.value); scrollToBlock(event.target.value); }} className={`${inputClass} mt-2`}>{positions.map((position, index) => <option key={position.id} value={position.id}>{index + 1}. {position.title}</option>)}</select></label>
-        <nav aria-label="ניווט וסידור מקטעי ECO" className="hidden max-h-[75dvh] space-y-1 overflow-y-auto xl:block">
-          {positions.map((position, index) => <div key={position.id} className={`flex items-center gap-1 rounded-lg ${activeSection === position.id ? "bg-blue-50 text-blue-800" : "text-slate-600"}`}>
-            <button type="button" disabled={locked} aria-current={activeSection === position.id ? "location" : undefined} onClick={() => { setActiveSection(position.id); scrollToBlock(position.id); }} className="min-h-11 min-w-0 flex-1 break-words px-2 py-2 text-start text-sm font-bold hover:text-blue-700 disabled:opacity-40">{index + 1}. {position.title}</button>
-            <div className="flex shrink-0 flex-col"><button type="button" disabled={locked || index === 0} aria-label={`הזזת ${position.title} למעלה בסרגל`} onClick={() => moveBlock(position.id, index - 1)} className="rounded p-2 hover:bg-blue-100 disabled:opacity-25"><ArrowUp className="h-4 w-4" /></button><button type="button" disabled={locked || index === positions.length - 1} aria-label={`הזזת ${position.title} למטה בסרגל`} onClick={() => moveBlock(position.id, index + 1)} className="rounded p-2 hover:bg-blue-100 disabled:opacity-25"><ArrowDown className="h-4 w-4" /></button></div>
-          </div>)}
-        </nav>
-      </aside>
+    <div className="mx-auto w-full max-w-6xl">
       <fieldset disabled={locked} inert={locked} className="min-w-0"><legend className="sr-only">עריכת טופס ECO</legend><main className="min-w-0 space-y-4">
       <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"><h2 className="font-black text-blue-950">מבנה המסמך</h2><p className="mt-1 text-sm leading-6 text-blue-900">הוסף מקטע בכל מקום, ושלב טקסט, תמונות ולפני ואחרי בכל סדר. להזזה השתמש בגרירה, בחיצים או בבחירת מיקום. הסדר נשמר גם ב־PDF.</p></div>
       <EcoInsertControls onInsert={kind => addBlock(kind, null)} disabled={locked} canText={canText} canImage={canImage} />
@@ -148,5 +127,5 @@ closure: (<Section title="סגירת הטופס ע״י מנהל איכות"><lab
         </EcoDocumentBlock>
         <EcoInsertControls onInsert={kind => addBlock(kind, block.id)} disabled={locked} canText={canText} canImage={canImage} />
       </Fragment>)}
-    </main></fieldset></div><footer className="mx-auto flex max-w-[1600px] justify-end rounded-xl border border-slate-200 bg-white p-4">{actions}</footer>{preview ? <EcoPreview payload={preview} onClose={() => setPreview(null)} /> : null}</div>;
+    </main></fieldset></div><footer className="mx-auto flex w-full max-w-6xl justify-end rounded-xl border border-slate-200 bg-white p-4">{actions}</footer>{preview ? <EcoPreview payload={preview} onClose={() => setPreview(null)} /> : null}</div>;
 }
