@@ -9,6 +9,7 @@ export function SignaturePad({ label, value, onChange }: { label: string; value:
   const [hasInk, setHasInk] = useState(Boolean(value));
 
   useEffect(() => {
+    setHasInk(Boolean(value));
     const canvas = canvasRef.current;
     if (!canvas) return;
     const context = canvas.getContext("2d");
