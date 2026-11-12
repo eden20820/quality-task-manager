@@ -80,16 +80,18 @@ export function justifiedTextLayout(text: string, available: number, measureWord
 
 // Every text operation uses exactly 12 pt. Cells grow and wrap instead of shrinking.
 export class DavidFormPdf {
+  private flowTextRows = false;
   private page!: PDFPage;
   private top = 96;
   private padding = 5;
   private attachmentNumber = 0;
   private constructor(readonly pdf: PDFDocument, private regular: PDFFont, private bold: PDFFont, private logo: PDFImage, private title: string, private annex: string, private titleSize = 12) { this.newPage(); }
-  static async create(title: string, annex: string, options: { cellPadding?: number; titleSize?: number } = {}) {
+  static async create(title: string, annex: string, options: { cellPadding?: number; titleSize?: number; flowTextRows?: boolean } = {}) {
     const pdf = await PDFDocument.create(); pdf.registerFontkit(fontkit);
     const [regular, bold, logo] = await Promise.all([readFile(path.join(process.cwd(), "assets/fonts/David.ttf")), readFile(path.join(process.cwd(), "assets/fonts/David-Bold.ttf")), readFile(path.join(process.cwd(), "public/caeli-logo.png"))]);
     const form = new DavidFormPdf(pdf, await pdf.embedFont(regular, { subset: true }), await pdf.embedFont(bold, { subset: true }), await pdf.embedPng(logo), title, annex, options.titleSize ?? 12);
     form.padding = Math.max(5, Math.min(12, options.cellPadding ?? 5));
+    form.flowTextRows = options.flowTextRows ?? false;
     pdf.setTitle(title); pdf.setSubject(`נספח ${annex}`); return form;
   }
   private newPage() {
@@ -180,13 +182,27 @@ export class DavidFormPdf {
       const fileRows = cells.map((cell, index) => this.attachmentRows(cell.attachments ?? [], widths[index] - 12));
       const filesHeight = Math.max(0, ...fileRows.map(rows => rows.reduce((sum, row) => sum + row.height, 0)));
       const lineCount = Math.max(1, ...wrapped.map(lines => lines.length));
+      // Narrative cells consume the current page before continuing. Keep images,
+      // attachment cards and table headers atomic; other forms retain their layout.
+      const flowing = this.flowTextRows && !header && !cells.some(cell => cell.image || cell.attachments?.length);
       for (let offset = 0; offset < lineCount;) {
         const remaining = lineCount - offset;
         let count = Math.min(remaining, 40);
-        const minimumHeight = offset === 0 ? Math.min(630, Math.max(0, ...cells.map(cell => cell.minHeight ?? 0))) : 0;
+        let minimumHeight = offset === 0 ? Math.min(630, Math.max(0, ...cells.map(cell => cell.minHeight ?? 0))) : 0;
         const attachmentHeight = offset === 0 ? filesHeight : 0;
         const required = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + this.padding * 2) + attachmentHeight;
-        if (this.top + required > bottom) {
+        if (flowing) {
+          // Reserve two lines when possible, avoiding a heading or lone line at
+          // the bottom. Do NOT reserve the entire paragraph's minimum height.
+          if (bottom - this.top < Math.min(remaining, 2) * lineHeight + this.padding * 2) {
+            this.newPage();
+            if (headers) await render(headers, true);
+          }
+          const available = bottom - this.top;
+          count = Math.min(remaining, Math.max(1, Math.floor((available - this.padding * 2) / lineHeight)));
+          if (remaining - count === 1 && count > 2) count--;
+          minimumHeight = Math.min(minimumHeight, available);
+        } else if (this.top + required > bottom) {
           this.newPage();
           if (!header && headers) await render(headers, true);
           count = Math.min(remaining, Math.floor((bottom - this.top - this.padding * 2) / lineHeight));

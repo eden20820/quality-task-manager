@@ -9,9 +9,9 @@ const date = (value: string) => { const [y, m, d] = value.split("-"); return y &
 const mark = (checked: boolean) => checked ? "[X]" : "[ ]";
 const label = (text: string): FormCell => ({ text, bold: true, shade: true, align: "right" });
 export async function buildEcoFormPdf(payload: EcoFormPayload) {
-  const form = await DavidFormPdf.create("טופס בקשה לשינוי / Change Control", "8.5.6.1.0", { cellPadding: 7, titleSize: 20 });
+  const form = await DavidFormPdf.create("טופס בקשה לשינוי / Change Control", "8.5.6.1.0", { cellPadding: 7, titleSize: 20, flowTextRows: true });
   const paragraph = async (title: string, value: string, minHeight: number) => {
-    form.gap(12); form.ensureSpace(29 + Math.min(minHeight, 150));
+    form.gap(12); form.ensureSpace((title.trim() ? 29 : 0) + 44);
     if (title.trim()) await form.table([[{ text: title, bold: true, shade: true }]], [1]);
     await form.table([[{ text: value, align: "justify", minHeight }]], [1]);
   };
@@ -57,7 +57,7 @@ initialApproval: async () => {
 
 },
 impact: async () => {
-  form.gap(12); form.ensureSpace(175);
+  form.gap(12); form.ensureSpace(73);
   await form.table([[{ text: "השפעת השינוי - למילוי ע״י הבטחת איכות", bold: true, shade: true }]], [1]);
   await form.table([[{ text: payload.productImpact, align: "justify", minHeight: 42 }, label("על איכות המוצר")], [{ text: payload.qualitySystemImpact, align: "justify", minHeight: 42 }, label("על מערכת האיכות")], [{ text: payload.regulatoryImpact, align: "justify", minHeight: 42 }, label("על חוקים, תקנות רגולטוריות")]], [70, 30]);
 
@@ -72,7 +72,8 @@ actions: async () => {
   if (!payload.layout) form.startPage(); else { form.gap(12); form.ensureSpace(95); }
   await form.table([[{ text: "פעולות נלוות", bold: true, shade: true }], ["(בשינוי גרפיקה יש להתייחס לכל רמות האריזה)"]], [1]);
   const requirement = (value: string, completed: string) => `${mark(value === "required")} נדרש, בוצע בתאריך: ${date(completed)}    ${mark(value === "not-required")} לא נדרש`;
-  await form.table([[{ text: `${requirement(payload.risk.requirement, payload.risk.date)}\nסקר סיכונים\n${payload.risk.survey}`, align: "justify", minHeight: 70, attachments: payload.risk.attachments }, label("ביצוע ניהול סיכונים")], [
+  await form.table([[{ text: `${requirement(payload.risk.requirement, payload.risk.date)}\nסקר סיכונים\n${payload.risk.survey}`, align: "justify", minHeight: 70 }, label("ביצוע ניהול סיכונים")],
+    ...(payload.risk.attachments?.length ? [[{ text: "", attachments: payload.risk.attachments }, label("קבצים מצורפים לסקר סיכונים")]] : []), [
     { text: `${mark(payload.inventory === "none")} אין   ${mark(payload.inventory === "use")} שימוש במלאי   ${mark(payload.inventory === "reject")} פסול   ${mark(payload.inventory === "other")} אחר (פרט): ${payload.inventoryOther}`, align: "right" }, label("מלאי נוכחי")], [
     { text: `${mark(payload.openOrders === "none")} אין   ${mark(payload.openOrders === "accept")} קבלה   ${mark(payload.openOrders === "cancel")} ביטול   ${mark(payload.openOrders === "other")} אחר (פרט): ${payload.openOrdersOther}`, align: "right" }, label("הזמנות פתוחות")],
     ...payload.actions.map((action, index): FormCell[] => [{ text: requirement(action.requirement, action.date), align: "right", attachments: action.attachments }, label(ECO_ACTIONS[index])]),
@@ -81,7 +82,8 @@ actions: async () => {
 
 },
 closure: async () => {
-  form.ensureSpace(175);
+  // Keep a short decision with its signature; long explanations are free to flow.
+  form.ensureSpace(payload.closure.reason.length < 70 && !payload.closure.reason.includes("\n") ? 175 : 83);
   await form.section("סגירת הטופס ע״י מנהל איכות");
   await form.table([[{ text: `${mark(payload.closure.decision === "approved")} מאושר    ${mark(payload.closure.decision === "rejected")} נדחה. הסבר: ${payload.closure.reason}`, align: "justify" }]], [1]);
   await signature("אישור מנהל איכות", payload.closure);
