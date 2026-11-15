@@ -5,6 +5,8 @@ export const ECO_FORM_TITLE = "טופס ECO";
 export function isEcoFormDescription(description: string | null) { return parseArchivedFormDescription(description).title === ECO_FORM_TITLE; }
 export const RIR_ARCHIVE_EDIT_STORAGE_KEY = "quality-rir-archive-edit";
 export const SHELF_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY = "quality-shelf-inspection-archive-edit";
+export const SHELF_INSPECTION_ARCHIVE_RECORD_STORAGE_KEY = "quality-shelf-inspection-archive-record";
+export const SHELF_INSPECTION_FORM_TITLE = "טופס ביקורת קבלה למוצר מדף";
 export const ADHESION_LEAK_TEST_ARCHIVE_EDIT_STORAGE_KEY = "quality-adhesion-leak-test-archive-edit";
 export const ADHESION_LEAK_TEST_ARCHIVE_RECORD_STORAGE_KEY = "quality-adhesion-leak-test-archive-record";
 export const ADHESION_LEAK_TEST_FORM_TITLE = "טופס בדיקת אטימות – הדבקה";
@@ -12,7 +14,7 @@ export const DEVELOPMENT_INSPECTION_ARCHIVE_EDIT_STORAGE_KEY = "quality-developm
 export const DEVELOPMENT_INSPECTION_ARCHIVE_RECORD_STORAGE_KEY = "quality-development-inspection-archive-record";
 export const DEVELOPMENT_INSPECTION_FORM_TITLE = "טופס ביקורת קבלה – מוצרי פיתוח";
 
-export type QualityFormStatus = "pending-signature" | "signed";
+export type QualityFormStatus = "pending-signature" | "signed" | "archived";
 
 const FORM_STATUS_TOKEN = "|||status:";
 
@@ -23,7 +25,7 @@ export function buildArchivedFormDescription(title: string, status?: QualityForm
 export function parseArchivedFormDescription(description: string | null) {
   const value = description ?? "טופס מקוון";
   const [title, rawStatus] = value.split(FORM_STATUS_TOKEN, 2);
-  const status = rawStatus === "pending-signature" || rawStatus === "signed" ? rawStatus : null;
+  const status = rawStatus === "pending-signature" || rawStatus === "signed" || rawStatus === "archived" ? rawStatus : null;
   return { title, status: status as QualityFormStatus | null };
 }
 

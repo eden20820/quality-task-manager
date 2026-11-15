@@ -80,25 +80,32 @@ export function justifiedTextLayout(text: string, available: number, measureWord
 
 // Every text operation uses exactly 12 pt. Cells grow and wrap instead of shrinking.
 export class DavidFormPdf {
+  private compactRows = false;
   private flowTextRows = false;
+  private tableLeft = left;
+  private tableWidth = width;
   private page!: PDFPage;
   private top = 96;
   private padding = 5;
   private attachmentNumber = 0;
   private constructor(readonly pdf: PDFDocument, private regular: PDFFont, private bold: PDFFont, private logo: PDFImage, private title: string, private annex: string, private titleSize = 12) { this.newPage(); }
-  static async create(title: string, annex: string, options: { cellPadding?: number; titleSize?: number; flowTextRows?: boolean } = {}) {
+  static async create(title: string, annex: string, options: { cellPadding?: number; titleSize?: number; flowTextRows?: boolean; tableWidth?: number; compactRows?: boolean } = {}) {
     const pdf = await PDFDocument.create(); pdf.registerFontkit(fontkit);
     const [regular, bold, logo] = await Promise.all([readFile(path.join(process.cwd(), "assets/fonts/David.ttf")), readFile(path.join(process.cwd(), "assets/fonts/David-Bold.ttf")), readFile(path.join(process.cwd(), "public/caeli-logo.png"))]);
     const form = new DavidFormPdf(pdf, await pdf.embedFont(regular, { subset: true }), await pdf.embedFont(bold, { subset: true }), await pdf.embedPng(logo), title, annex, options.titleSize ?? 12);
-    form.padding = Math.max(5, Math.min(12, options.cellPadding ?? 5));
+    form.compactRows = options.compactRows ?? false;
+    form.padding = Math.max(form.compactRows ? 3 : 5, Math.min(12, options.cellPadding ?? (form.compactRows ? 3 : 5)));
+    if (form.compactRows && form.titleSize > 12) form.top = 110;
     form.flowTextRows = options.flowTextRows ?? false;
+    form.tableWidth = Math.max(380, Math.min(width, options.tableWidth ?? width));
+    form.tableLeft = (595.28 - form.tableWidth) / 2;
     pdf.setTitle(title); pdf.setSubject(`נספח ${annex}`); return form;
   }
   private newPage() {
     this.page = this.pdf.addPage([595.28, height]); this.top = 96;
     this.page.drawImage(this.logo, { x: left, y: height - 70, width: 74, height: 52 });
     this.paint(this.title, this.titleSize > 12 ? left : left + 84, this.titleSize > 12 ? 76 : 58, this.titleSize > 12 ? width : width - 84, true, "center", this.titleSize);
-    if (this.titleSize > 12) this.top = 116;
+    if (this.titleSize > 12) this.top = this.compactRows ? 110 : 116;
   }
   private paint(text: string, x: number, top: number, available: number, bold = false, align = "center", size = FORM_FONT_SIZE, direction?: Direction) {
     if (!text) return;
@@ -174,7 +181,7 @@ export class DavidFormPdf {
     this.page.node.addAnnot(annotation);
   }
   async table(rows: FormCell[][], weights: number[], headers?: FormCell[]) {
-    const sum = weights.reduce((a, b) => a + b, 0), widths = weights.map(weight => width * weight / sum);
+    const sum = weights.reduce((a, b) => a + b, 0), widths = weights.map(weight => this.tableWidth * weight / sum);
     const render = async (source: FormCell[], header = false) => {
       const cells = source.map(cell => typeof cell === "string" ? { text: cell } : cell);
       const lineLayouts = cells.map((cell, index) => this.wrapLines(cell.text, widths[index] - 12, cell.bold || header));
@@ -190,7 +197,8 @@ export class DavidFormPdf {
         let count = Math.min(remaining, 40);
         let minimumHeight = offset === 0 ? Math.min(630, Math.max(0, ...cells.map(cell => cell.minHeight ?? 0))) : 0;
         const attachmentHeight = offset === 0 ? filesHeight : 0;
-        const required = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + this.padding * 2) + attachmentHeight;
+        const baseHeight = cells.some(cell => cell.image) ? this.compactRows ? 30 : 38 : this.compactRows ? 21 : 25;
+        const required = Math.max(baseHeight, minimumHeight, count * lineHeight + this.padding * 2) + attachmentHeight;
         if (flowing) {
           // Reserve two lines when possible, avoiding a heading or lone line at
           // the bottom. Do NOT reserve the entire paragraph's minimum height.
@@ -207,8 +215,8 @@ export class DavidFormPdf {
           if (!header && headers) await render(headers, true);
           count = Math.min(remaining, Math.floor((bottom - this.top - this.padding * 2) / lineHeight));
         }
-        const rowHeight = Math.max(cells.some(cell => cell.image) ? 38 : 25, minimumHeight, count * lineHeight + this.padding * 2) + attachmentHeight;
-        let x = left;
+        const rowHeight = Math.max(baseHeight, minimumHeight, count * lineHeight + this.padding * 2) + attachmentHeight;
+        let x = this.tableLeft;
         for (let index = 0; index < cells.length; index++) {
           const cell = cells[index];
           this.page.drawRectangle({ x, y: height - this.top - rowHeight, width: widths[index], height: rowHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.6, color: header || cell.shade ? rgb(0.94, 0.94, 0.94) : undefined });
@@ -244,7 +252,7 @@ export class DavidFormPdf {
     if (headers) await render(headers, true);
     for (const row of rows) await render(row);
   }
-  async section(title: string) { this.top += 10; if (this.top + 70 > bottom) this.newPage(); await this.table([[{ text: title, bold: true, shade: true }]], [1]); }
+  async section(title: string) { this.top += this.compactRows ? 5 : 10; if (this.top + (this.compactRows ? 45 : 70) > bottom) this.newPage(); await this.table([[{ text: title, bold: true, shade: true }]], [1]); }
   startPage() { this.newPage(); }
   gap(points = 12) { this.top += points; }
   ensureSpace(points: number) { if (this.top + points > bottom) this.newPage(); }

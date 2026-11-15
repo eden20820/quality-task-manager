@@ -5,6 +5,14 @@ import { buildDevelopmentInspectionPdf, developmentPdfTextLayout, extractDevelop
 import { createEmptyDevelopmentInspection, emptyDevelopmentProduct, getDevelopmentProducts, isDevelopmentInspectionPayload, withDevelopmentProducts } from "./development-inspection";
 
 describe("development inspection form", () => {
+  it("fits the standard completed form including both signatures on one A4 page without shrinking David 12", async () => {
+    const p = createEmptyDevelopmentInspection("2026-11-15");
+    Object.assign(p, { supplierName: "ספק לדוגמה", catalogNumber: "MPL-AL6050-1R5", itemDescription: "סליל", receivedQuantity: "15", inspectedQuantity: "3", checkedByName: "בודק", approvedByName: "מאשר", checkedBySignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", approvedBySignature: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=" });
+    const bytes = await buildDevelopmentInspectionPdf(p);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+    expect(await extractDevelopmentInspectionPayload(bytes)).toEqual(p);
+    if (process.env.DEVELOPMENT_SIGNED_ONE_PAGE_PATH) await writeFile(process.env.DEVELOPMENT_SIGNED_ONE_PAGE_PATH, bytes);
+  });
   it("loads legacy single-product forms and synchronizes archive identifiers after edits", () => {
     const legacy = { ...createEmptyDevelopmentInspection("2026-11-11"), catalogNumber: "OLD-1", itemDescription: "פריט קודם" };
     expect(getDevelopmentProducts(legacy)[0].catalogNumber).toBe("OLD-1");

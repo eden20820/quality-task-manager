@@ -31,6 +31,14 @@ const sample: ShelfProductInspectionPayload = {
 };
 
 describe("shelf product inspection DOCX", () => {
+  it("keeps missing signatures blank and preserves them when reopened", async () => {
+    const source = { ...sample, includeInspectorSignature: false, includeApproverSignature: false };
+    const buffer = await buildShelfProductInspectionDocx(source);
+    const xml = await (await JSZip.loadAsync(buffer)).file("word/document.xml")!.async("string");
+    expect((xml.match(/<w:drawing>/g) ?? []).length).toBe(1); // logo only
+    expect(await parseShelfProductInspectionDocx(buffer)).toEqual(source);
+    if (process.env.SHELF_UNSIGNED_DOCX_SAMPLE_PATH) await writeFile(process.env.SHELF_UNSIGNED_DOCX_SAMPLE_PATH, buffer);
+  });
   it("creates a complete single-page inspection document", async () => {
     const buffer = await buildShelfProductInspectionDocx(sample);
     const zip = await JSZip.loadAsync(buffer);
