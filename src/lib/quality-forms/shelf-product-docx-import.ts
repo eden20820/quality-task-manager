@@ -99,6 +99,9 @@ export async function parseShelfProductInspectionDocx(data: Buffer | Uint8Array)
   const inspectorNameText = inspectorCells.find((cell) => /^שם\s*:?[\s\u00a0]/.test(cell))?.replace(/^שם\s*:?\s*/, "") ?? "";
 
   return {
+    // Preserve actual missing signature cells; never auto-add them on reopen.
+    ...(!/<w:(drawing|pict)\b/.test(topLevelBlocks(tables.at(-1) ?? "", "w:tr")[1] ?? "") ? { includeInspectorSignature: false } : {}),
+    ...(!/<w:(drawing|pict)\b/.test(topLevelBlocks(tables.at(-1) ?? "", "w:tr")[3] ?? "") ? { includeApproverSignature: false } : {}),
     products,
     productName: products[0]?.productName ?? "",
     catalogNumber: products[0]?.catalogNumber ?? "",

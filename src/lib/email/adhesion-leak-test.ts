@@ -1,13 +1,11 @@
 import "server-only";
 
 import { sendBrevoEmail } from "./brevo";
+import { QUALITY_FORM_RECIPIENTS } from "./pending-form";
 
 import type { AdhesionLeakTestPayload } from "@/lib/quality-forms/adhesion-leak-test";
 
-export const ADHESION_LEAK_TEST_RECIPIENTS = [
-  { name: "עדן", email: "eden@caeli.pro" },
-  { name: "סרגיי", email: "sergey@caeli.pro" },
-] as const;
+export const ADHESION_LEAK_TEST_RECIPIENTS = QUALITY_FORM_RECIPIENTS;
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] ?? character);

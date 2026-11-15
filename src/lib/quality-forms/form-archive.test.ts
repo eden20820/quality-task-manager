@@ -20,6 +20,10 @@ describe("quality form archive filenames", () => {
 });
 
 describe("quality form archive status", () => {
+  it("does not treat a manual archive without signature as signed or pending", () => {
+    const description = buildArchivedFormDescription(ADHESION_LEAK_TEST_FORM_TITLE, "archived");
+    expect(parseArchivedFormDescription(description).status).toBe("archived"); expect(isPendingSignatureDescription(description)).toBe(false);
+  });
   it("stores and hides the internal signature status", () => {
     const description = buildArchivedFormDescription(ADHESION_LEAK_TEST_FORM_TITLE, "pending-signature");
     expect(parseArchivedFormDescription(description)).toEqual({ title: ADHESION_LEAK_TEST_FORM_TITLE, status: "pending-signature" });

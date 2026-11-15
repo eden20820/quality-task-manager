@@ -19,39 +19,49 @@ export async function extractDevelopmentInspectionPayload(bytes: Uint8Array) {
 
 
 export async function buildDevelopmentInspectionPdf(payload: DevelopmentInspectionPayload) {
-  const form = await DavidFormPdf.create("טופס ביקורת קבלה - מוצרי פיתוח", "8.4.2.3.2");
-  const field = (name: string, value: string): FormCell[] => [value.trim(), { text: name, bold: true, shade: true }];
-  const fields = (rows: Array<[string, string]>) => form.table(rows.map(([name, value]) => field(name, value)), [70, 30]);
+  const form = await DavidFormPdf.create("טופס ביקורת קבלה - מוצרי פיתוח", "8.4.2.3.2", { titleSize: 19, tableWidth: 475, compactRows: true });
   const mark = (checked: boolean) => checked ? "[X]" : "[ ]";
-  const choices = (rows: Array<[string, boolean]>) => form.table([[rows.map(([text, checked]) => `${mark(checked)} ${text}`).join("\n")]], [1]);
+  const label = (text: string): FormCell => ({ text, bold: true, shade: true, align: "right" });
+  const pair = (a: [string, string], b: [string, string]): FormCell[] => [b[1].trim(), label(b[0]), a[1].trim(), label(a[0])];
+  const choices = (items: Array<[string, boolean]>) => items.map(([text, checked]) => mark(checked) + " " + text).join("    ");
   const products = getDevelopmentProducts(payload);
-  await fields([["תאריך", formatDate(payload.date)], ["שם הספק", payload.supplierName]]);
+  await form.table([pair(["שם הספק", payload.supplierName], ["תאריך", formatDate(payload.date)])], [23, 17, 43, 17]);
   if (products.length === 1) {
     const p = products[0];
-    await fields([["מק״ט", p.catalogNumber], ["תיאור פריט", p.itemDescription], ["מספר שרטוט", p.drawingNumber], ["גרסה", p.revision], ["כמות שהתקבלה", p.receivedQuantity], ["כמות שנבדקה", p.inspectedQuantity]]);
+    await form.table([
+      pair(["תיאור פריט", p.itemDescription], ["מק״ט", p.catalogNumber]),
+      pair(["מספר שרטוט", p.drawingNumber], ["גרסה", p.revision]),
+    ], [23, 17, 43, 17]);
+    await form.table([[{ text: "כמות שנבדקה: " + p.inspectedQuantity, align: "right" }, { text: "כמות שהתקבלה: " + p.receivedQuantity, align: "right" }]], [1, 1]);
   } else {
     await form.section("מוצרים שהתקבלו");
-    await form.table(products.map((p, i) => [p.inspectedQuantity, p.receivedQuantity, p.revision, p.drawingNumber, p.catalogNumber, p.itemDescription, String(i + 1)]), [60, 60, 40, 80, 75, 180, 28], ["כמות שנבדקה", "כמות שהתקבלה", "גרסה", "מספר שרטוט", "מק״ט", "תיאור פריט", "#"]);
+    await form.table(products.map((p, i) => [p.inspectedQuantity, p.receivedQuantity, p.revision, p.drawingNumber, p.catalogNumber, p.itemDescription, String(i + 1)]), [62, 68, 46, 72, 73, 124, 30], ["כמות שנבדקה", "כמות שהתקבלה", "גרסה", "מספר שרטוט", "מק״ט", "תיאור פריט", "#"]);
   }
-  await form.section("בדיקת מסמכים");
-  await choices([["התקבל COC", payload.documents.coc], ["התקבל דו״ח בדיקה", payload.documents.inspectionReport], ["אין מסמכים נלווים", payload.documents.none]]);
-  await form.section("בדיקות ויזואליות בסיסיות");
-  await choices([["שלמות האריזה", payload.visualChecks.packageIntegrity], ["סימון/זיהוי", payload.visualChecks.marking], ["תוקף (אם רלוונטי)", payload.visualChecks.validity]]);
-  await fields([["הערות", payload.visualNotes]]);
+  form.gap(5);
+  await form.table([
+    [{ text: choices([["התקבל COC", payload.documents.coc], ["התקבל דו״ח בדיקה", payload.documents.inspectionReport], ["אין מסמכים נלווים", payload.documents.none]]), align: "right" }, label("בדיקת מסמכים")],
+    [{ text: choices([["שלמות האריזה", payload.visualChecks.packageIntegrity], ["סימון/זיהוי", payload.visualChecks.marking], ["תוקף (אם רלוונטי)", payload.visualChecks.validity]]), align: "right" }, label("בדיקה ויזואלית")],
+    [{ text: payload.visualNotes, align: "right" }, label("הערות")],
+  ], [78, 22]);
   await form.section("בדיקת התאמה לשרטוט / דרישה");
   await form.table(payload.drawingRows.map((r, i) => [r.conformity === "pass" ? "תקין" : r.conformity === "fail" ? "לא תקין" : "", r.actualResult, r.inspectionMethod, r.requirement, r.characteristic, String(i + 1)]), [65, 90, 85, 115, 140, 28], ["תקין/לא תקין", "תוצאה בפועל", "אמצעי בדיקה", "דרישה/טולרנס", "מאפיין שנבדק", "#"]);
-  await choices([["תואם לדרישה ההנדסית", payload.generalConformity === "conforms"], ["קיים פער", payload.generalConformity === "gap"]]);
-  await fields([["פרטי הפער", payload.gapDetails]]);
-  await form.section("תיעוד חריגות");
-  await form.table([[`נמצאה אי התאמה?  ${mark(payload.nonconformityFound === "yes")} כן   ${mark(payload.nonconformityFound === "no")} לא`]], [1]);
-  await choices([["מאושר לשימוש בפיתוח למרות חריגה", payload.deviationActions.developmentUse], ["נדרש תיקון/עיבוד חוזר", payload.deviationActions.rework], ["להחזיר לספק", payload.deviationActions.returnToSupplier], ["נפתחה אי-התאמה", payload.deviationActions.nonconformityOpened]]);
-  await fields([["מספר אי-התאמה", payload.nonconformityNumber]]);
-  await form.section("סטטוס סופי");
+  await form.table([
+    [{ text: choices([["תואם לדרישה ההנדסית", payload.generalConformity === "conforms"], ["קיים פער", payload.generalConformity === "gap"]]), align: "right" }],
+    [{ text: "פרטי הפער: " + payload.gapDetails, align: "right" }],
+  ], [1]);
+  form.gap(5);
   const statuses: Array<[string, DevelopmentInspectionPayload["finalStatus"]]> = [["מאושר לשימוש בפיתוח", "approved"], ["מאושר לשימוש בפיתוח בכפוף לחריגה מאושרת", "approved-deviation"], ["נדרש תיקון או עיבוד חוזר", "rework"], ["בהמתנה לבירור / On Hold", "on-hold"], ["נדרש שיפור תכן פנימי", "design-improvement"], ["אחר", "other"]];
-  await choices(statuses.map(([text, status]) => [text, payload.finalStatus === status]));
-  await fields([["פירוט שיפור תכן", payload.designImprovementDetails], ["פירוט אחר", payload.otherStatusDetails]]);
+  await form.table([[label("סטטוס סופי"), label("תיעוד חריגות")]], [1, 1]);
+  const deviations = [
+    "נמצאה אי התאמה? " + choices([["כן", payload.nonconformityFound === "yes"], ["לא", payload.nonconformityFound === "no"]]),
+    ...([["מאושר לשימוש בפיתוח למרות חריגה", payload.deviationActions.developmentUse], ["נדרש תיקון/עיבוד חוזר", payload.deviationActions.rework], ["להחזיר לספק", payload.deviationActions.returnToSupplier], ["נפתחה אי-התאמה", payload.deviationActions.nonconformityOpened]] as Array<[string, boolean]>).map(item => choices([item])),
+    "מספר אי-התאמה: " + payload.nonconformityNumber,
+  ].join("\n");
+  await form.table([[{ text: statuses.map(([text, status]) => choices([[text, payload.finalStatus === status]])).join("\n"), align: "right" }, { text: deviations, align: "right" }]], [1, 1]);
+  await form.table([[{ text: "פירוט אחר: " + payload.otherStatusDetails, align: "right" }, { text: "פירוט שיפור תכן: " + payload.designImprovementDetails, align: "right" }]], [1, 1]);
   await form.section("הצהרה");
-  await form.table([["הפריט נבדק ואושר לשימוש במסגרת פעילויות פיתוח בלבד, בהתאם לסטטוס ולמגבלות המפורטים בטופס זה. אין באישור זה כדי להוות שחרור לייצור סדרתי, להתקנה במוצר משוחרר, למסירה ללקוח או לשימוש מבצעי."]], [1]);
+  await form.table([[{ text: "הפריט נבדק ואושר לשימוש במסגרת פעילויות פיתוח בלבד, בהתאם לסטטוס ולמגבלות המפורטים בטופס זה. אין באישור זה כדי להוות שחרור לייצור סדרתי, להתקנה במוצר משוחרר, למסירה ללקוח או לשימוש מבצעי.", align: "right" }]], [1]);
+  form.ensureSpace(90);
   await form.section("חתימות");
   await form.table([
     [{ text: "", image: payload.checkedBySignature }, formatDate(payload.checkedByDate), payload.checkedByName, "נבדק ע״י"],

@@ -66,7 +66,7 @@ export function EcoForm({ catalogItems, draftScope = "" }: { catalogItems: Catal
     try {
       const response = await fetch(`/api/forms/eco/${mode === "save" ? "save" : "export"}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(mode === "save" ? { payload: form, archiveId } : form) });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? "לא ניתן להפיק את הטופס");
-      if (mode === "save") { await editor.clearDraft().catch(() => toast.warning("הטופס נשמר במערכת, אך הטיוטה המקומית לא הוסרה")); toast.success("טופס ECO נשמר בהצלחה במאגר הטפסים"); router.push("/forms"); router.refresh(); }
+      if (mode === "save") { const result = await response.json(); if (result.emailStatus === "failed" || result.emailStatus === "partial") toast.warning("הטופס נשמר, אך ההתראה לא נשלחה לשני הנמענים"); await editor.clearDraft().catch(() => toast.warning("הטופס נשמר במערכת, אך הטיוטה המקומית לא הוסרה")); toast.success("טופס ECO נשמר בהצלחה במאגר הטפסים"); router.push("/forms"); router.refresh(); }
       else { const url = URL.createObjectURL(await response.blob()); const anchor = document.createElement("a"); anchor.href = url; anchor.download = buildQualityFormDownloadName(`ECO-${form.formNumber || form.products[0].catalogNumber || "חדש"}`, "pdf"); anchor.click(); URL.revokeObjectURL(url); toast.success("טופס ECO הורד בהצלחה"); }
     } catch (error) { toast.error(error instanceof Error ? error.message : "הפעולה נכשלה"); } finally { setBusy(null); }
   }

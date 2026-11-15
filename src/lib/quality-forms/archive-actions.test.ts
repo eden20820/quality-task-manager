@@ -6,12 +6,14 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(), archive: vi.fn(), alerts: vi.fn(), pdf: vi.fn(), removeFile: vi.fn(),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
-vi.mock("@/lib/quality-forms/form-archive-server", () => ({ archiveQualityFormExport: mocks.archive }));
+vi.mock("@/lib/quality-forms/form-archive-server", () => ({ archiveQualityFormExport: mocks.archive, FormArchiveError: class extends Error { constructor(message: string, readonly status = 409) { super(message); } } }));
 vi.mock("@/lib/email/adhesion-leak-test", () => ({ sendAdhesionLeakTestAlerts: mocks.alerts }));
 vi.mock("@/lib/quality-forms/adhesion-leak-test-pdf", () => ({ buildAdhesionLeakTestPdf: mocks.pdf }));
 
 import { POST } from "../../app/api/forms/adhesion-leak-test/save/route";
 import { DELETE } from "../../app/api/forms/archive/[id]/route";
+import { POST as archiveManually } from "../../app/api/forms/archive/[id]/route";
+import { FormArchiveError } from "./form-archive-server";
 
 const id = "00000000-0000-4000-8000-000000000099";
 const pending = buildArchivedFormDescription(ADHESION_LEAK_TEST_FORM_TITLE, "pending-signature");
@@ -26,7 +28,7 @@ function fakeClient() {
     maybeSingle: vi.fn(async () => ({ data: record, error: null })),
     then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: deleteRows, error: deleteError }).then(resolve),
   };
-  return { auth: { getClaims: vi.fn(async () => ({ data: { claims: { sub: "user" } } })) }, from: vi.fn(() => chain), storage: { from: vi.fn(() => ({ remove: mocks.removeFile })) } };
+  return { auth: { getClaims: vi.fn(async () => ({ data: { claims: { sub: "user" } } })) }, from: vi.fn(() => chain), storage: { from: vi.fn(() => ({ remove: mocks.removeFile, download: vi.fn(async () => ({ data: new Blob(["pdf"]), error: null })) })) } };
 }
 
 beforeEach(() => {
@@ -34,7 +36,7 @@ beforeEach(() => {
   record = { id, description: pending, storage_path: "user/form-exports/sample.pdf" };
   deleteRows = [{ id }]; deleteError = null;
   client = fakeClient(); mocks.createClient.mockResolvedValue(client);
-  mocks.archive.mockResolvedValue({ fileName: "form.pdf" });
+  mocks.archive.mockResolvedValue({ fileName: "form.pdf", formStatus: "pending-signature", emailStatus: "sent", record: { id: "new" } });
   mocks.pdf.mockResolvedValue(Buffer.from("pdf"));
   mocks.alerts.mockResolvedValue([{ status: "sent" }]);
   mocks.removeFile.mockResolvedValue({ error: null });
@@ -48,20 +50,35 @@ function remove() { return DELETE(new Request(`http://localhost/api/forms/archiv
 describe("archive completion notifications", () => {
   it("sends initial notifications for new forms", async () => {
     expect((await save()).status).toBe(200);
-    expect(mocks.alerts).toHaveBeenCalledTimes(1);
+    expect(mocks.archive).toHaveBeenCalledWith(expect.objectContaining({ archiveId: null, formStatus: "pending-signature" }));
   });
   it("saves reopened forms without sending another email", async () => {
     const response = await save(id);
     expect(response.status).toBe(200);
-    expect((await response.json()).emailStatus).toBe("skipped");
+    expect(mocks.archive).toHaveBeenCalledWith(expect.objectContaining({ archiveId: id }));
     expect(mocks.archive).toHaveBeenCalledTimes(1);
     expect(mocks.alerts).not.toHaveBeenCalled();
   });
   it("rejects missing or inaccessible source forms before saving", async () => {
     record = null;
+    mocks.archive.mockRejectedValue(new FormArchiveError("Not accessible", 404));
     expect((await save(id)).status).toBe(404);
-    expect(mocks.archive).not.toHaveBeenCalled();
+    expect(mocks.archive).toHaveBeenCalledTimes(1);
     expect(mocks.alerts).not.toHaveBeenCalled();
+  });
+});
+
+describe("manual archive without signature", () => {
+  const request = () => archiveManually(new Request(`http://localhost/api/forms/archive/${id}`, { method: "POST", body: JSON.stringify({ action: "archive-without-signature" }) }), { params: Promise.resolve({ id }) });
+  it("moves the file unchanged using archived rather than falsely signed status", async () => {
+    Object.assign(record!, { file_name: "supplier_2026-11-12_TEST.pdf", mime_type: "application/pdf", file_size: 3 });
+    expect((await request()).status).toBe(200);
+    expect(mocks.archive).toHaveBeenCalledWith(expect.objectContaining({ formStatus: "archived", archiveId: id, bytes: new TextEncoder().encode("pdf") }));
+    expect(mocks.alerts).not.toHaveBeenCalled();
+  });
+  it("rejects a form which is no longer pending", async () => {
+    record!.description = buildArchivedFormDescription(ADHESION_LEAK_TEST_FORM_TITLE, "signed");
+    expect((await request()).status).toBe(409); expect(mocks.archive).not.toHaveBeenCalled();
   });
 });
 

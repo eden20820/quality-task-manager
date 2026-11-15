@@ -54,7 +54,7 @@ describe("David 12 export typography", () => {
       const operators = streams.filter((stream): stream is PDFRawStream => stream instanceof PDFRawStream).map(stream => Buffer.from(decodePDFRawStream(stream).decode()).toString()).join("\n");
       const sizes = Array.from(operators.matchAll(/\/[^\s]+\s+([\d.]+)\s+Tf/g), match => Number(match[1]));
       expect(sizes.length).toBeGreaterThan(0);
-      expect(new Set(sizes)).toEqual(new Set([12]));
+      expect(new Set(sizes)).toEqual(new Set(kind === "development" ? [12, 19] : [12]));
     }
   });
   it("paginates long values without losing editable content", async () => {
