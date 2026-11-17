@@ -3,18 +3,12 @@
 import { FolderSearch } from "lucide-react";
 import { useMemo } from "react";
 
-import { entrySearchScore, isSupplierSearchMatch, normalizeSupplierName, type SupplierBinderDirectoryEntry } from "@/lib/supplier-binders";
+import type { SupplierBinderDirectoryEntry } from "@/lib/supplier-binders";
+import { findSupplierBinderMatches } from "@/lib/quality-forms/supplier-binder-matches";
 
 export function SupplierBinderNotice({ supplierName, directory }: { supplierName: string; directory: SupplierBinderDirectoryEntry[] }) {
   const matches = useMemo(() => {
-    if (normalizeSupplierName(supplierName).length < 2) return [];
-    const matching = directory
-      .filter((entry) => isSupplierSearchMatch(supplierName, entry))
-      .map((entry) => ({ ...entry, score: entrySearchScore(supplierName, entry) }))
-      .sort((left, right) => right.score - left.score);
-    if (!matching.length) return [];
-    const bestScore = matching[0].score;
-    return matching.filter((entry) => entry.score >= bestScore - 4).slice(0, 4);
+    return findSupplierBinderMatches(supplierName, directory);
   }, [directory, supplierName]);
 
   if (!matches.length) return null;
