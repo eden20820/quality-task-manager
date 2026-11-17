@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { buildRirWorkbook } from "@/lib/quality-forms/rir-excel";
+import { loadSupplierBinderDirectory } from "@/lib/quality-forms/supplier-binder-directory";
+import { findSupplierBinderMatches } from "@/lib/quality-forms/supplier-binder-matches";
 import { archiveQualityFormExport } from "@/lib/quality-forms/form-archive-server";
 import type { RirFormPayload } from "@/lib/quality-forms/rir";
 import { createClient } from "@/lib/supabase/server";
@@ -43,7 +45,10 @@ export async function POST(request: Request) {
         drawingRevision: payload.details.drawingRevision.trim() || "01",
       },
     };
-    const workbook = await buildRirWorkbook(normalizedPayload);
+    const directory = await loadSupplierBinderDirectory({ allowFallback: false });
+    const supplierBinderLabels = findSupplierBinderMatches(normalizedPayload.details.supplierName, directory)
+      .map((entry) => entry.binderLabel);
+    const workbook = await buildRirWorkbook(normalizedPayload, { supplierBinderLabels });
     workbook.eachSheet((worksheet) => {
       worksheet.eachRow((row) => {
         row.eachCell((cell) => {
