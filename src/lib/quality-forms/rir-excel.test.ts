@@ -47,35 +47,15 @@ function examplePayload(): RirFormPayload {
 }
 
 describe("RIR Excel export", () => {
-  it("prints deduplicated binder locations near the top without shifting results or import", async () => {
-    const source = examplePayload();
-    const workbook = await buildRirWorkbook(source, { supplierBinderLabels: ["IV-B", "IV-B", "VI-B"] });
-    const sheet = workbook.getWorksheet("RIR")!;
-    expect(sheet.getCell("A9").value).toBe("קלסר ספק");
-    expect(sheet.getCell("B9").value).toBe("קלסר IV-B · קלסר VI-B");
-    expect(sheet.getCell("B9").alignment.readingOrder).toBe("rtl");
-    expect(sheet.getCell("D16").value).toBe(10);
-    expect(sheet.getCell("D19").value).toMatchObject({ formula: expect.stringContaining("MAX") });
-    const restored = await parseRirWorkbook(Buffer.from(await workbook.xlsx.writeBuffer()));
-    expect(restored.details.supplierName).toBe(source.details.supplierName);
-    expect(restored.rows[0].values).toEqual(["10.00", "3.2"]);
-  });
-
-  it("shows an explicit unassigned location, also for a VIS-only form", async () => {
-    const source = examplePayload();
-    source.attributes = [];
-    source.rows = source.rows.map((row) => ({ ...row, values: [] }));
-    source.includeFunctional = false;
-    const workbook = await buildRirWorkbook(source);
-    expect(workbook.getWorksheet("RIR")!.getCell("B9").value).toBe("לא נמצא שיוך לקלסר");
-  });
-
   it("creates a downloadable workbook with values, formulas and the inspection decision", async () => {
     const workbook = await buildRirWorkbook(examplePayload());
     const worksheet = workbook.getWorksheet("RIR");
     expect(worksheet?.getCell("A1").value).toBe("Receiving Inspection Report (RIR)");
     expect(worksheet?.getCell("C2").value).toBe("Rev.: 00");
     expect(worksheet?.getCell("B3").value).toBe("CAT-100");
+    // Supplier binder location stays in the website notice, not the exported form.
+    expect(worksheet?.getCell("A9").value).toBeNull();
+    expect(worksheet?.getCell("B9").value).toBeNull();
     expect(worksheet?.getCell("E5").value).toBe("N/A");
     expect(worksheet?.getCell("E6").value).toBe("00");
     expect(worksheet?.getCell("D16").value).toBe(10);

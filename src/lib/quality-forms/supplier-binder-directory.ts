@@ -11,7 +11,7 @@ function fallbackDirectory(): SupplierBinderDirectoryEntry[] {
   })));
 }
 
-export async function loadSupplierBinderDirectory(options: { allowFallback?: boolean } = {}): Promise<SupplierBinderDirectoryEntry[]> {
+export async function loadSupplierBinderDirectory(): Promise<SupplierBinderDirectoryEntry[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("supplier_binders")
@@ -20,7 +20,6 @@ export async function loadSupplierBinderDirectory(options: { allowFallback?: boo
     .order("sort_order", { referencedTable: "supplier_binder_entries" });
 
   if (error) {
-    if (options.allowFallback === false) throw new Error("Supplier binder directory could not be loaded");
     if (error.code !== "42P01") console.error("Load supplier binder directory failed", error);
     return fallbackDirectory();
   }

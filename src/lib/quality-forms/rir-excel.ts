@@ -73,7 +73,7 @@ function ncDecisionLabel(value: RirFormPayload["approval"]["ncDecision"]) {
   return { "": "", accept: "Accept", reject: "Reject", rework: "Rework" }[value];
 }
 
-export async function buildRirWorkbook(payload: RirFormPayload, options: { supplierBinderLabels?: string[] } = {}) {
+export async function buildRirWorkbook(payload: RirFormPayload) {
   const { Workbook } = await import("exceljs");
   const workbook = new Workbook();
   workbook.creator = "Quality Task Manager";
@@ -170,14 +170,6 @@ export async function buildRirWorkbook(payload: RirFormPayload, options: { suppl
   worksheet.mergeCells(8, 2, 8, lastColumn);
   worksheet.getCell(8, 2).value = valueOrNA(payload.details.comments);
   worksheet.getRow(8).height = 34;
-  // Reuse the existing spacer row: measurement cells and formulas never move.
-  const binderLabels = [...new Set((options.supplierBinderLabels ?? []).map((label) => label.trim()).filter(Boolean))];
-  worksheet.getCell(9, 1).value = "קלסר ספק";
-  worksheet.mergeCells(9, 2, 9, lastColumn);
-  worksheet.getCell(9, 2).value = binderLabels.length
-    ? binderLabels.map((label) => `קלסר ${label}`).join(" · ")
-    : "לא נמצא שיוך לקלסר";
-  worksheet.getRow(9).height = Math.max(24, Math.ceil(binderLabels.join(" · ").length / 65) * 15 + 10);
   worksheet.getCell(10, 1).value = "Sample Size";
   worksheet.getCell(10, 2).value = payload.sampleSize;
   worksheet.getCell(10, 3).value = "Test Columns";
@@ -373,7 +365,7 @@ export async function buildRirWorkbook(payload: RirFormPayload, options: { suppl
       };
     }
   }
-  for (let row = 3; row <= 9; row += 1) {
+  for (let row = 3; row <= 8; row += 1) {
     worksheet.getCell(row, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: slate } };
     worksheet.getCell(row, 1).font = { name: "Arial", size: 10, bold: true };
     if (row <= 6) {
@@ -381,7 +373,6 @@ export async function buildRirWorkbook(payload: RirFormPayload, options: { suppl
       worksheet.getCell(row, middleColumn + 1).font = { name: "Arial", size: 10, bold: true };
     }
   }
-  worksheet.getCell(9, 2).alignment = { vertical: "middle", horizontal: "center", wrapText: true, readingOrder: "rtl" };
   worksheet.getRow(10).height = 24;
   for (const column of [1, 3]) {
     worksheet.getCell(10, column).fill = { type: "pattern", pattern: "solid", fgColor: { argb: slate } };
