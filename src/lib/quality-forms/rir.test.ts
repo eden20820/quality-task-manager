@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { automaticApprovedPartCounts, drawingNumberForCatalog, evaluateMeasurementFormula, formatMeasurementForEquipment, isCaliperEquipment, measurementState, resizeMeasurementRows, resolveMeasurementInput, sampleSizeForReceivedQuantity, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
+import { automaticApprovedPartCounts, drawingNumberForCatalog, evaluateMeasurementFormula, fillEmptyMeasurementsInColumn, formatMeasurementForEquipment, isCaliperEquipment, measurementState, resizeMeasurementRows, resolveMeasurementInput, sampleSizeForReceivedQuantity, sampleStandardDeviation, summarizeMeasurementColumn, summarizePassFail } from "./rir";
 
 describe("RIR calculations", () => {
   it("formats Caliper measurements with exactly two decimal places", () => {
@@ -43,6 +43,23 @@ describe("RIR calculations", () => {
     expect(resized).toHaveLength(3);
     expect(resized[0]).toMatchObject({ specimen: 1, values: ["10"], visual: "Pass" });
     expect(resized[2]).toMatchObject({ specimen: 3, values: [""], visual: "" });
+  });
+
+  it("fills only empty cells with random values inside the configured column range", () => {
+    const rows = resizeMeasurementRows([], 4, 2);
+    rows[1].values[0] = "2.50";
+    rows[2].values[1] = "keep";
+    const randomValues = [0, 0.5, 0.999999];
+    const filled = fillEmptyMeasurementsInColumn(rows, 0, "2.45", "2.55", "Caliper", () => randomValues.shift() ?? 0);
+    expect(filled.map((row) => row.values[0])).toEqual(["2.45", "2.50", "2.50", "2.55"]);
+    expect(filled[2].values[1]).toBe("keep");
+    expect(filled.every((row) => Number(row.values[0]) >= 2.45 && Number(row.values[0]) <= 2.55)).toBe(true);
+  });
+
+  it("keeps the measurements unchanged when the limits are missing or reversed", () => {
+    const rows = resizeMeasurementRows([], 2, 1);
+    expect(fillEmptyMeasurementsInColumn(rows, 0, "", "2.55", "Caliper")).toBe(rows);
+    expect(fillEmptyMeasurementsInColumn(rows, 0, "3", "2", "Caliper")).toBe(rows);
   });
 
   it("matches the Excel sample standard deviation calculation", () => {
