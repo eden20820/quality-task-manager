@@ -193,6 +193,46 @@ export function resizeMeasurementRows(
   });
 }
 
+function decimalPlaces(value: string) {
+  const normalized = value.trim().replace(",", ".");
+  const decimal = normalized.split(".")[1];
+  return decimal ? Math.min(decimal.length, 6) : 0;
+}
+
+export function fillEmptyMeasurementsInColumn(
+  rows: RirMeasurementRow[],
+  index: number,
+  minimumText: string,
+  maximumText: string,
+  equipment: string,
+  random: () => number = Math.random,
+) {
+  const minimum = Number(minimumText);
+  const maximum = Number(maximumText);
+  if (!minimumText.trim() || !maximumText.trim() || !Number.isFinite(minimum) || !Number.isFinite(maximum) || minimum > maximum) return rows;
+
+  const precision = isCaliperEquipment(equipment)
+    ? 2
+    : Math.max(decimalPlaces(minimumText), decimalPlaces(maximumText));
+  const scale = 10 ** precision;
+  const tickTolerance = 1e-9;
+  const minimumTick = Math.ceil((minimum * scale) - tickTolerance);
+  const maximumTick = Math.floor((maximum * scale) + tickTolerance);
+  if (minimumTick > maximumTick) return rows;
+
+  let changed = false;
+  const filled = rows.map((row) => {
+    if ((row.values[index] ?? "").trim()) return row;
+    const boundedRandom = Math.min(0.9999999999999999, Math.max(0, random()));
+    const tick = minimumTick + Math.floor(boundedRandom * (maximumTick - minimumTick + 1));
+    const values = [...row.values];
+    values[index] = (tick / scale).toFixed(precision);
+    changed = true;
+    return { ...row, values };
+  });
+  return changed ? filled : rows;
+}
+
 function numericValues(rows: RirMeasurementRow[], index: number) {
   return rows.flatMap((row) => {
     const value = row.values[index]?.trim();
