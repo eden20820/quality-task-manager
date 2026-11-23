@@ -21,6 +21,7 @@ export async function archiveQualityFormExport(input: {
   formTitle: string;
   formStatus?: QualityFormStatus;
   archiveId?: string | null;
+  recheckPendingOnEdit?: boolean;
 }) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -35,7 +36,8 @@ export async function archiveQualityFormExport(input: {
     previous = source;
   }
   // Manual archive is not a signature and survives subsequent unsigned edits.
-  const formStatus = input.formStatus === "signed" ? "signed" : previous && parseArchivedFormDescription(previous.description).status === "archived" ? "archived" : input.formStatus;
+  const previousStatus = previous ? parseArchivedFormDescription(previous.description).status : undefined;
+  const formStatus = !input.recheckPendingOnEdit && input.formStatus !== "signed" && previousStatus === "archived" ? "archived" : input.formStatus;
 
   const fileName = buildQualityFormFileName(input);
   const storagePath = `${userId}/form-exports/${Date.now()}-${randomUUID()}.${input.extension.replace(/^\./, "").toLowerCase()}`;
@@ -76,7 +78,7 @@ export async function archiveQualityFormExport(input: {
     if (cleanup.error) console.error("Replaced archive storage cleanup failed", previous.id);
   }
   let emailStatus: FormEmailStatus = "skipped";
-  if (!previous && formStatus === "pending-signature") {
+  if (formStatus === "pending-signature" && (!previous || (input.recheckPendingOnEdit && previousStatus !== "pending-signature"))) {
     try { emailStatus = await sendPendingFormAlerts({ ...input, organizationId: record.organization_id }); }
     catch { emailStatus = "failed"; }
   }
