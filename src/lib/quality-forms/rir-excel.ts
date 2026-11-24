@@ -1,3 +1,4 @@
+import { UZI_RIR_APPROVER_DISPLAY } from "./form-approver";
 import {
   formatMeasurementForEquipment,
   isCaliperEquipment,
@@ -344,7 +345,7 @@ export async function buildRirWorkbook(payload: RirFormPayload) {
   worksheet.addImage(inspectorSignatureImageId, `${columnLetter(signatureValueColumn)}${decisionStart + 4}:${columnLetter(signatureValueColumn)}${decisionStart + 4}`);
 
   worksheet.getCell(decisionStart + 5, 1).value = "Reviewed and Approved by";
-  worksheet.getCell(decisionStart + 5, 2).value = "Uzi Barzilay";
+  worksheet.getCell(decisionStart + 5, 2).value = UZI_RIR_APPROVER_DISPLAY;
   worksheet.getCell(decisionStart + 5, dateValueColumn).value = displayDate(payload.approval.reviewDate);
   const approverSignatureImageId = workbook.addImage({
     base64: `data:image/png;base64,${UZI_BARZILAY_SIGNATURE_PNG_BASE64}`,

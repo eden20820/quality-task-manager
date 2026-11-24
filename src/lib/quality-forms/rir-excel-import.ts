@@ -1,3 +1,4 @@
+import { UZI_DISPLAY_NAME_EN, UZI_RIR_APPROVER_DISPLAY } from "./form-approver";
 import { formatMeasurementForEquipment, resizeMeasurementRows, type RirApproval, type RirFormPayload, type RirPassFail } from "./rir";
 
 type Worksheet = import("exceljs").Worksheet;
@@ -170,6 +171,7 @@ export async function parseRirWorkbook(data: Buffer | Uint8Array) {
   const rejectedParts = valueAfterLabel(worksheet, "Rejected Parts") || legacyParts[1] || "";
   const inspectorRow = findLabel(worksheet, "Inspector Name")?.fullAddress.row;
   const reviewerRow = findLabel(worksheet, "Reviewed and Approved by")?.fullAddress.row;
+  const reviewerName = reviewerRow ? valueAfterLabel(worksheet, "Reviewed and Approved by") : UZI_DISPLAY_NAME_EN;
   const approval: RirFormPayload["approval"] = {
     disposition: dispositionValue(valueAfterLabel(worksheet, "Disposition")),
     ncNumber: valueAfterLabel(worksheet, "NC No."),
@@ -179,7 +181,7 @@ export async function parseRirWorkbook(data: Buffer | Uint8Array) {
     rejectedParts,
     inspectorName: inspectorRow ? valueAfterLabel(worksheet, "Inspector Name") : "Eden Aharon",
     inspectionDate: inspectorRow ? isoDate(cellValue(worksheet.getCell(inspectorRow, Math.max(4, Math.floor(worksheet.columnCount / 2) + 1)))) : "",
-    reviewerName: reviewerRow ? valueAfterLabel(worksheet, "Reviewed and Approved by") : "Uzi Barzilay",
+    reviewerName: reviewerName === UZI_RIR_APPROVER_DISPLAY ? UZI_DISPLAY_NAME_EN : reviewerName,
     reviewDate: reviewerRow ? isoDate(cellValue(worksheet.getCell(reviewerRow, Math.max(4, Math.floor(worksheet.columnCount / 2) + 1)))) : "",
   };
 

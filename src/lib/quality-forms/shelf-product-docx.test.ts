@@ -68,7 +68,8 @@ describe("shelf product inspection DOCX", () => {
     expect(xml).not.toContain("שם הספק:");
     expect(xml).not.toContain("אישור לשימוש:");
     expect(plainText).toContain("תפקיד: QC");
-    expect(xml).toContain("תפקיד: משנה למנכ״ל");
+    expect(plainText).toContain("תפקיד: מנכ״ל");
+    expect(plainText).not.toContain("משנה למנכ״ל");
     expect(plainText).toContain("שם: Sergey Dror");
     expect(plainText).toContain("שם: Uzi Barzilay");
     expect(xml).not.toMatch(/\{\{[A-Z0-9_]+\}\}/);
