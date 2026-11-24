@@ -1,16 +1,37 @@
 import Link from "next/link";
-import { ArrowLeft, ClipboardCheck, FlaskConical, PackageCheck, ShieldCheck, FilePenLine } from "lucide-react";
+import { ClipboardCheck, FilePenLine, FlaskConical, PackageCheck, ShieldCheck } from "lucide-react";
 
 import { FormsNavigation } from "@/components/quality-forms/forms-navigation";
 
 const forms = [
-  { href: "/forms/eco", title: "טופס ECO", subtitle: "בקרת שינוי", description: "בקשת שינוי, מוצרים וגרסאות, השפעות, אישורים, פעולות נלוות וסגירת הטופס.", icon: FilePenLine, iconClass: "bg-indigo-50 text-indigo-700", hoverClass: "group-hover:bg-indigo-700" },
-  { href: "/forms/rir", title: "דוח ביקורת קבלה", subtitle: "Receiving Inspection Report (RIR)", description: "קליטת פרטי ספק ופריט, הגדרת מאפייני בדיקה, הזנת מדידות, בדיקות Pass/Fail וסיכום תוצאות אוטומטי.", icon: ClipboardCheck, iconClass: "bg-blue-50 text-blue-700", hoverClass: "group-hover:bg-blue-700" },
-  { href: "/forms/shelf-product-inspection", title: "ביקורת קבלה למוצר מדף", subtitle: "נספח 8.4.2.1.0", description: "פרטי מוצר וספק, מסמכים נלווים, ארבע בדיקות קבלה, אישור שימוש וחתימות קבועות.", icon: PackageCheck, iconClass: "bg-violet-50 text-violet-700", hoverClass: "group-hover:bg-violet-700" },
-  { href: "/forms/adhesion-leak-test", title: "בדיקת אטימות – הדבקה", subtitle: "נספח 8.4.2.4.0", description: "תיעוד פרטי ההדבקה, תנאי סביבה, שיטת בדיקה, תוצאות, החלטה וחתימות דיגיטליות.", icon: ShieldCheck, iconClass: "bg-cyan-50 text-cyan-700", hoverClass: "group-hover:bg-cyan-700" },
-  { href: "/forms/development-inspection", title: "ביקורת קבלה – מוצרי פיתוח", subtitle: "נספח 8.4.2.3.2", description: "בדיקת מסמכים, בדיקה ויזואלית, התאמה לשרטוט, תיעוד חריגות, החלטה וחתימות דיגיטליות.", icon: FlaskConical, iconClass: "bg-amber-50 text-amber-700", hoverClass: "group-hover:bg-amber-700" },
+  { href: "/forms/eco", title: "טופס ECO", icon: FilePenLine, iconClass: "bg-indigo-50 text-indigo-700" },
+  { href: "/forms/rir", title: "דוח ביקורת קבלה (RIR)", icon: ClipboardCheck, iconClass: "bg-blue-50 text-blue-700" },
+  { href: "/forms/shelf-product-inspection", title: "ביקורת קבלה למוצר מדף", icon: PackageCheck, iconClass: "bg-violet-50 text-violet-700" },
+  { href: "/forms/adhesion-leak-test", title: "בדיקת אטימות – הדבקה", icon: ShieldCheck, iconClass: "bg-cyan-50 text-cyan-700" },
+  { href: "/forms/development-inspection", title: "ביקורת קבלה – מוצרי פיתוח", icon: FlaskConical, iconClass: "bg-amber-50 text-amber-700" },
 ];
 
 export default function FormsPage() {
-  return <div className="space-y-6"><header><h1 className="text-3xl font-black tracking-tight sm:text-4xl">מילוי טפסים</h1></header><FormsNavigation active="fill" /><section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{forms.map((form) => { const Icon = form.icon; return <article key={form.href} className="group flex min-h-64 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg"><div className="flex items-start justify-between"><span className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${form.iconClass}`}><Icon className="h-6 w-6" /></span><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-extrabold text-emerald-700">זמין למילוי</span></div><div className="mt-5 flex-1"><h2 className="text-xl font-black">{form.title}</h2><p className="mt-1 text-sm font-bold text-slate-500">{form.subtitle}</p><p className="mt-4 text-sm leading-6 text-slate-600">{form.description}</p></div><Link href={form.href} className={`mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-extrabold text-white transition ${form.hoverClass}`}>פתיחת הטופס<ArrowLeft className="h-4 w-4" /></Link></article>; })}</section></div>;
+  return (
+    <div dir="rtl" className="space-y-5">
+      <header>
+        <h1 className="text-3xl font-black tracking-tight sm:text-4xl">מילוי טפסים</h1>
+      </header>
+      <FormsNavigation active="fill" />
+      <section aria-label="טפסים למילוי" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        {forms.map(({ href, title, icon: Icon, iconClass }, index) => (
+          <Link
+            key={href}
+            href={href}
+            className={`flex min-h-20 min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-950 transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${index < 3 ? "lg:col-span-2" : "lg:col-span-3"}`}
+          >
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${iconClass}`}>
+              <Icon aria-hidden="true" className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 text-start text-base font-extrabold leading-snug">{title}</span>
+          </Link>
+        ))}
+      </section>
+    </div>
+  );
 }
