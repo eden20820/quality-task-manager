@@ -18,17 +18,17 @@ export default function FormsPage() {
         <h1 className="text-3xl font-black tracking-tight sm:text-4xl">מילוי טפסים</h1>
       </header>
       <FormsNavigation active="fill" />
-      <section aria-label="טפסים למילוי" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        {forms.map(({ href, title, icon: Icon, iconClass }, index) => (
+      <section aria-label="טפסים למילוי" className="mx-auto flex max-w-[54rem] flex-wrap justify-center gap-3">
+        {forms.map(({ href, title, icon: Icon, iconClass }) => (
           <Link
             key={href}
             href={href}
-            className={`flex min-h-20 min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-950 transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${index < 3 ? "lg:col-span-2" : "lg:col-span-3"}`}
+            className="flex min-h-[4.25rem] w-full max-w-[17.5rem] items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 transition-colors hover:border-blue-300 hover:bg-blue-50/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           >
             <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${iconClass}`}>
               <Icon aria-hidden="true" className="h-5 w-5" />
             </span>
-            <span className="min-w-0 text-start text-base font-extrabold leading-snug">{title}</span>
+            <span className="min-w-0 text-center text-base font-extrabold leading-snug">{title}</span>
           </Link>
         ))}
       </section>
