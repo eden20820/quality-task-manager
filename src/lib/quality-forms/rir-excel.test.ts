@@ -72,7 +72,7 @@ describe("RIR Excel export", () => {
     expect(worksheet?.getCell("B31").value).toBe("1");
     expect(worksheet?.getCell("D31").value).toBe("Special Conditions");
     expect(worksheet?.getCell("B32").value).toBe("Sergey Dror");
-    expect(worksheet?.getCell("B33").value).toBe("Uzi Barzilay");
+    expect(worksheet?.getCell("B33").value).toBe("Uzi Barzilay\nמנכ״ל");
     expect(worksheet?.getImages()).toHaveLength(3);
     expect(worksheet?.getImages()[0]?.range).toMatchObject({ ext: { width: 61, height: 43 } });
 
@@ -88,6 +88,7 @@ describe("RIR Excel export", () => {
     expect(restored?.getCell("E30").value).toBe("49");
     expect(restored?.getCell("B31").value).toBe("1");
     expect(restored?.getCell("B32").value).toBe("Sergey Dror");
+    expect(restored?.getCell("B33").value).toBe("Uzi Barzilay\nמנכ״ל");
   });
 
   it("exports VIS and FUNC without measurement columns", async () => {
@@ -154,6 +155,9 @@ describe("RIR Excel export", () => {
     });
     expect(restored).toMatchObject({ sampleSize: 3, includeVisual: true, includeFunctional: true });
     expect(workbook.getWorksheet("_QTM_DATA")?.state).toBe("veryHidden");
+    workbook.removeWorksheet(workbook.getWorksheet("_QTM_DATA")!.id);
+    const restoredFromCells = await parseRirWorkbook(Buffer.from(await workbook.xlsx.writeBuffer()));
+    expect(restoredFromCells.approval.reviewerName).toBe("Uzi Barzilay");
   });
 
   it("loads older exported RIR files that do not contain metadata", async () => {

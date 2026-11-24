@@ -1,3 +1,4 @@
+import { UZI_DISPLAY_NAME_EN, UZI_FORM_TITLE } from "./form-approver";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -96,7 +97,7 @@ function signaturesTable(payload: ShelfProductInspectionPayload) {
   const inspectorSignature = payload.inspectorName === "Sergey Dror" ? SERGEY_DROR_SIGNATURE_PNG_BASE64 : EDEN_AHARON_SIGNATURE_PNG_BASE64;
   const signatureCell = (base64: string, include = true) => new TableCell({ width: { size: 20, type: WidthType.PERCENTAGE }, verticalAlign: VerticalAlign.CENTER, margins: { top: 15, bottom: 15, left: 40, right: 40 }, children: [include ? signatureImage(base64) : paragraph("")] });
   const heading = (text: string) => new TableRow({ children: [new TableCell({ columnSpan: 4, shading: { type: ShadingType.CLEAR, fill: "F2F2F2" }, children: [paragraph(text, { bold: true })] })] });
-  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [heading("נבדק על ידי"), new TableRow({ children: [signatureCell(inspectorSignature, payload.includeInspectorSignature !== false), cell(formatDate(payload.inspectorDate), 20), cell("תפקיד: QC", 25), cell(`שם: ${payload.inspectorName}`, 35)] }), heading("אושר על ידי"), new TableRow({ children: [signatureCell(UZI_BARZILAY_SIGNATURE_PNG_BASE64, payload.includeApproverSignature !== false), cell(formatDate(payload.approverDate), 20), cell("תפקיד: משנה למנכ״ל", 25), cell("שם: Uzi Barzilay", 35)] })] });
+  return new Table({ width: { size: 92, type: WidthType.PERCENTAGE }, alignment: AlignmentType.CENTER, layout: TableLayoutType.FIXED, borders, rows: [heading("נבדק על ידי"), new TableRow({ children: [signatureCell(inspectorSignature, payload.includeInspectorSignature !== false), cell(formatDate(payload.inspectorDate), 20), cell("תפקיד: QC", 25), cell(`שם: ${payload.inspectorName}`, 35)] }), heading("אושר על ידי"), new TableRow({ children: [signatureCell(UZI_BARZILAY_SIGNATURE_PNG_BASE64, payload.includeApproverSignature !== false), cell(formatDate(payload.approverDate), 20), cell(`תפקיד: ${UZI_FORM_TITLE}`, 25), cell(`שם: ${UZI_DISPLAY_NAME_EN}`, 35)] })] });
 }
 
 export async function buildShelfProductInspectionDocx(payload: ShelfProductInspectionPayload) {
